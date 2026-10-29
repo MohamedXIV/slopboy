@@ -57,3 +57,9 @@ jobs:
           test -f apps/web/out/play/star-patrol.html || test -f apps/web/out/play/star-patrol/index.html
           test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
           test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
+          test -f apps/web/out/sw.js
+          test -f apps/web/out/offline-build.json
+          test -f apps/web/out/manifest.webmanifest
+          test -f apps/web/out/icons/slopboy-192.png
+          test -f apps/web/out/icons/slopboy-512.png
+          grep -q '/cartridges/circuit-slide.slop' apps/web/out/sw.js

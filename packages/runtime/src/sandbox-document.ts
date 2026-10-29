@@ -9,8 +9,11 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
   let worker = null;
   let busy = false;
   let watchdog = 0;
+  let pendingSave;
+  let saveTimer = 0;
   const MAX_CODE = 65536;
   const MAX_PIXELS = 512 * 512;
+  const MAX_SAVE = 8192;
   const MAX_FRAME_MS = 1500;
   const VALID_BUTTONS = ['UP','DOWN','LEFT','RIGHT','A','B','START','SELECT'];
   const post = (type, extra={}) => parent.postMessage({scope:'slopboy-v1',key,type,...extra}, '*');
@@ -25,6 +28,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     let moduleGame=null;
     let width=0, height=0, shadeCount=0;
     let frame=null;
+    let storedSave=null;
     let down=new Set(), pressed=new Set();
     const clampShade = (shade) => {
       if (!Number.isInteger(shade) || shade < 0 || shade >= shadeCount) throw Error('Invalid pixel shade');
@@ -32,6 +36,18 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     };
     const api={
       input:{down:(k)=>down.has(k),pressed:(k)=>pressed.has(k)},
+      storage:{
+        load:()=>storedSave,
+        save:(value)=>{
+          if(typeof value!=='string' || new TextEncoder().encode(value).byteLength>8192)throw Error('Save exceeds hardware budget');
+          storedSave=value;
+          self.postMessage({type:'save',value});
+        },
+        erase:()=>{
+          storedSave=null;
+          self.postMessage({type:'save',value:null});
+        }
+      },
       screen:{
         clear:(shade=0)=>{frame.fill(clampShade(shade));},
         pixel:(x,y,shade)=>{
@@ -57,6 +73,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
         if(m?.type==='load' && !moduleGame){
           width=m.width;height=m.height;shadeCount=m.shades;
           if(!Number.isInteger(width)||width<1||width>512||!Number.isInteger(height)||height<1||height>512||!Number.isInteger(shadeCount)||shadeCount<1||shadeCount>256)throw Error('Bad hardware');
+          storedSave=typeof m.save==='string'?m.save:null;
           frame=new Uint8Array(width*height);
           const url=URL.createObjectURL(new Blob([m.code],{type:'text/javascript'}));
           try {
@@ -94,6 +111,18 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
           const data=e.data;
           if(data?.type==='ready'){clearTimeout(watchdog);post('ready');return;}
           if(data?.type==='error'){fail(data.reason||'Game crashed');return;}
+          if(data?.type==='save'){
+            if((data.value===null||typeof data.value==='string') &&
+              (data.value===null||new TextEncoder().encode(data.value).byteLength<=MAX_SAVE)){
+              pendingSave=data.value;
+              if(!saveTimer)saveTimer=setTimeout(()=>{
+                saveTimer=0;
+                const value=pendingSave;pendingSave=undefined;
+                if(value!==undefined)post('save',{value});
+              },300);
+            }
+            return;
+          }
           if(data?.type!=='frame'||!busy)return;
           const pixels=data.pixels;
           if(!(pixels instanceof Uint8Array)||pixels.length!==m.width*m.height){fail('Malformed frame');return;}
@@ -101,7 +130,8 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
           clearTimeout(watchdog);busy=false;
           post('frame',{pixels});
         };
-        worker.postMessage({type:'load',code:m.code,width:m.width,height:m.height,shades:m.shades});
+        const snapshot=(m.save===null||typeof m.save==='string'&&new TextEncoder().encode(m.save).byteLength<=MAX_SAVE)?m.save:null;
+        worker.postMessage({type:'load',code:m.code,width:m.width,height:m.height,shades:m.shades,save:snapshot});
         watchdog=setTimeout(()=>fail('Game initialization timeout'),MAX_FRAME_MS);
       }catch(e){fail(e?.message||e);}
     } else if(m.type==='tick' && key===m.key && worker && !busy){
@@ -112,7 +142,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       watchdog=setTimeout(()=>fail('Game frame timeout'),MAX_FRAME_MS);
       worker.postMessage({type:'tick',down:m.down,pressed:m.pressed,dt:m.dt});
     } else if(m.type==='stop' && key===m.key){
-      if(worker)worker.terminate();worker=null;clearTimeout(watchdog);busy=false;
+      if(worker)worker.terminate();worker=null;clearTimeout(watchdog);clearTimeout(saveTimer);busy=false;
     }
   });
   parent.postMessage({scope:'slopboy-v1',type:'boot'},'*');

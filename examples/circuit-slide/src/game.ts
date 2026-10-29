@@ -1,4 +1,4 @@
-import type { GameModule } from '@slopboy/sdk';
+import type { GameModule, GameContext } from '@slopboy/sdk';
 // Sliding 3x3 number puzzle. Arrows move the empty slot; A/Start reshuffles.
 const SIZE=3;
 let tiles:number[]=[1,2,3,4,5,6,7,8,0];
@@ -26,16 +26,30 @@ const scramble=()=>{
   }
   if(checkSolved())move(0,-1);
 };
+const remember=(ctx:GameContext)=>ctx.storage.save(JSON.stringify({version:1,tiles,seed}));
+const restore=(ctx:GameContext):boolean=>{
+  const text=ctx.storage.load();
+  if(!text)return false;
+  try {
+    const data=JSON.parse(text);
+    if(!data||data.version!==1||!Array.isArray(data.tiles)||data.tiles.length!==9)return false;
+    if(new Set(data.tiles).size!==9||data.tiles.some((v:unknown)=>!Number.isInteger(v)||(v as number)<0||(v as number)>8))return false;
+    if(!Number.isInteger(data.seed)||data.seed<0||data.seed>0xffffffff)return false;
+    tiles=[...data.tiles];blank=tiles.indexOf(0);seed=data.seed;solved=checkSolved();
+    return true;
+  }catch{return false;}
+};
 const game:GameModule={
-  init(){scramble();},
+  init(ctx){if(!restore(ctx)){scramble();remember(ctx);}},
   update(ctx){
-    if(ctx.input.pressed('A')||ctx.input.pressed('START')){scramble();return;}
+    if(ctx.input.pressed('A')||ctx.input.pressed('START')){scramble();remember(ctx);return;}
     if(solved)return;
-    if(ctx.input.pressed('UP'))move(0,-1);
-    else if(ctx.input.pressed('DOWN'))move(0,1);
-    else if(ctx.input.pressed('LEFT'))move(-1,0);
-    else if(ctx.input.pressed('RIGHT'))move(1,0);
-    solved=checkSolved();
+    let moved=false;
+    if(ctx.input.pressed('UP'))moved=move(0,-1);
+    else if(ctx.input.pressed('DOWN'))moved=move(0,1);
+    else if(ctx.input.pressed('LEFT'))moved=move(-1,0);
+    else if(ctx.input.pressed('RIGHT'))moved=move(1,0);
+    if(moved){solved=checkSolved();remember(ctx);}
   },
   draw(ctx){
     ctx.screen.clear(0);

@@ -32,3 +32,10 @@ The current browser sandbox has been probed on local headless Chromium for denie
 ## P2 curated catalog
 
 `pnpm cartridge:build` builds *every* approved game from `packages/catalog/src/index.ts` into `apps/web/public/cartridges`; `pnpm cartridge:verify` checks byte-identical output and rejects unlisted extra `.slop` files. `pnpm build` includes these cartridges in the static export and generates `/library`, `/play`, and each curated `/play/[game]` route. See [Creator quickstart](creator-quickstart.md) for manual AI/human authoring. Public uploads, coins, PWA offline capability, and achievement awards are *not* implemented by this catalog milestone.
+
+
+## Offline PWA + local save baseline
+
+`pnpm build` produces the complete Next static export and then generates an immutable-revision Service Worker (`apps/web/out/sw.js`) from the actual exported HTML, JS, CSS, icon and approved cartridge files. Installation precaches the three games. After visiting a deployed HTTPS build and allowing installation, the game routes can be opened without network; test offline browser navigation separately on Chrome/Firefox/Android before claiming device compatibility. Each change creates a new cache revision; only Slopboy caches are deleted. Never cache private API endpoints or account tokens.
+
+The Game SDK now exposes `context.storage.load()`, `save(value)`, and `erase()` to cartridges. The host owns IndexedDB, isolates slots by hardware ID/version and approved game ID, and rejects data over the current hardware `saveBytes` budget (8 KiB). Saves are *local, best-effort*, can be cleared by browser data settings, and are never authoritative for Slop Coins or public achievements. Circuit Slide is the initial restore/resume fixture. User account sync, export and full mobile/browser acceptance remain open.

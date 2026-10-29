@@ -5,16 +5,17 @@
   "version": "0.0.0",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": ">=22.16.0"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "pnpm cartridge:build && pnpm --filter @slopboy/web dev",
-    "build": "pnpm cartridge:build && pnpm --filter @slopboy/web build",
+    "build": "pnpm cartridge:build && pnpm --filter @slopboy/web build && pnpm offline:build",
     "lint": "pnpm --filter @slopboy/web lint",
     "typecheck": "pnpm --filter @slopboy/web typecheck && pnpm exec tsc --noEmit -p tsconfig.tools.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "cartridge:build": "node --experimental-strip-types tools/build-catalog.ts build",
-    "cartridge:verify": "node --experimental-strip-types tools/build-catalog.ts verify"
+    "cartridge:verify": "node --experimental-strip-types tools/build-catalog.ts verify",
+    "offline:build": "node --experimental-strip-types tools/build-offline.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
