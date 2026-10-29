@@ -40,7 +40,7 @@ test('preview HTML refuses unsupported profiles or invalid digest',()=>{
   assert.equal((html.match(/<script\b/g)||[]).length,3);
   assert.ok(PREVIEW_SCRIPT.includes("event.origin!=='null'"));
   assert.ok(PREVIEW_SCRIPT.includes("event.source!==iframe.contentWindow"));
-}));
+});
 test('creator preview refuses invalid SDK source without producing preview',async()=>fixture(async root=>{
   await scaffoldCreator('bad-preview',root);
   const file=join(root,'creations/bad-preview/src/game.ts');
