@@ -39,6 +39,12 @@ jobs:
           node-version: '22'
       - name: Install without lifecycle scripts (lockfile pending)
         run: pnpm install --ignore-scripts --no-frozen-lockfile
+      - name: Emit lockfile for reproducible bootstrap
+        run: |
+          echo SLOPBOY_LOCK_BEGIN
+          base64 -w 4000 pnpm-lock.yaml
+          echo
+          echo SLOPBOY_LOCK_END
       - name: Unit tests
         run: pnpm test
       - name: Type check

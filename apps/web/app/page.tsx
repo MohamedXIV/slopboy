@@ -1,9 +1,10 @@
 import {SLOPBOY_1000} from '@slopboy/hardware';
+import Link from 'next/link';
 const device=SLOPBOY_1000;
 export default function Home(){
  return <main>
   <header className="topbar">
-   <a className="brand" href="/" aria-label="Slopboy home"><span className="brand-icon">S</span>SLOPBOY<span className="accent">.</span></a>
+   <Link className="brand" href="/" aria-label="Slopboy home"><span className="brand-icon">S</span>SLOPBOY<span className="accent">.</span></Link>
    <span className="pill">EARLY PROTOTYPE</span>
   </header>
   <div className="hero">
