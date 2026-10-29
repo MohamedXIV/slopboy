@@ -1,12 +1,13 @@
-import {scaffoldCreator,checkCreator,buildCreator,verifyCreator,CreatorError} from './creator-kit.ts';
+import {scaffoldCreator,checkCreator,buildCreator,verifyCreator,previewCreator,CreatorError} from './creator-kit.ts';
 async function main(args:string[]):Promise<void>{
   const [cmd,id,...rest]=args;
-  if(rest.length||!id||!['new','check','build','verify'].includes(cmd||'')){
-    throw new CreatorError('USAGE','Use: pnpm creator:new|creator:check|creator:build|creator:verify <game-id>');
+  if(rest.length||!id||!['new','check','build','verify','preview'].includes(cmd||'')){
+    throw new CreatorError('USAGE','Use: pnpm creator:new|creator:check|creator:build|creator:verify|creator:preview <game-id>');
   }
   const result=cmd==='new'?await scaffoldCreator(id):
     cmd==='check'?await checkCreator(id):
-    cmd==='build'?await buildCreator(id):await verifyCreator(id);
+    cmd==='build'?await buildCreator(id):
+    cmd==='preview'?await previewCreator(id):await verifyCreator(id);
   console.log(JSON.stringify(result,null,2));
 }
 main(process.argv.slice(2)).catch(error=>{

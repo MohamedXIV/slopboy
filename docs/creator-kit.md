@@ -19,9 +19,13 @@ Edit those two files, then:
 pnpm creator:check my-first-game
 pnpm creator:build my-first-game
 pnpm creator:verify my-first-game
+pnpm creator:preview my-first-game
 ```
 
-The build writes `creations/my-first-game/dist/my-first-game.slop`, which is intentionally ignored by Git. Each command prints structured JSON to stdout (or a JSON error to stderr with a nonzero exit code), suitable for AI and CLI agents. `check` does not create an output file.
+The build writes `creations/my-first-game/dist/my-first-game.slop`, which is intentionally ignored by Git.
+`pnpm creator:preview my-first-game` generates `creations/my-first-game/dist/my-first-game.preview.html`. Open that HTML file locally in Chromium to play your game using **the same opaque iframe/Worker sandbox**, keyboard/touch controls, Console/Game Mode, and restart. No server, upload, model API or production catalog change is involved. You can regenerate the file after source edits; the tool validates and repackages before writing it. Preview saves are in-memory and last only until the preview page closes.
+
+The preview is a **local development convenience**, not a certification of untrusted JavaScript safety. Do not post the generated HTML on public web hosting. Browser acceptance is currently Chromium only; Firefox/WebKit and low-end mobile remain unverified. Each command prints structured JSON to stdout (or a JSON error to stderr with a nonzero exit code), suitable for AI and CLI agents. `check` does not create an output file.
 
 ## Hardware contract: Slopboy 1000 v0.1
 
@@ -33,7 +37,7 @@ The build writes `creations/my-first-game/dist/my-first-game.slop`, which is int
 - Only `import type {...} from '@slopboy/sdk'` is supported. No runtime packages, DOM, network, dynamic imports or eval.
 - `achievements` in the manifest are **definitions only**, not a way to award platform currency.
 
-The local validator performs manifest checks, AST screening, proper TypeScript semantic typechecking against the SDK, compressed package size checks, deterministic bundling and byte-identical verification. **It cannot prove JavaScript safe**, approve assets/content/IP, or run the game in a trustworthy environment. Preview and third-party public submissions remain disabled until the cross-browser security gate is met.
+The local validator performs manifest checks, AST screening, proper TypeScript semantic typechecking against the SDK, compressed package size checks, deterministic bundling and byte-identical verification. **It cannot prove JavaScript safe**, approve assets/content/IP, or run the game in a trustworthy environment. **Local standalone preview is now available**, but web-hosted public creator previews and third-party public submissions remain disabled until the cross-browser security gate is met.
 
 ## Use with any AI assistant
 

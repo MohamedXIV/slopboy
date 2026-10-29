@@ -5,6 +5,7 @@ import {resolve,join,relative,sep,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import ts from 'typescript';
 import {SLOPBOY_1000} from '../packages/hardware/src/index.ts';
+import {renderCreatorPreview} from './creator-preview.ts';
 import {compileGameSource,packCartridge,unpackCartridge,validateManifest,CartridgeError} from '../packages/cartridge/src/index.ts';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -138,6 +139,19 @@ export async function buildCreator(id:string,base=ROOT):Promise<CreatorReport>{
   try{await writeFile(temp,packed,{flag:'wx'});await rename(temp,p.output);}
   finally{await rm(temp,{force:true});}
   return report;
+}
+/** Generates a standalone local file. Never starts a server or publishes game code. */
+export async function previewCreator(id:string,base=ROOT):Promise<CreatorReport&{preview:string}>{
+  const {p,packed,report}=await prepare(id,base);
+  const html=renderCreatorPreview(unpackCartridge(packed),report.sha256);
+  const dest=join(dirname(p.output),id+'.preview.html');
+  await mkdir(dirname(dest),{recursive:true});
+  const temp=dest+'.partial-'+process.pid;
+  try{
+    await writeFile(temp,html,{flag:'wx'});
+    await rename(temp,dest);
+  }finally{await rm(temp,{force:true});}
+  return {...report,preview:relative(base,dest).split(sep).join('/')};
 }
 export async function verifyCreator(id:string,base=ROOT):Promise<CreatorReport>{
   const {p,packed,report}=await prepare(id,base);

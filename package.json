@@ -21,7 +21,9 @@
     "creator:check": "node --experimental-strip-types tools/creator-cli.ts check",
     "creator:build": "node --experimental-strip-types tools/creator-cli.ts build",
     "creator:verify": "node --experimental-strip-types tools/creator-cli.ts verify",
-    "security:browser": "node --experimental-strip-types tools/browser-security-smoke.ts"
+    "security:browser": "node --experimental-strip-types tools/browser-security-smoke.ts",
+    "creator:preview": "node --experimental-strip-types tools/creator-cli.ts preview",
+    "security:creator-preview": "node --experimental-strip-types tools/creator-preview-smoke.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
