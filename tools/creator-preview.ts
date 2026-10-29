@@ -23,7 +23,7 @@ export function renderCreatorPreview(cartridge:Cartridge,sha256:string):string{
   };
   // srcdoc inherits its parent's CSP. Permit only the *fixed* sandbox bootstrap
   // hash and Blob-backed Worker import, never arbitrary creator inline scripts.
-  const sandboxBootstrap=SANDBOX_DOCUMENT.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+  const sandboxBootstrap=SANDBOX_DOCUMENT.split('<script>')[1]?.split('</script>')[0];
   if(!sandboxBootstrap)throw Error('Missing trusted sandbox bootstrap');
   const csp=[
     "default-src 'none'",
