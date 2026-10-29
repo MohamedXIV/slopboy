@@ -18,7 +18,9 @@ const keyMap:Record<string,InputName>={
   Space:'A',KeyK:'B',KeyX:'B',ShiftLeft:'B',Enter:'START',Backspace:'SELECT'
 };
 
-undefined
+export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string}){
+  const selectedGame=getCatalogGame(gameId);
+  if(!selectedGame)throw Error('Unlisted cartridge: '+gameId);
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [mode,setMode]=useState<Mode>('console');
   const [status,setStatus]=useState<Status>('loading');
@@ -50,9 +52,14 @@ undefined
 
   useEffect(()=>{
     let active=true;
-    undefined.catch(error=>{if(active)updateStatus('error',String(error));});
+    loadBundledCartridge(selectedGame.cartridge,DEVICE).then(game=>{
+      if(game.manifest.id!==selectedGame.id)throw Error('Catalog identity mismatch');
+      if(active){setCartridge(game);updateStatus('booting');}
+    }).catch(error=>{if(active)updateStatus('error',String(error));});
     return ()=>{active=false;};
-undefined
+  },[selectedGame,updateStatus]);
+
+  useEffect(()=>{
     if(!cartridge)return;
     sessionKey.current=crypto.randomUUID();
     ready.current=false;
@@ -134,7 +141,7 @@ undefined
 
   return <section className="player-root" ref={wrapperRef}>
     <div className="player-toolbar">
-      <div><p className="player-kicker">NOW INSERTED · SLOPBOY 1000</p>undefined</div>
+      <div><p className="player-kicker">NOW INSERTED · SLOPBOY 1000</p><h1>{selectedGame.title.toUpperCase()}</h1></div>
       <div className="player-actions">
         <button type="button" onClick={()=>setMode(v=>v==='console'?'game':'console')}>{mode==='console'?'◱ Game mode':'▣ Console mode'}</button>
         <button type="button" onClick={switchFullscreen}>{fullscreen?'⤓ Exit fullscreen':'⛶ Fullscreen'}</button>
@@ -144,18 +151,24 @@ undefined
     <div className={'player-stage mode-'+mode}>
       <div className="handheld-shell">
         <div className="shell-header"><span>SLOPBOY <b>1000</b></span><span className="power-light" aria-label={status==='running'?'Power on':'Power off'} /></div>
-        <div className="screen-bezel"><div className="screen-border"><canvas width={DEVICE.display.width} height={DEVICE.display.height} ref={canvasRef} aria-label="Tiny Catcher game display" role="img" /></div><span className="screen-inscription">MONOCHROME / 4 SHADES</span></div>
+        <div className="screen-bezel"><div className="screen-border"><canvas width={DEVICE.display.width} height={DEVICE.display.height} ref={canvasRef} aria-label={selectedGame.title+" game display"} role="img" /></div><span className="screen-inscription">MONOCHROME / 4 SHADES</span></div>
         <div className="device-buttons"><div className="direction-pad">
           {button('UP','up','Move up')}{button('LEFT','left','Move left')}{button('RIGHT','right','Move right')}{button('DOWN','down','Move down')}
         </div><div className="face-buttons">{button('B','face-b','B button')}{button('A','face-a','A button')}</div></div>
         <div className="device-system-buttons">{button('SELECT','system','Select')}{button('START','system','Start')}<div className="speaker" aria-hidden="true">▰ ▰ ▰ ▰</div></div>
       </div>
       {mode==='game'&&<div className="game-touch-controls" aria-label="Game touch controls">
-        undefined
+        <div className="game-touch-direction">
+          {button('UP','touch dir-up','Up')}
+          {button('LEFT','touch dir-left','Left')}
+          {button('RIGHT','touch dir-right','Right')}
+          {button('DOWN','touch dir-down','Down')}
+        </div>
+        <div className="game-touch-actions">{button('B','touch','B')}{button('A','touch','A')}{button('START','touch touch-start','Start')}</div>
       </div>}
       {status!=='running'&&<div className="player-status" role="status"><strong>{status==='error'?'Game stopped':status==='loading'?'Loading cartridge…':'Starting sandbox…'}</strong>{reason&&<p>{reason}</p>}</div>}
     </div>
-    <div className="player-help">undefined<span><strong>Sandbox:</strong> opaque origin · no platform credentials · network blocked</span></div>
+    <div className="player-help"><span><strong>Controls:</strong> Arrow keys or WASD · Z/J/Space = A · X/K = B · Enter = Start</span><span><strong>Sandbox:</strong> opaque origin · no platform credentials · network blocked</span></div>
     {cartridge&&<iframe key={session} ref={iframeRef} sandbox="allow-scripts" referrerPolicy="no-referrer" title="Isolated game worker sandbox" srcDoc={SANDBOX_DOCUMENT} className="isolated-game-frame" tabIndex={-1} />}
   </section>;
 }
