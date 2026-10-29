@@ -8,14 +8,15 @@
     "node": "22.x"
   },
   "scripts": {
-    "dev": "pnpm cartridge:build && pnpm --filter @slopboy/web dev",
-    "build": "pnpm cartridge:build && pnpm --filter @slopboy/web build && pnpm offline:build",
+    "dev": "pnpm icons:build && pnpm cartridge:build && pnpm --filter @slopboy/web dev",
+    "build": "pnpm icons:build && pnpm cartridge:build && pnpm --filter @slopboy/web build && pnpm offline:build",
     "lint": "pnpm --filter @slopboy/web lint",
     "typecheck": "pnpm --filter @slopboy/web typecheck && pnpm exec tsc --noEmit -p tsconfig.tools.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "cartridge:build": "node --experimental-strip-types tools/build-catalog.ts build",
     "cartridge:verify": "node --experimental-strip-types tools/build-catalog.ts verify",
-    "offline:build": "node --experimental-strip-types tools/build-offline.ts"
+    "offline:build": "node --experimental-strip-types tools/build-offline.ts",
+    "icons:build": "node --experimental-strip-types tools/build-icons.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
