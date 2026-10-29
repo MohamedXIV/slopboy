@@ -50,6 +50,13 @@ async function run():Promise<void>{
     const sandbox=await evaluate("document.getElementById('game-sandbox').getAttribute('sandbox')");
     if(sandbox!=='allow-scripts')throw Error('Preview escalated iframe privileges');
     console.log('Creator Preview Chrome smoke: loaded, rendered, keyboard moved sprite, game mode, restart, opaque sandbox PASS');
-  }finally{chrome?.close();await rm(root,{recursive:true,force:true});}
+  }finally{
+    chrome?.close();
+    // Chrome writes its profile briefly after SIGTERM. Cleanup must never mask a
+    // real preview assertion failure, so use bounded retries and report warnings.
+    await sleep(500);
+    try{await rm(root,{recursive:true,force:true,maxRetries:20,retryDelay:150});}
+    catch(error){console.warn('Temporary Chrome profile cleanup failed:',error);}
+  }
 }
 run().catch(err=>{console.error(err);process.exitCode=1;});
