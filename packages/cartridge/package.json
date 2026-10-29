@@ -1,0 +1,1 @@
+{"name":"@slopboy/cartridge","version":"0.1.0","private":true,"type":"module","dependencies":{"@slopboy/hardware":"workspace:*","typescript":"^5.9.3"},"exports":{".":"./src/index.ts"}}

@@ -1,0 +1,22 @@
+# Development workflow
+
+**Node.js 22.16+** and **pnpm 10** required.
+
+```sh
+pnpm install
+pnpm test
+pnpm typecheck
+pnpm cartridge:build
+pnpm cartridge:verify
+pnpm dev
+```
+
+The Next.js app is initially a concept preview, not a playable emulator. Static export: `pnpm build` -> `apps/web/out`.
+
+The `.slop` prototype is a canonical JSON envelope compressed with deterministic gzip. It is a **v0 experimental file format**: manifest, compiled ES module and validated inline assets. Its source scan is NOT a JS sandbox. The CLI never executes a cartridge. **Do not execute public cartridge code until issue #4 passes the browser isolation/security gate.**
+
+Games can be built by humans or AI using the same SDK types. Only type-only imports from `@slopboy/sdk` are permitted; runtime dependencies are intentionally excluded. The validator enforces package bounds and known asset palettes but cannot prove arbitrary source is safe. Browser runtime enforcement will come in P1.
+
+A dependency lockfile could not be generated in the current sandbox (npm registry unavailable). Run `pnpm install` on a connected developer machine, commit `pnpm-lock.yaml`, then validate Next.js build, ESLint and TS separately. Avoid privileged or unreviewed contribution workflows.
+
+There is **no backend, identity, global coin balance, public publishing, or MCP connector yet**. No game is currently playable in the platform.
