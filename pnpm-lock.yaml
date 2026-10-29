@@ -20,6 +20,9 @@ importers:
       '@slopboy/hardware':
         specifier: workspace:*
         version: link:../../packages/hardware
+      '@slopboy/runtime':
+        specifier: workspace:*
+        version: link:../../packages/runtime
       next:
         specifier: ^16.0.0
         version: 16.4.3(@babel/core@7.29.7)(@types/node@22.20.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -62,6 +65,12 @@ importers:
         version: 5.9.3
 
   packages/hardware: {}
+
+  packages/runtime:
+    dependencies:
+      '@slopboy/hardware':
+        specifier: workspace:*
+        version: link:../hardware
 
   packages/sdk: {}
 
