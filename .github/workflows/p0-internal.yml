@@ -47,3 +47,8 @@ jobs:
         run: pnpm lint
       - name: Static export build
         run: pnpm build
+      - name: Verify playable build artifacts
+        run: |
+          pnpm cartridge:verify
+          test -f apps/web/out/cartridges/tiny-catcher.slop
+          test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
