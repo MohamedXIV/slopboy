@@ -1,0 +1,1 @@
+{"name":"@slopboy/runtime","version":"0.1.0","private":true,"type":"module","dependencies":{"@slopboy/hardware":"workspace:*"},"exports":{"./sandbox-document":"./src/sandbox-document.ts","./cartridge-browser":"./src/cartridge-browser.ts","./protocol":"./src/protocol.ts"}}

@@ -4,7 +4,7 @@
 
 Slopboy is a zero-budget-first, community-created fantasy handheld gaming platform. Each fictional console has its own display, controls, audio capabilities, and enforceable game limits. Games are portable cartridges built with one TypeScript SDK by people or AI assistants.
 
-> **Project status:** constitution and prototype planning. Slopboy is a codename, not a cleared brand. No playable runtime or production service exists yet.
+> **Project status:** constitution and prototype planning. Slopboy is a codename, not a cleared brand. A first curated play prototype is in development; no public submissions or production service exists yet.
 
 ## Product pillars
 
@@ -29,6 +29,6 @@ Next.js + React + TypeScript, Tailwind + shadcn/ui, pnpm monorepo, standalone Ty
 
 ## First milestone
 
-Run a separately packaged, validated demo cartridge on an original virtual console in both Console and Game modes, with keyboard/touch controls and no backend.
+Run a separately packaged, validated demo cartridge on an original virtual console in both Console and Game modes, with keyboard/touch controls and no backend. See `/play` after starting `pnpm dev`.
 
 This repository is at planning stage. See the roadmap before beginning implementation.

@@ -1,1 +1,23 @@
-{"name":"slopboy","private":true,"type":"module","version":"0.0.0","packageManager":"pnpm@10.20.0","engines":{"node":">=22.16.0"},"scripts":{"dev":"pnpm --filter @slopboy/web dev","build":"pnpm --filter @slopboy/web build","lint":"pnpm --filter @slopboy/web lint","typecheck":"pnpm --filter @slopboy/web typecheck && pnpm exec tsc --noEmit -p tsconfig.tools.json","test":"node --experimental-strip-types --test tests/*.test.ts","cartridge:build":"node --experimental-strip-types tools/cartridge-cli.ts build examples/tiny-catcher/manifest.json examples/tiny-catcher/src/game.ts examples/tiny-catcher/dist/tiny-catcher.slop","cartridge:verify":"node --experimental-strip-types tools/cartridge-cli.ts verify examples/tiny-catcher/dist/tiny-catcher.slop"},"devDependencies":{"@types/node":"^22.0.0","typescript":"^5.9.3"}}
+{
+  "name": "slopboy",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "scripts": {
+    "dev": "pnpm cartridge:build && pnpm --filter @slopboy/web dev",
+    "build": "pnpm cartridge:build && pnpm --filter @slopboy/web build",
+    "lint": "pnpm --filter @slopboy/web lint",
+    "typecheck": "pnpm --filter @slopboy/web typecheck && pnpm exec tsc --noEmit -p tsconfig.tools.json",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "cartridge:build": "node --experimental-strip-types tools/cartridge-cli.ts build examples/tiny-catcher/manifest.json examples/tiny-catcher/src/game.ts apps/web/public/cartridges/tiny-catcher.slop",
+    "cartridge:verify": "node --experimental-strip-types tools/cartridge-cli.ts verify apps/web/public/cartridges/tiny-catcher.slop"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3"
+  }
+}
