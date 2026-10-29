@@ -26,7 +26,10 @@ async function run():Promise<void>{
       if(status==='error')throw Error('Preview failed before first frame: '+await evaluate("document.getElementById('status')?.textContent"));
       await sleep(100);
     }
-    if(status!=='running')throw Error('Preview did not reach a playable state: '+String(status));
+    if(status!=='running'){
+      const details=await evaluate("JSON.stringify({title:document.getElementById('game-title')?.textContent, message:document.getElementById('status')?.textContent, error:document.body.dataset.previewError, iframeLength:document.getElementById('game-sandbox')?.srcdoc.length, ready:document.readyState, randomUUID:typeof crypto.randomUUID})");
+      throw Error('Preview did not reach a playable state: '+String(status)+'; '+String(details));
+    }
     const before=await evaluate("document.getElementById('screen').toDataURL()");
     await evaluate("window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowLeft',bubbles:true}));'down'");
     await sleep(700);
