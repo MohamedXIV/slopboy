@@ -14,7 +14,8 @@ const MAX_MANIFEST_BYTES=16*1024;
 const MAX_SOURCE_BYTES=128*1024;
 
 export class CreatorError extends Error{
-  constructor(readonly code:string, message:string){super(code+': '+message);this.name='CreatorError';}
+  readonly code:string;
+  constructor(code:string, message:string){super(code+': '+message);this.name='CreatorError';this.code=code;}
 }
 function checkedId(id:string):void{
   if(!ID.test(id)||id.length>64)throw new CreatorError('PROJECT_ID','Use 1–64 lowercase letters, digits and hyphens');
