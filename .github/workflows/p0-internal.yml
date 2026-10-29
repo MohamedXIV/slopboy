@@ -41,6 +41,8 @@ jobs:
         run: pnpm install --ignore-scripts --frozen-lockfile
       - name: Unit tests
         run: pnpm test
+      - name: Chromium sandbox isolation regression
+        run: pnpm security:browser
       - name: Creator Kit round-trip (no game execution)
         run: |
           pnpm creator:new ci-smoke
