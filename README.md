@@ -21,6 +21,7 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [Architecture & security](docs/architecture-and-security.md)
 - [Slopboy 1000 draft hardware contract](docs/hardware/slopboy-1000.md)
 - [Roadmap and acceptance gates](docs/roadmap.md)
+- [Development setup and P0 validation](docs/development.md)
 
 ## Proposed implementation
 
