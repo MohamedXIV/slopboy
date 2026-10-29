@@ -58,6 +58,7 @@ jobs:
           test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
           test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
           test -f apps/web/out/sw.js
+          node --check apps/web/out/sw.js
           test -f apps/web/out/offline-build.json
           test -f apps/web/out/manifest.webmanifest
           test -f apps/web/out/icons/slopboy-192.png
