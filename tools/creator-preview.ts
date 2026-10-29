@@ -21,9 +21,14 @@ export function renderCreatorPreview(cartridge:Cartridge,sha256:string):string{
     shades:hardware.display.indexedColors,saveBytes:hardware.budgets.saveBytes,
     sha256
   };
+  // srcdoc inherits its parent's CSP. Permit only the *fixed* sandbox bootstrap
+  // hash and Blob-backed Worker import, never arbitrary creator inline scripts.
+  const sandboxBootstrap=SANDBOX_DOCUMENT.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+  if(!sandboxBootstrap)throw Error('Missing trusted sandbox bootstrap');
   const csp=[
     "default-src 'none'",
-    "script-src 'sha256-"+hash(PREVIEW_SCRIPT)+"'",
+    "script-src 'sha256-"+hash(PREVIEW_SCRIPT)+"' 'sha256-"+hash(sandboxBootstrap)+"' blob:",
+    "worker-src blob:",
     "style-src 'sha256-"+hash(PREVIEW_CSS)+"'",
     "frame-src 'self' about:",
     "connect-src 'none'","img-src 'none'","form-action 'none'","base-uri 'none'","object-src 'none'"
