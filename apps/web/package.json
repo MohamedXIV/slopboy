@@ -14,7 +14,8 @@
     "next": "^16.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@slopboy/runtime": "workspace:*"
+    "@slopboy/runtime": "workspace:*",
+    "@slopboy/catalog": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

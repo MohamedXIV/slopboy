@@ -51,4 +51,9 @@ jobs:
         run: |
           pnpm cartridge:verify
           test -f apps/web/out/cartridges/tiny-catcher.slop
+          test -f apps/web/out/cartridges/star-patrol.slop
+          test -f apps/web/out/cartridges/circuit-slide.slop
+          test -f apps/web/out/library.html || test -f apps/web/out/library/index.html
+          test -f apps/web/out/play/star-patrol.html || test -f apps/web/out/play/star-patrol/index.html
+          test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
           test -f apps/web/out/play.html || test -f apps/web/out/play/index.html

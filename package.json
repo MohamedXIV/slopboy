@@ -13,8 +13,8 @@
     "lint": "pnpm --filter @slopboy/web lint",
     "typecheck": "pnpm --filter @slopboy/web typecheck && pnpm exec tsc --noEmit -p tsconfig.tools.json",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "cartridge:build": "node --experimental-strip-types tools/cartridge-cli.ts build examples/tiny-catcher/manifest.json examples/tiny-catcher/src/game.ts apps/web/public/cartridges/tiny-catcher.slop",
-    "cartridge:verify": "node --experimental-strip-types tools/cartridge-cli.ts verify apps/web/public/cartridges/tiny-catcher.slop"
+    "cartridge:build": "node --experimental-strip-types tools/build-catalog.ts build",
+    "cartridge:verify": "node --experimental-strip-types tools/build-catalog.ts verify"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

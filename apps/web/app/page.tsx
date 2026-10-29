@@ -12,8 +12,8 @@ export default function Home(){
     <p className="eyebrow">● THE IMAGINARY CONSOLE CLUB</p>
     <h1>Tiny hardware.<br/><span>Limitless ideas.</span></h1>
     <p className="description">Original virtual handhelds, real technical limitations and tiny worlds built by people or AI. A new home for games you can hold in your imagination.</p>
-    <div className="links"><Link className="primary" href="/play">Play Tiny Catcher ↗</Link><a className="secondary" href="https://github.com/MohamedXIV/slopboy">Follow development ↗</a></div>
-    <p className="disclaimer">P1 preview — one curated cartridge in an isolated sandbox; public uploads and account features are not enabled.</p>
+    <div className="links"><Link className="primary" href="/library">Explore 3 games ↗</Link><a className="secondary" href="https://github.com/MohamedXIV/slopboy">Follow development ↗</a></div>
+    <p className="disclaimer">P2 curated library preview — three independent cartridges; public uploads and account features are not enabled.</p>
    </section>
    <aside className="stage" aria-label="Illustration of an original imaginary console; controls are not interactive">
     <span className="stage-label">CONCEPT // MODEL 001</span>
@@ -33,7 +33,7 @@ export default function Home(){
    <div className="hardware-inner">
     <div className="section-heading"><div><p className="eyebrow">HARDWARE PROFILE / 001</p><h2>{device.id.toUpperCase()}</h2><p className="description">Every imaginary console has a versioned, testable hardware contract. These numbers are provisional until mobile testing.</p></div><span className="pill">SPEC v{device.version}</span></div>
     <div className="stats"><Spec label="DISPLAY" value={device.display.width+' × '+device.display.height} sub="Logical pixels"/><Spec label="PALETTE" value={device.display.indexedColors+' shades'} sub="Indexed LCD"/><Spec label="INPUT" value="D-Pad + A/B" sub="Start / Select"/><Spec label="CARTRIDGE" value="512 KiB" sub="Compressed budget"/></div>
-    <p className="footnote">P1 prototype: the independently packaged Tiny Catcher cartridge loads in an isolated Worker. Choose Console or Game mode on the play page. Public game submissions remain disabled.</p>
+    <p className="footnote">P2 prototype: three independently packaged games share one SDK and isolated Worker runtime. Visit the game library to choose a cartridge. Public submissions remain disabled.</p>
    </div>
   </section>
   <footer><span>© Slopboy — working title.</span><span>Open development · $0/month MVP target</span></footer>

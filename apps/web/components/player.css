@@ -48,3 +48,13 @@
 .player-root:fullscreen .player-stage{flex:1;min-height:0}
 @media (hover:hover) and (pointer:fine){.game-touch-controls{opacity:.45}.game-touch-controls:hover{opacity:1}}
 @media(max-width:620px){.player-root{padding:18px 8px}.player-stage{min-height:550px;padding:20px 12px}.handheld-shell{width:290px;padding:17px 20px 25px}.player-toolbar{padding:0 9px}.player-actions button{padding:9px;font-size:12px}.game-touch-controls .hardware-button{min-height:53px;min-width:53px}.player-help{padding:0 9px}}
+
+/* Expanded touch layout so puzzles requiring vertical movement work on mobile. */
+.game-touch-controls .game-touch-direction{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,50px);gap:2px}
+.game-touch-direction .dir-up{grid-column:2;grid-row:1}
+.game-touch-direction .dir-left{grid-column:1;grid-row:2}
+.game-touch-direction .dir-right{grid-column:3;grid-row:2}
+.game-touch-direction .dir-down{grid-column:2;grid-row:3}
+.game-touch-controls .game-touch-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.game-touch-controls .touch-start{font-size:10px;min-width:58px;min-height:42px;border-radius:20px}
+@media(max-width:620px){.game-touch-controls{gap:5px}.game-touch-controls .game-touch-direction{grid-template-columns:repeat(3,47px);grid-template-rows:repeat(3,43px)}.game-touch-controls .hardware-button{min-width:44px;min-height:44px}.game-touch-controls .game-touch-actions{gap:7px}}
