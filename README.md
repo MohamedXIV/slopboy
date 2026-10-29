@@ -40,3 +40,7 @@ Run `pnpm install && pnpm dev`, then open `/library` for the catalog or `/play/t
 ## Installable offline prototype
 
 The production static export includes a PWA manifest, icons and a versioned offline Service Worker which precaches all curated games. Install through the browser's app menu after opening the online site. Circuit Slide persists its puzzle to a per-game 8 KiB IndexedDB slot. No backend, global achievements, trusted coins or public user uploads. See [offline and saves instructions](docs/development.md).
+
+## Creator Kit (local only)
+
+Run `pnpm creator:new my-first-game`, edit the generated TypeScript source and manifest, then `pnpm creator:check my-first-game` and `pnpm creator:build my-first-game`. The tooling performs semantic SDK checks and deterministic packaging without executing creator game code. Follow [Creator Kit v0.1](docs/creator-kit.md) or the in-app `/create` page. **No general public game uploads or approved creator publishing workflow yet.**

@@ -1,24 +1,17 @@
-# Slopboy creator quickstart (manual path, **not public uploads**)
+# Slopboy creator quickstart
 
-The project currently ships **curated**, locally validated cartridges only. This is a reproducible authoring guide for developers and AI assistants, **not an upload or publication endpoint**. Follow [security notes](p1-runtime-security.md); an accepted cartridge is not automatically safe or licensed.
+The supported offline Creator Kit now has executable scaffolding, semantic TypeScript SDK checks and deterministic packaging. See the [complete Creator Kit guide](creator-kit.md).
 
-## Steps
+```sh
+pnpm install --frozen-lockfile --ignore-scripts
+pnpm creator:new my-first-game
+pnpm creator:check my-first-game
+pnpm creator:build my-first-game
+pnpm creator:verify my-first-game
+```
 
-1. Inspect `packages/sdk/src/index.ts`, `packages/hardware/src/index.ts` and one existing game in `examples/`.
-2. Create `examples/your-game/manifest.json` containing a unique `id`, `title`, a supported `hardware` ID/version, allowed `controls` and an `achievements` list (metadata only; no award system yet).
-3. Put your game in `examples/your-game/src/game.ts`. Export a `GameModule` as default. Type-only `@slopboy/sdk` imports are supported; external runtime imports, browser APIs and unrestricted dependencies are not.
-4. Run `pnpm test` to validate all curated games. You can use `node --experimental-strip-types tools/cartridge-cli.ts build <manifest> <game.ts> <output.slop>` to inspect a candidate package *without running its game code*.
-5. Publication is restricted: a maintainer must inspect source, rights, content, behavior, technical budget and browser isolation. Only after approval can a maintainer add the new game descriptor to `packages/catalog/src/index.ts` and publish via `pnpm cartridge:build`.
+These commands do not run the creator's game code and **do not publish** it to Slopboy. A successful check means the source conforms to available technical screens, not that it is safe, rights-cleared or ready for publication. Third-party public uploads and preview remain disabled pending the browser security gate [#4](https://github.com/MohamedXIV/slopboy/issues/4).
 
-The catalog is the **single source of truth** for approved game IDs, cartridge URLs, art metadata and build source paths. Do not add an arbitrary file browser, URL-based cartridge loader or user upload button: issue #4 has unresolved mobile and cross-browser security acceptance tests.
+**AI assistants:** Share the SDK and hardware contract with your model, have it edit only the new project's `manifest.json` and `src/game.ts`, then return the exact JSON diagnostics from `pnpm creator:check` for correction. This works without a paid AI API or an MCP connection. See `/create` on the web app for a copyable prompt.
 
-## AI prompt starter
-
-> Create an original game for Slopboy 1000 using only the supplied `GameModule` SDK contract and versioned Hardware Profile. Return a `manifest.json` and a typed `src/game.ts`, with no runtime imports, DOM/network APIs or external assets. Keep every drawing operation within the 4-shade palette, and provide brief manual gameplay test steps. Do not claim that tests or achievements have passed unless verified.
-
-## Publication gates
-
-- The automated validator and deterministic build must pass.
-- A human reviewer must inspect licensing/IP, age-appropriateness, controls, technical quality and security.
-- Publishing a library game must **not** involve running arbitrary unreviewed submission scripts in a privileged CI workflow.
-- MCP for ChatGPT/Claude, web uploads, creator identity and global coin grants are deferred.
+Publishing remains maintainer-reviewed: only reviewed source may be moved into the curated `examples/` + `packages/catalog/` flow, with explicit content, license, and security checks. Do not upload arbitrary `.slop` code to the public platform.

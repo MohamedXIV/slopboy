@@ -26,7 +26,7 @@ export default function LibraryPage(){
           </div>
         </article>)}
       </div>
-      <p className="library-notice">Curated demonstration games only. Public cartridge uploads, accounts and cloud achievements are not enabled.</p>
+      <p className="library-notice">Curated demonstration games only. <Link href="/create">Build a local cartridge with the Creator Kit</Link>. Public uploads, accounts and cloud achievements are not enabled.</p>
     </section>
   </main>;
 }

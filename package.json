@@ -16,7 +16,11 @@
     "cartridge:build": "node --experimental-strip-types tools/build-catalog.ts build",
     "cartridge:verify": "node --experimental-strip-types tools/build-catalog.ts verify",
     "offline:build": "node --experimental-strip-types tools/build-offline.ts",
-    "icons:build": "node --experimental-strip-types tools/build-icons.ts"
+    "icons:build": "node --experimental-strip-types tools/build-icons.ts",
+    "creator:new": "node --experimental-strip-types tools/creator-cli.ts new",
+    "creator:check": "node --experimental-strip-types tools/creator-cli.ts check",
+    "creator:build": "node --experimental-strip-types tools/creator-cli.ts build",
+    "creator:verify": "node --experimental-strip-types tools/creator-cli.ts verify"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

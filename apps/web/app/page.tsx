@@ -12,7 +12,7 @@ export default function Home(){
     <p className="eyebrow">● THE IMAGINARY CONSOLE CLUB</p>
     <h1>Tiny hardware.<br/><span>Limitless ideas.</span></h1>
     <p className="description">Original virtual handhelds, real technical limitations and tiny worlds built by people or AI. A new home for games you can hold in your imagination.</p>
-    <div className="links"><Link className="primary" href="/library">Explore 3 games ↗</Link><a className="secondary" href="https://github.com/MohamedXIV/slopboy">Follow development ↗</a></div>
+    <div className="links"><Link className="primary" href="/library">Explore 3 games ↗</Link><Link className="secondary" href="/create">Make a game ✦</Link><a className="secondary" href="https://github.com/MohamedXIV/slopboy">Follow development ↗</a></div>
     <p className="disclaimer">P2 curated library preview — three independent cartridges; public uploads and account features are not enabled.</p>
    </section>
    <aside className="stage" aria-label="Illustration of an original imaginary console; controls are not interactive">
