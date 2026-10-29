@@ -1,0 +1,30 @@
+.create-page{min-height:100vh;background:radial-gradient(circle at 50% 0%,#21383b,#0c1719 65%)}
+.creator-back{font-size:13px;color:#d5ecac;font-weight:800}
+.creator-main{max-width:1150px;margin:0 auto;padding:65px 26px 100px}
+.creator-main h1{font-size:clamp(38px,6vw,68px);letter-spacing:-3px;margin:20px 0}
+.creator-lead{max-width:850px;font-size:19px;line-height:1.6;color:#bdcfc9}
+.creator-note{border-left:4px solid #d6e997;background:#213638;border-radius:8px;padding:16px 20px;margin:28px 0 45px;color:#d7e6db;font-size:14px;line-height:1.65}
+.creator-note strong{display:block;color:#e4f5b6;margin-bottom:4px}
+.creator-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:34px;align-items:start}
+.creator-grid h2{font-size:24px;letter-spacing:-.5px;margin:0 0 16px}
+.creator-subtext{font-size:14px;line-height:1.75;color:#aebfbf}
+.creator-subtext a,.creator-footer a{color:#d5ec9a;text-decoration:underline;text-underline-offset:3px}
+.creator-subtext code{color:#c9e2ab}
+.creator-steps{display:grid;gap:12px;margin-top:24px}
+.creator-step{background:#1c3031;border:1px solid #354e4a;border-radius:14px;padding:19px}
+.creator-step strong{display:block;color:#dbeea9;font-size:13px}
+.creator-step code{display:block;margin:11px 0;padding:12px 14px;background:#111e20;color:#f3f5e0;border-radius:8px;white-space:normal;overflow-wrap:anywhere;font-size:13px}
+.creator-step p{font-size:13px;color:#adbdb7;margin:0;line-height:1.65}
+.creator-spec{background:#d8e6ba;border-radius:22px;padding:27px;color:#20372f;box-shadow:12px 12px 0 #304745}
+.creator-spec-overline{font-size:11px;font-weight:900;letter-spacing:1.5px}
+.creator-spec h2{font-size:25px;letter-spacing:-1px;margin:14px 0 26px}
+.creator-spec>div{display:flex;justify-content:space-between;gap:15px;padding:14px 0;border-top:1px solid #9fae98;font-size:13px}
+.creator-spec>div strong{text-align:right}
+.creator-prompt{margin-top:55px;background:#172829;border:1px solid #35504b;border-radius:20px;padding:24px}
+.creator-prompt-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.creator-prompt-heading strong{font-size:18px}
+.creator-prompt-heading button{cursor:pointer;border:0;background:#d6eba4;color:#17251e;border-radius:9px;padding:11px 15px;font-weight:800}
+.creator-prompt-heading button:focus-visible{outline:3px solid white;outline-offset:3px}
+.creator-prompt pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#b9cfc3;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;line-height:1.75;margin-top:22px}
+.creator-footer{margin-top:28px;color:#aabdb4;font-size:14px;line-height:1.7}
+@media(max-width:750px){.creator-main{padding:38px 17px 70px}.creator-grid{grid-template-columns:1fr}.creator-spec{box-shadow:none}.creator-lead{font-size:17px}.creator-main h1{letter-spacing:-1.8px}.creator-prompt{padding:18px}}

@@ -41,6 +41,12 @@ jobs:
         run: pnpm install --ignore-scripts --frozen-lockfile
       - name: Unit tests
         run: pnpm test
+      - name: Creator Kit round-trip (no game execution)
+        run: |
+          pnpm creator:new ci-smoke
+          pnpm creator:check ci-smoke
+          pnpm creator:build ci-smoke
+          pnpm creator:verify ci-smoke
       - name: Type check
         run: pnpm typecheck
       - name: Lint
@@ -57,6 +63,7 @@ jobs:
           test -f apps/web/out/play/star-patrol.html || test -f apps/web/out/play/star-patrol/index.html
           test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
           test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
+          test -f apps/web/out/create.html || test -f apps/web/out/create/index.html
           test -f apps/web/out/sw.js
           node --check apps/web/out/sw.js
           test -f apps/web/out/offline-build.json
