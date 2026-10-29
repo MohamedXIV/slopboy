@@ -7,6 +7,7 @@ import {getCatalogGame} from '@slopboy/catalog';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
 import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {LCD_PALETTE,rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
+import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
 import './player.css';
 
 const DEVICE=SLOPBOY_1000;
@@ -27,6 +28,9 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
   const [reason,setReason]=useState('');
   const [fullscreen,setFullscreen]=useState(false);
   const [session,setSession]=useState(0);
+  const [saveSnapshot,setSaveSnapshot]=useState<{session:number;value:string|null}|null>(null);
+  const saveWriterRef=useRef<Promise<void>>(Promise.resolve());
+  const lastSaveAt=useRef(0);
   const canvasRef=useRef<HTMLCanvasElement>(null);
   const iframeRef=useRef<HTMLIFrameElement>(null);
   const wrapperRef=useRef<HTMLDivElement>(null);
@@ -61,7 +65,19 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
 
   useEffect(()=>{
     if(!cartridge)return;
+    let active=true;
+    setSaveSnapshot(null);
+    const store=createSaveService(browserSaveDriver,DEVICE,selectedGame.id);
+    saveWriterRef.current.then(()=>store.read()).catch(()=>null).then(value=>{
+      if(active)setSaveSnapshot({session,value});
+    });
+    return ()=>{active=false;};
+  },[cartridge,selectedGame.id,session]);
+
+  useEffect(()=>{
+    if(!cartridge||!saveSnapshot||saveSnapshot.session!==session)return;
     sessionKey.current=crypto.randomUUID();
+    lastSaveAt.current=0;
     ready.current=false;
     lastTick.current=0;
     const receive=(event:MessageEvent)=>{
@@ -69,12 +85,24 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
       const data=event.data;
       if(!data || data.scope!=='slopboy-v1')return;
       if(data.type==='boot'){
-        post('load',{code:cartridge.code,width:DEVICE.display.width,height:DEVICE.display.height,shades:DEVICE.display.indexedColors});
+        post('load',{code:cartridge.code,width:DEVICE.display.width,height:DEVICE.display.height,shades:DEVICE.display.indexedColors,save:saveSnapshot.value});
         return;
       }
       if(data.key!==sessionKey.current)return;
       if(data.type==='ready'){ready.current=true;updateStatus('running');return;}
       if(data.type==='error'){ready.current=false;updateStatus('error',String(data.reason||'Game failed').slice(0,120));return;}
+      if(data.type==='save'&&ready.current){
+        if(!validSave(data.value,DEVICE)){
+          ready.current=false;post('stop');updateStatus('error','Invalid save request');return;
+        }
+        const now=Date.now();
+        if(now-lastSaveAt.current<250)return;
+        lastSaveAt.current=now;
+        const store=createSaveService(browserSaveDriver,DEVICE,selectedGame.id);
+        const value=data.value;
+        saveWriterRef.current=saveWriterRef.current.catch(()=>{}).then(()=>store.write(value)).catch(error=>console.warn('Local save unavailable:',error));
+        return;
+      }
       if(data.type==='frame' && ready.current){
         const pixels:unknown=data.pixels;
         if(!validateFrame(pixels,DEVICE.display.width,DEVICE.display.height,DEVICE.display.indexedColors)){
@@ -96,7 +124,7 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
     };
     animation=requestAnimationFrame(run);
     return ()=>{cancelAnimationFrame(animation);window.removeEventListener('message',receive);ready.current=false;post('stop');};
-  },[cartridge,session,post,updateStatus]);
+  },[cartridge,saveSnapshot,selectedGame.id,session,post,updateStatus]);
 
   useEffect(()=>{
     const down=(event:KeyboardEvent)=>{
@@ -134,6 +162,10 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
     if(!document.fullscreenElement) await wrapperRef.current?.requestFullscreen().catch(()=>{});
     else await document.exitFullscreen().catch(()=>{});
   };
+  const onSandboxLoad=()=>{
+    if(!cartridge||!saveSnapshot||saveSnapshot.session!==session)return;
+    post('load',{code:cartridge.code,width:DEVICE.display.width,height:DEVICE.display.height,shades:DEVICE.display.indexedColors,save:saveSnapshot.value});
+  };
   const restart=()=>{
     post('stop');ready.current=false;held.current.clear();pressed.current.clear();lastTick.current=0;
     updateStatus('booting');setSession(v=>v+1);
@@ -168,7 +200,7 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
       </div>}
       {status!=='running'&&<div className="player-status" role="status"><strong>{status==='error'?'Game stopped':status==='loading'?'Loading cartridge…':'Starting sandbox…'}</strong>{reason&&<p>{reason}</p>}</div>}
     </div>
-    <div className="player-help"><span><strong>Controls:</strong> Arrow keys or WASD · Z/J/Space = A · X/K = B · Enter = Start</span><span><strong>Sandbox:</strong> opaque origin · no platform credentials · network blocked</span></div>
-    {cartridge&&<iframe key={session} ref={iframeRef} sandbox="allow-scripts" referrerPolicy="no-referrer" title="Isolated game worker sandbox" srcDoc={SANDBOX_DOCUMENT} className="isolated-game-frame" tabIndex={-1} />}
+    <div className="player-help"><span><strong>Controls:</strong> Arrow keys or WASD · Z/J/Space = A · X/K = B · Enter = Start</span><span><strong>Local saves:</strong> IndexedDB · isolated per game · 8 KiB max</span></div>
+    {cartridge&&saveSnapshot?.session===session&&<iframe key={session} ref={iframeRef} onLoad={onSandboxLoad} sandbox="allow-scripts" referrerPolicy="no-referrer" title="Isolated game worker sandbox" srcDoc={SANDBOX_DOCUMENT} className="isolated-game-frame" tabIndex={-1} />}
   </section>;
 }

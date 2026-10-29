@@ -36,3 +36,7 @@ This repository is at planning stage. See the roadmap before beginning implement
 ## Play the curated games
 
 Run `pnpm install && pnpm dev`, then open `/library` for the catalog or `/play/tiny-catcher` for the first cartridge. The static build (`pnpm build`) packages all games listed in `packages/catalog/src/index.ts`. Creator submissions are **not** accepted yet; see [Creator quickstart](docs/creator-quickstart.md) for the manual authoring contract.
+
+## Installable offline prototype
+
+The production static export includes a PWA manifest, icons and a versioned offline Service Worker which precaches all curated games. Install through the browser's app menu after opening the online site. Circuit Slide persists its puzzle to a per-game 8 KiB IndexedDB slot. No backend, global achievements, trusted coins or public user uploads. See [offline and saves instructions](docs/development.md).
