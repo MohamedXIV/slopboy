@@ -3,6 +3,7 @@
 import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent} from 'react';
 import type {InputName} from '@slopboy/hardware';
 import {SLOPBOY_1000} from '@slopboy/hardware';
+import {getCatalogGame} from '@slopboy/catalog';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
 import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {LCD_PALETTE,rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
@@ -17,7 +18,7 @@ const keyMap:Record<string,InputName>={
   Space:'A',KeyK:'B',KeyX:'B',ShiftLeft:'B',Enter:'START',Backspace:'SELECT'
 };
 
-export default function HandheldPlayer(){
+undefined
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [mode,setMode]=useState<Mode>('console');
   const [status,setStatus]=useState<Status>('loading');
@@ -49,13 +50,9 @@ export default function HandheldPlayer(){
 
   useEffect(()=>{
     let active=true;
-    loadBundledCartridge('/cartridges/tiny-catcher.slop',DEVICE).then(game=>{
-      if(active){setCartridge(game);updateStatus('booting');}
-    }).catch(error=>{if(active)updateStatus('error',String(error));});
+    undefined.catch(error=>{if(active)updateStatus('error',String(error));});
     return ()=>{active=false;};
-  },[updateStatus]);
-
-  useEffect(()=>{
+undefined
     if(!cartridge)return;
     sessionKey.current=crypto.randomUUID();
     ready.current=false;
@@ -137,7 +134,7 @@ export default function HandheldPlayer(){
 
   return <section className="player-root" ref={wrapperRef}>
     <div className="player-toolbar">
-      <div><p className="player-kicker">NOW INSERTED · SLOPBOY 1000</p><h1>TINY CATCHER</h1></div>
+      <div><p className="player-kicker">NOW INSERTED · SLOPBOY 1000</p>undefined</div>
       <div className="player-actions">
         <button type="button" onClick={()=>setMode(v=>v==='console'?'game':'console')}>{mode==='console'?'◱ Game mode':'▣ Console mode'}</button>
         <button type="button" onClick={switchFullscreen}>{fullscreen?'⤓ Exit fullscreen':'⛶ Fullscreen'}</button>
@@ -154,12 +151,11 @@ export default function HandheldPlayer(){
         <div className="device-system-buttons">{button('SELECT','system','Select')}{button('START','system','Start')}<div className="speaker" aria-hidden="true">▰ ▰ ▰ ▰</div></div>
       </div>
       {mode==='game'&&<div className="game-touch-controls" aria-label="Game touch controls">
-        <div className="game-touch-direction">{button('LEFT','touch','Left')}{button('RIGHT','touch','Right')}</div>
-        <div>{button('B','touch','B')}{button('A','touch','A')}</div>
+        undefined
       </div>}
       {status!=='running'&&<div className="player-status" role="status"><strong>{status==='error'?'Game stopped':status==='loading'?'Loading cartridge…':'Starting sandbox…'}</strong>{reason&&<p>{reason}</p>}</div>}
     </div>
-    <div className="player-help"><span><strong>Controls:</strong> ← → or A / D to move; Z / J = A, X / K = B</span><span><strong>Sandbox:</strong> opaque origin · no platform credentials · network blocked</span></div>
+    <div className="player-help">undefined<span><strong>Sandbox:</strong> opaque origin · no platform credentials · network blocked</span></div>
     {cartridge&&<iframe key={session} ref={iframeRef} sandbox="allow-scripts" referrerPolicy="no-referrer" title="Isolated game worker sandbox" srcDoc={SANDBOX_DOCUMENT} className="isolated-game-frame" tabIndex={-1} />}
   </section>;
 }

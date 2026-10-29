@@ -32,3 +32,7 @@ Next.js + React + TypeScript, Tailwind + shadcn/ui, pnpm monorepo, standalone Ty
 Run a separately packaged, validated demo cartridge on an original virtual console in both Console and Game modes, with keyboard/touch controls and no backend. See `/play` after starting `pnpm dev`.
 
 This repository is at planning stage. See the roadmap before beginning implementation.
+
+## Play the curated games
+
+Run `pnpm install && pnpm dev`, then open `/library` for the catalog or `/play/tiny-catcher` for the first cartridge. The static build (`pnpm build`) packages all games listed in `packages/catalog/src/index.ts`. Creator submissions are **not** accepted yet; see [Creator quickstart](docs/creator-quickstart.md) for the manual authoring contract.

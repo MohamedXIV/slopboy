@@ -27,3 +27,8 @@ There is **no backend, identity, global coin balance, public publishing, or MCP 
 `pnpm dev` or `pnpm build` now builds the vetted Tiny Catcher cartridge into `apps/web/public/cartridges/` before launching/exporting Next.js. Visit `/play` to use the original virtual handheld with touch, keyboard, Console/Game and browser fullscreen. The shell appearance and hardware budgets remain provisional. 
 
 The current browser sandbox has been probed on local headless Chromium for denied fetch, missing Worker DOM, invalid pixels and infinite-loop termination. See [P1 security spike](p1-runtime-security.md). **Do not enable public game uploads** until the remaining cross-browser/mobile security gates in issue #4 have been satisfied.
+
+
+## P2 curated catalog
+
+`pnpm cartridge:build` builds *every* approved game from `packages/catalog/src/index.ts` into `apps/web/public/cartridges`; `pnpm cartridge:verify` checks byte-identical output and rejects unlisted extra `.slop` files. `pnpm build` includes these cartridges in the static export and generates `/library`, `/play`, and each curated `/play/[game]` route. See [Creator quickstart](creator-quickstart.md) for manual AI/human authoring. Public uploads, coins, PWA offline capability, and achievement awards are *not* implemented by this catalog milestone.
