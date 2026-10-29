@@ -8,9 +8,10 @@ pnpm creator:new my-first-game
 pnpm creator:check my-first-game
 pnpm creator:build my-first-game
 pnpm creator:verify my-first-game
+pnpm creator:preview my-first-game
 ```
 
-These commands do not run the creator's game code and **do not publish** it to Slopboy. A successful check means the source conforms to available technical screens, not that it is safe, rights-cleared or ready for publication. Third-party public uploads and preview remain disabled pending the browser security gate [#4](https://github.com/MohamedXIV/slopboy/issues/4).
+The `new`, `check`, `build` and `verify` commands never execute game JS. **Preview** generates a standalone local HTML file; opening that file executes the game in the same isolated iframe/Worker runtime, not in the Creator CLI. None of these commands publishes to Slopboy. A successful check means the source conforms to available technical screens, not that it is safe, rights-cleared or ready for publication. Third-party public uploads and preview remain disabled pending the browser security gate [#4](https://github.com/MohamedXIV/slopboy/issues/4).
 
 **AI assistants:** Share the SDK and hardware contract with your model, have it edit only the new project's `manifest.json` and `src/game.ts`, then return the exact JSON diagnostics from `pnpm creator:check` for correction. This works without a paid AI API or an MCP connection. See `/create` on the web app for a copyable prompt.
 

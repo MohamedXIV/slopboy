@@ -44,3 +44,7 @@ The production static export includes a PWA manifest, icons and a versioned offl
 ## Creator Kit (local only)
 
 Run `pnpm creator:new my-first-game`, edit the generated TypeScript source and manifest, then `pnpm creator:check my-first-game` and `pnpm creator:build my-first-game`. The tooling performs semantic SDK checks and deterministic packaging without executing creator game code. Follow [Creator Kit v0.1](docs/creator-kit.md) or the in-app `/create` page. **No general public game uploads or approved creator publishing workflow yet.**
+
+### Local playable preview
+
+Run `pnpm creator:preview my-first-game` and open `creations/my-first-game/dist/my-first-game.preview.html` in Chromium. It uses the same isolated runtime as the curated site and requires no development server, but is **local-only** and must not be uploaded to public hosting. Preview saves live in memory for that page session. Firefox/Safari/mobile compatibility and public submissions are still gated by [security issue #4](https://github.com/MohamedXIV/slopboy/issues/4).

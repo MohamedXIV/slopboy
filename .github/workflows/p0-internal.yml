@@ -49,6 +49,10 @@ jobs:
           pnpm creator:check ci-smoke
           pnpm creator:build ci-smoke
           pnpm creator:verify ci-smoke
+          pnpm creator:preview ci-smoke
+          test -f creations/ci-smoke/dist/ci-smoke.preview.html
+      - name: Browser smoke local Creator Preview
+        run: pnpm security:creator-preview
       - name: Type check
         run: pnpm typecheck
       - name: Lint

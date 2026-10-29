@@ -8,7 +8,8 @@ const commands=[
   {name:'1. Scaffold',command:'pnpm creator:new my-first-game',note:'Creates the manifest and typed game starter without overwriting files.'},
   {name:'2. Validate',command:'pnpm creator:check my-first-game',note:'Checks SDK TypeScript, hardware budgets and security-screening rules.'},
   {name:'3. Package',command:'pnpm creator:build my-first-game',note:'Produces deterministic .slop cartridge; no code execution.'},
-  {name:'4. Verify',command:'pnpm creator:verify my-first-game',note:'Checks that cartridge bytes still match the source.'}
+  {name:'4. Verify',command:'pnpm creator:verify my-first-game',note:'Checks that cartridge bytes still match the source.'},
+  {name:'5. Preview locally',command:'pnpm creator:preview my-first-game',note:'Open creations/my-first-game/dist/my-first-game.preview.html — no upload or server.'}
 ];
 export default function CreatePage(){
   return <main className="create-page">
@@ -20,10 +21,10 @@ export default function CreatePage(){
       <p className="eyebrow">MAKE SOMETHING SMALL / CREATE WITH ANY AI</p>
       <h1>Build your own cartridge.</h1>
       <p className="creator-lead">Make a tiny original game using TypeScript or ask ChatGPT or Claude to help. One SDK, real handheld constraints, no paid AI API required by Slopboy.</p>
-      <div className="creator-note"><strong>Local creator preview · no public uploads.</strong> The tools create and validate a cartridge on your machine. Third-party games cannot be uploaded or run on the public Slopboy site yet; security testing and human publication review are still required.</div>
+      <div className="creator-note"><strong>Local creator preview · no public uploads.</strong> The tools build and validate your cartridge locally, and can generate a private standalone playable preview. Third-party games still cannot be uploaded or run on the public Slopboy site; cross-browser security tests and human review remain mandatory.</div>
       <div className="creator-grid">
         <section>
-          <h2>Four commands to start</h2>
+          <h2>Five commands to start</h2>
           <p className="creator-subtext">Clone <a href="https://github.com/MohamedXIV/slopboy">the source repository</a>, install Node 22 and pnpm 10, then run <code>pnpm install --frozen-lockfile --ignore-scripts</code>.</p>
           <div className="creator-steps">{commands.map(step=><div key={step.name} className="creator-step"><strong>{step.name}</strong><code>{step.command}</code><p>{step.note}</p></div>)}</div>
         </section>
