@@ -22,3 +22,13 @@ This is an isolation prototype, **not a certified sandbox**. Browser flaws, memo
 No public upload, global currency, account access, trusted publishing or arbitrary game code is enabled. Need automated browser regression checks on target browsers, Android acceptance, abusive messages and navigation cases, low-end memory/performance testing and content moderation before closing #4 and accepting public creator submissions.
 
 The host only verifies visual frame payloads, not whether a game is honest about achievements. Spendable global currency requires a server-side ledger in P3.
+
+## 2026-10-29: Private Worker MessageChannel and reproducible browser regression
+
+**Problem addressed:** game code runs in a Worker global scope and can call its public `postMessage()`; an untrusted cartridge could forge `ready`, `frame`, or `save` messages if the host listened to the default Worker message channel. Receiving a forged `ready` could previously disarm the initialization watchdog.
+
+**Change:** a dedicated `MessageChannel` is transferred from the iframe to the Worker **before loading cartridge code**. The private port remains in the trusted Worker bootstrap closure and is not included in the creator SDK. The iframe listens for trusted messages **only on that port**, not on `worker.onmessage`. Phase transitions (`idle` → `starting` → `running` → `stopped`) gate acknowledgements, frame responses, save writes and timeouts. A hostile game can still call its public `postMessage`, but this does not reach the trusted channel.
+
+**Automated Chromium regression:** `pnpm security:browser` runs original curated attack fixtures in actual headless Chromium through an opaque-origin iframe, verifying normal indexed frames, forged worker `ready` and `frame` rejection, initialization and frame watchdogs, fifth-shade rejection and CSP-blocked `fetch('data:...')`. This is a browser behavior check, not merely a regex assertion. It uses the Chrome binary preinstalled on the GitHub Actions runner; no new npm packages or remote endpoints.
+
+**Still required before third-party games:** Android Chrome and iOS Safari tests, Firefox/WebKit browser compatibility, host navigation/abuse and storage quota tests, low-end device profiling, consistent mobile touch behavior, user-facing error recovery, content/rights review. These tests do not make arbitrary JavaScript mathematically safe. No public uploads or executable creator previews are enabled by this change.
