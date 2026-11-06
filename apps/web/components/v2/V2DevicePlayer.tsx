@@ -369,7 +369,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
               <span>OPTICS // {screenFx.enabled ? screenFx.preset.toUpperCase() : 'RAW BYPASS'}</span>
             </div>
             <div className="v2-stage-hud v2-stage-hud-tr" aria-hidden="true">
-              <span>CADENCE // {screenFx.refresh === 'native' ? '60HZ NATIVE' : screenFx.refresh + 'FPS SAMPLE'}</span>
+              <span>CADENCE // {screenFx.refresh === 'native' ? 'NATIVE / SMOOTH' : screenFx.refresh + 'FPS SAMPLE'}</span>
               <span>SHELL // {colors.name.toUpperCase()}</span>
             </div>
 
@@ -423,7 +423,8 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
                       aria-label={game.title + ' game screen'}
                     />
                     <canvas className="v2-fx-output" ref={fxCanvasRef} aria-hidden="true" />
-                    <div className="v2-display-glass" aria-hidden="true" />
+                    <div className="v2-display-glass" aria-hidden="true"
+                        style={{opacity:fxActive?screenFx.glass/100:0}} />
                   </div>
                 </div>
                 <div className="v2-screen-note">
@@ -708,7 +709,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
                   }))
                 }
               >
-                <option value="native">Native / smooth (60Hz)</option>
+                <option value="native">Native / smooth</option>
                 <option value="30">30 FPS LCD cadence</option>
                 <option value="20">20 FPS retro cadence</option>
               </select>

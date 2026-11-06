@@ -28,3 +28,9 @@ Inspirations from Gemini's single-file prototype: tactile pressure feedback, col
 ## V2 design lab
 
 Visit `/v2` and `/v2/play/tiny-catcher` in the branch preview. These pages demonstrate one real profile and three playable compatibility games, not all device families or accounts. This document is a design rule, not permission to claim that conceptual hardware is implemented.
+
+## Slopboy 1000 flagship polish (Gemini handoff, 2026-11-06)
+
+The first device's 2D body and screen optics use the reviewed Gemini redesign on the isolated V2 branch: a sculpted rectangular slab, improved tactile control deck, recessed optical well, subdued stage, cartridge navigation, named shell finishes (Studio Bone / Field Moss / Lab Graphite / Signal Clay), and LCD palettes (Classic Moss / Pocket Warm / Terminal Green / Ink & Paper). The WebGL optical pass has multi-tap bloom, pixel-cell relief, curvature and temporal afterglow. These are presentation-only features. Clean / disabled bypass both GPU processing and the CSS glass overlay; virtual hardware still limits only resolution and indexed source colors.
+
+The standalone 3,500-line demo's embedded mock game catalog, direct eval sandbox and fake save system were **not integrated**. The original catalog, strict iframe/Worker execution isolation, validation, navigation routes and save adapter remain authoritative. Any future 3D variant should reuse presentation contracts rather than copy the demo's simulated runtime.

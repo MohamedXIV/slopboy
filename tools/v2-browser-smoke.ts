@@ -90,6 +90,8 @@ async function main(){
     await evalJs("document.querySelector('[aria-label=\"Screen effects\"]').click();true");
     const off=await evalJs("document.querySelector('[aria-label=\"Screen effects\"]').getAttribute('aria-checked')==='false'&&!document.querySelector('.v2-display').classList.contains('fx-active')");
     if(off!==true)throw Error('Complete screen FX bypass not working');
+    const glassOff=await evalJs("getComputedStyle(document.querySelector('.v2-display-glass')).opacity");
+    if(Number(glassOff)!==0)throw Error('Screen FX off must also bypass optical glass overlay');
     const rawStillAvailable=await evalJs("document.querySelector('.v2-raw-frame').getContext('2d').getImageData(0,0,1,1).data[3]===255");
     if(rawStillAvailable!==true)throw Error('Effect bypass broke the underlying frame');
     await evalJs("document.querySelector('.v2-fx-presets button:first-child').click();true");
