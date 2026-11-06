@@ -36,3 +36,7 @@ Actual pass/fail evidence belongs to CI and browser smoke. Do not equate green s
 ## Render scheduler diagnostic
 
 The first Chromium run rendered index-validated frames but did not move during a 900ms keypress. The original sandbox canvas was hidden in a 1×1 opacity-zero iframe. A diagnostic run found only 12 KAPLAY update ticks over several seconds despite complete asset loading, consistent with background/occlusion throttling. The follow-up keeps the isolated WebGL iframe at its natural 160×144 dimensions behind the trusted, quantized display and tests sustained keypresses. This change is still a feasibility experiment, not a browser-wide FPS guarantee.
+
+### Raw renderer preview in this spike
+
+This lab deliberately shows a second small raw WebGL preview (the visible iframe) alongside the indexed Slopboy output. Chrome stopped the engine game loop after about 12 ticks when the iframe was fully occluded, even while the parent displayed previously captured valid pixels. This visibility experiment is a **diagnostic concession** for first-party code; final hardware must not expose unrestricted RGB or unrestricted iframe DOM as the player-facing display.

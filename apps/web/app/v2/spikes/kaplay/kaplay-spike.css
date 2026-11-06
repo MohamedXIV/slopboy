@@ -5,9 +5,9 @@
 .kaplay-lab h1 small{display:block;font-size:15px;letter-spacing:0;font-weight:500}
 .kaplay-lab p{line-height:1.65;max-width:720px}
 .kaplay-card{margin:28px 0;display:grid;grid-template-columns:minmax(200px,1fr) minmax(190px,1fr);gap:22px;align-items:start}
-.kaplay-display-wrap{background:#2d4140;border:10px solid #495a55;border-radius:20px;padding:18px;position:relative;box-shadow:0 16px 45px #213c3830}
+.kaplay-display-wrap{display:grid;grid-template-columns:minmax(0,1fr) 160px;gap:10px;align-items:start;background:#2d4140;border:10px solid #495a55;border-radius:20px;padding:18px;position:relative;box-shadow:0 16px 45px #213c3830}
 .kaplay-display-wrap canvas{position:relative;z-index:1;display:block;aspect-ratio:10/9;width:100%;height:auto;background:#dce9b1;image-rendering:pixelated;image-rendering:crisp-edges}
-.kaplay-display-wrap iframe{width:160px;height:144px;border:0;position:absolute;left:18px;top:18px;opacity:1;z-index:0;pointer-events:none}
+.kaplay-display-wrap iframe{width:160px;height:144px;border:1px solid #78978a;position:static;display:block;opacity:1;pointer-events:none}
 .kaplay-controls{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:18px}
 .kaplay-control-pad{display:grid;grid-template-columns:repeat(3,44px);gap:4px}
 .kaplay-control-pad button:first-child{grid-column:2}
@@ -25,4 +25,6 @@
 .kaplay-stats select,.kaplay-stats button{padding:9px;border:1px solid #7d9589;background:#fff;border-radius:8px;color:inherit}
 .kaplay-stats .kaplay-error{color:#a32626;overflow-wrap:anywhere}
 .kaplay-lab aside{font-size:13px;color:#526562;line-height:1.5}
-@media(max-width:680px){.kaplay-card{grid-template-columns:1fr}.kaplay-lab{padding-top:16px}.kaplay-lab h1{margin-top:24px}}
+@media(max-width:680px){.kaplay-card{grid-template-columns:1fr}.kaplay-display-wrap{grid-template-columns:minmax(0,1fr) 160px}.kaplay-lab{padding-top:16px}.kaplay-lab h1{margin-top:24px}}
+
+@media(max-width:420px){.kaplay-display-wrap{grid-template-columns:minmax(0,1fr)}.kaplay-display-wrap iframe{width:160px;height:144px}}

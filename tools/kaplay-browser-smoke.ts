@@ -44,7 +44,7 @@ async function main() {
     if (evidence.width!==160 || evidence.height!==144 || evidence.colors<2 || evidence.colors>4) {
       throw Error("Indexed framebuffer mismatch "+JSON.stringify(evidence));
     }
-    if (evidence.sandbox!=="allow-scripts" || !evidence.isolated || !evidence.hasCsp) {
+    if (evidence.sandbox!=="allow-scripts" || !evidence.isolated || !evidence.hasCsp || !evidence.visibleRenderer) {
       throw Error("Opaque-origin/CSP gate failed "+JSON.stringify(evidence));
     }
     const initialX=Number(await evaluate("document.querySelector('[data-testid=kaplay-player-x]').textContent"));
