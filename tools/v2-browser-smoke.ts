@@ -1,0 +1,79 @@
+import {createServer} from 'node:http';
+import {readFile,mkdtemp,rm} from 'node:fs/promises';
+import {join,resolve,extname,sep} from 'node:path';
+import {tmpdir} from 'node:os';
+import {openChromePage} from './chrome-cdp.ts';
+
+const sleep=(ms:number)=>new Promise<void>(r=>setTimeout(r,ms));
+const root=resolve('apps/web/out');
+const mime:Record<string,string>={
+  '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
+  '.css':'text/css; charset=utf-8','.slop':'application/octet-stream',
+  '.png':'image/png','.json':'application/json','.webmanifest':'application/manifest+json',
+  '.woff2':'font/woff2','.svg':'image/svg+xml'
+};
+async function main(){
+  const profile=await mkdtemp(join(tmpdir(),'slopboy-v2-browser-'));
+  const server=createServer(async(req,res)=>{
+    try{
+      const pathname=decodeURIComponent(new URL(req.url||'/', 'http://localhost').pathname);
+      const candidate=pathname.endsWith('/')?pathname+'index.html':pathname;
+      const safe=resolve(root,'.'+candidate);
+      if(!safe.startsWith(root+sep)){res.writeHead(403).end();return;}
+      const finalPath=extname(safe)?safe:safe+'.html';
+      const payload=await readFile(finalPath);
+      res.writeHead(200,{'content-type':mime[extname(finalPath)]||'application/octet-stream','cache-control':'no-store'});
+      res.end(payload);
+    }catch{res.writeHead(404).end('Not Found');}
+  });
+  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const port=(server.address() as {port:number}).port;
+  let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
+  try{
+    browser=await openChromePage('http://127.0.0.1:'+port+'/v2/play/tiny-catcher',join(profile,'chrome'));
+    const evalJs=browser.evaluate;
+    const deadline=Date.now()+15000;
+    let booted=false;
+    while(Date.now()<deadline){
+      const info=await evalJs("JSON.stringify({ready:!!document.querySelector('.v2-led.on'),canvas:!!document.querySelector('.v2-display canvas'),error:document.querySelector('.v2-status')?.textContent||''})");
+      const state=JSON.parse(String(info));
+      if(state.ready&&state.canvas){booted=true;break;}
+      if(state.error.includes('Game stopped'))throw Error('V2 playback error: '+state.error);
+      await sleep(150);
+    }
+    if(!booted)throw Error('V2 runtime did not become ready');
+    const dimensions=String(await evalJs("document.querySelector('.v2-display canvas').width+'x'+document.querySelector('.v2-display canvas').height"));
+    if(dimensions!=='160x144')throw Error('Incorrect hardware resolution '+dimensions);
+    const initial=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
+    await evalJs("window.__frame=document.querySelector('.v2-isolated-frame');window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));true");
+    await sleep(900);
+    await evalJs("window.dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight',bubbles:true}));true");
+    const moved=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
+    if(initial===moved)throw Error('Real game framebuffer did not change on player input');
+    await evalJs("document.querySelectorAll('.v2-palettes button')[1].click();true");
+    const pal=await evalJs("document.querySelectorAll('.v2-palettes button')[1].getAttribute('aria-pressed')");
+    if(pal!=='true')throw Error('LCD palette did not change');
+    await evalJs("document.querySelectorAll('.v2-swatches button')[2].click();true");
+    const skin=await evalJs("document.querySelectorAll('.v2-swatches button')[2].getAttribute('aria-pressed')");
+    if(skin!=='true')throw Error('Shell finish did not change');
+    await evalJs("document.querySelector('.v2-controlbar button').click();true");
+    const same=await evalJs("document.querySelector('.v2-device-stage').classList.contains('v2-game-mode')&&window.__frame===document.querySelector('.v2-isolated-frame')");
+    if(same!==true)throw Error('Game mode restarted the live sandbox');
+    await evalJs("document.querySelector('.v2-controlbar button:last-child').click();true");
+    let restarted=false;
+    const end=Date.now()+9000;
+    while(Date.now()<end){
+      const isOn=await evalJs("!!document.querySelector('.v2-led.on')&&window.__frame!==document.querySelector('.v2-isolated-frame')");
+      if(isOn===true){restarted=true;break;}
+      await sleep(150);
+    }
+    if(!restarted)throw Error('Restart failed to recover a fresh sandbox');
+    console.log('V2 Chrome smoke passed: real cartridge / resolution / controls / colors / cosmetics / same-session game mode / restart');
+  }finally{
+    browser?.close();
+    await new Promise<void>(resolve=>server.close(()=>resolve()));
+    await sleep(450);
+    await rm(profile,{force:true,recursive:true,maxRetries:20,retryDelay:150}).catch(err=>console.warn('Chrome temp cleanup:',err));
+  }
+}
+main().catch(err=>{console.error(err);process.exitCode=1;});

@@ -23,7 +23,8 @@
     "creator:verify": "node --experimental-strip-types tools/creator-cli.ts verify",
     "security:browser": "node --experimental-strip-types tools/browser-security-smoke.ts",
     "creator:preview": "node --experimental-strip-types tools/creator-cli.ts preview",
-    "security:creator-preview": "node --experimental-strip-types tools/creator-preview-smoke.ts"
+    "security:creator-preview": "node --experimental-strip-types tools/creator-preview-smoke.ts",
+    "security:v2-browser": "node --experimental-strip-types tools/v2-browser-smoke.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

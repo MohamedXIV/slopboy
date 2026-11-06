@@ -48,3 +48,7 @@ Run `pnpm creator:new my-first-game`, edit the generated TypeScript source and m
 ### Local playable preview
 
 Run `pnpm creator:preview my-first-game` and open `creations/my-first-game/dist/my-first-game.preview.html` in Chromium. It uses the same isolated runtime as the curated site and requires no development server, but is **local-only** and must not be uploaded to public hosting. Preview saves live in memory for that page session. Firefox/Safari/mobile compatibility and public submissions are still gated by [security issue #4](https://github.com/MohamedXIV/slopboy/issues/4).
+
+## Slopboy 2.0 design lab (branch-only)
+
+A clean-slate V2 foundation lives on `feat/slopboy-2-foundation` for testing, with a [new V2 architecture contract](docs/v2/foundation.md), [original device design language](docs/v2/device-language.md), and playable `/v2` and `/v2/play/tiny-catcher` routes. The first player is a **V1 pixel-game compatibility slice** under the existing isolated Worker; this is **not yet KAPLAY, Neon Auth, OAuth/MCP, or WebRTC**. The production `main` retains the existing stable prototype until the V2 gates pass.
