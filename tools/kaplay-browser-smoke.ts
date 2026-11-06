@@ -65,8 +65,6 @@ async function main() {
     if (screenshotBefore===screenshotAfter) throw Error("LCD display not repainted after palette selection");
     const ms=Number(await evaluate("document.querySelector('[data-testid=kaplay-capture]').textContent.replace(' ms','')"));
     if (!Number.isFinite(ms) || ms>150) throw Error("Per-frame readback exceeded generous spike diagnostic budget: "+ms);
-    const frame=await evaluate("document.querySelector('.kaplay-display-wrap iframe')");
-    void frame; // CDP JS value is not required to be serializable.
     console.log("KAPLAY real Chromium spike PASSED", {evidence,initialX,finalX,captureMs:ms});
   } finally {
     browser?.close();
