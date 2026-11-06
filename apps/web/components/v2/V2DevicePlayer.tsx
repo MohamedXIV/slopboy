@@ -2,7 +2,7 @@
 
 import {useCallback,useEffect,useRef,useState,type CSSProperties,type PointerEvent as ReactPointerEvent} from 'react';
 import Link from 'next/link';
-import {getCatalogGame} from '@slopboy/catalog';
+import {GAMES,getCatalogGame} from '@slopboy/catalog';
 import {SLOPBOY_1000,type InputName} from '@slopboy/hardware';
 import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId} from '@slopboy/hardware/v2';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
@@ -11,7 +11,7 @@ import {rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
 import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
 import {RetroScreenRenderer} from './RetroScreenRenderer';
 import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
-  sanitizeScreenFx,isScreenFxActive,editScreenFx,
+  sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
   type ScreenFxSettings,type ScreenRefresh} from './screen-fx-config';
 import './v2-player.css';
 
@@ -287,114 +287,529 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
       else await shellRef.current?.requestFullscreen();
     }catch{ /* Optional fullscreen denial must never interrupt gameplay. */ }
   };
-  const colors=V2_SHELLS[shell];
-  const shellStyle={'--v2-shell':colors.base,'--v2-shadow':colors.shadow,'--v2-ink':colors.ink,'--v2-face':colors.button} as CSSProperties;
-  return <main className="v2-player">
-    <header className="v2-header"><Link className="v2-brand" href="/v2">SLOPBOY <span>2.0</span></Link>
-      <div className="v2-header-right"><Link href="/v2">← Devices & games</Link><span>LIVE COMPATIBILITY LAB</span></div>
-    </header>
-    <div className="v2-player-grid">
-      <section className="v2-device-section" aria-label="Interactive virtual handheld">
-        <div className="v2-topline"><span>MODEL / 001</span><span>PLAYING · {game.title.toUpperCase()}</span></div>
-        <div className={'v2-device-stage'+(mode==='game'?' v2-game-mode':'')} ref={shellRef} style={shellStyle}>
-          <div className="v2-hardware-body">
-            <div className="v2-shell-logo"><strong>SLOPBOY <em>1000</em></strong><span className={'v2-led'+(status==='running'?' on':'')}/></div>
-            <div className="v2-screen-bezel">
-              <div ref={displayRef} className={'v2-display'+(fxAvailable&&isScreenFxActive(screenFx)?' fx-active':'')}>
-                <canvas className="v2-raw-frame" width={V2_DEVICE_1000.display.width} height={V2_DEVICE_1000.display.height}
-                  ref={canvasRef} role="img" aria-label={game.title+' game screen'}/>
-                <canvas className="v2-fx-output" ref={fxCanvasRef} aria-hidden="true"/>
+  const colors = V2_SHELLS[shell];
+  const paletteInfo = V2_LCD_PALETTES[palette];
+  const fxActive = fxAvailable && isScreenFxActive(screenFx);
+  const activeFxCount = countActiveScreenFx(screenFx);
+  const shellStyle = {
+    '--v2-shell': colors.base,
+    '--v2-shadow': colors.shadow,
+    '--v2-ink': colors.ink,
+    '--v2-face': colors.button,
+    '--v2-lcd-bg': paletteInfo.colors[0],
+    '--v2-lcd-ink': paletteInfo.colors[3]
+  } as CSSProperties;
+
+  const fxStateLabel = !screenFx.enabled
+    ? 'BYPASSED'
+    : !isScreenFxActive(screenFx)
+    ? 'RAW 1:1'
+    : fxAvailable
+    ? 'GPU ACTIVE'
+    : 'FALLBACK';
+
+  return (
+    <main className="v2-player">
+      <header className="v2-header">
+        <div className="v2-header-left">
+          <Link className="v2-brand" href="/v2">SLOPBOY <span>2.0</span></Link>
+          <span className="v2-header-divider" aria-hidden="true" />
+          <span className="v2-header-model">UNIT 1000 · VERTICAL SLAB</span>
+        </div>
+        <nav className="v2-cartridge-strip" aria-label="Curated cartridges">
+          {GAMES.map(item => (
+          <Link key={item.id} href={'/v2/play/' + item.id}
+            className={'v2-cartridge-pill' + (item.id === game.id ? ' active' : '')}
+            aria-current={item.id === game.id ? 'page' : undefined}>
+            <span className="v2-cartridge-emblem" aria-hidden="true">{item.artwork.emblem}</span>
+            <span>{item.title}</span>
+          </Link>
+        ))}
+        </nav>
+        <div className="v2-header-right">
+          <Link href="/v2">← Devices &amp; games</Link>
+          <span>LIVE COMPATIBILITY LAB</span>
+        </div>
+      </header>
+
+      <div className="v2-player-grid">
+        <section className="v2-device-section" aria-label="Interactive virtual handheld">
+          <div className="v2-topline">
+            <div className="v2-topline-left">
+              <span className="v2-topline-tag">MODEL / 001</span>
+              <span>
+                {V2_DEVICE_1000.display.width}×{V2_DEVICE_1000.display.height} ·{' '}
+                {V2_DEVICE_1000.display.indexedColors} SHADES
+              </span>
+            </div>
+            <div className="v2-topline-right">
+              <span className={'v2-runtime-pill ' + status}>
+                <i aria-hidden="true" />
+                {status === 'running' ? 'PLAYING · ' + game.title.toUpperCase() : status.toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          <div
+            className={
+              'v2-device-stage' +
+              (mode === 'game' ? ' v2-game-mode' : '') +
+              ' shell-' +
+              shell +
+              ' preset-' +
+              (screenFx.enabled ? screenFx.preset : 'bypass')
+            }
+            ref={shellRef}
+            style={shellStyle}
+          >
+            <div className="v2-stage-hud v2-stage-hud-tl" aria-hidden="true">
+              <span>DISPLAY // {paletteInfo.name.toUpperCase()}</span>
+              <span>OPTICS // {screenFx.enabled ? screenFx.preset.toUpperCase() : 'RAW BYPASS'}</span>
+            </div>
+            <div className="v2-stage-hud v2-stage-hud-tr" aria-hidden="true">
+              <span>CADENCE // {screenFx.refresh === 'native' ? '60HZ NATIVE' : screenFx.refresh + 'FPS SAMPLE'}</span>
+              <span>SHELL // {colors.name.toUpperCase()}</span>
+            </div>
+
+            <div className="v2-hardware-body">
+              <div className="v2-cartridge-slot" aria-hidden="true">
+                <span className="v2-slot-grip" />
+                <span className="v2-slot-label">CART · {game.id.toUpperCase()}</span>
+                <span className="v2-slot-grip" />
               </div>
-              <div className="v2-screen-note">PIXEL POCKET · FOUR SHADES</div>
+
+              <div className="v2-shell-logo">
+                <div className="v2-logo-lockup">
+                  <strong>
+                    SLOPBOY <em>1000</em>
+                  </strong>
+                  <span className="v2-model-sub">POCKET SYSTEM</span>
+                </div>
+                <div className="v2-power-cluster">
+                  <span className="v2-power-label">PWR</span>
+                  <span className={'v2-led' + (status === 'running' ? ' on' : '')} />
+                </div>
+              </div>
+
+              <div className="v2-screen-bezel">
+                <div className="v2-bezel-top" aria-hidden="true">
+                  <span className="v2-bezel-spec">DOT MATRIX · 4-SHADE</span>
+                  <span className="v2-bezel-fx-tag">
+                    {!screenFx.enabled || !isScreenFxActive(screenFx)
+                      ? '1:1 RAW'
+                      : screenFx.preset === 'phosphor'
+                      ? 'CRT PHOSPHOR'
+                      : 'OPTICAL LCD'}
+                  </span>
+                </div>
+                <div className="v2-display-well">
+                  <div
+                    ref={displayRef}
+                    className={
+                      'v2-display' +
+                      (fxActive ? ' fx-active' : '') +
+                      ' fx-mode-' +
+                      (screenFx.enabled ? screenFx.preset : 'clean')
+                    }
+                  >
+                    <canvas
+                      className="v2-raw-frame"
+                      width={V2_DEVICE_1000.display.width}
+                      height={V2_DEVICE_1000.display.height}
+                      ref={canvasRef}
+                      role="img"
+                      aria-label={game.title + ' game screen'}
+                    />
+                    <canvas className="v2-fx-output" ref={fxCanvasRef} aria-hidden="true" />
+                    <div className="v2-display-glass" aria-hidden="true" />
+                  </div>
+                </div>
+                <div className="v2-screen-note">
+                  <span className="v2-bezel-tick" aria-hidden="true" />
+                  <span>PIXEL POCKET · FOUR SHADES</span>
+                  <span className="v2-bezel-tick" aria-hidden="true" />
+                </div>
+              </div>
+
+              <div className="v2-controls">
+                <div className="v2-dpad-well">
+                  <div className="v2-dpad">
+                    {CYCLE_BUTTONS.map(({ name, label, className }) => button(name, className, label))}
+                    <span className="v2-dpad-pivot" aria-hidden="true" />
+                  </div>
+                  <span className="v2-control-caption" aria-hidden="true">
+                    DIRECTIONAL
+                  </span>
+                </div>
+                <div className="v2-facepad-well">
+                  <div className="v2-facepad">
+                    <div className="v2-face-unit">
+                      {button('B', 'v2-b', 'B button')}
+                      <span className="v2-face-label" aria-hidden="true">
+                        B
+                      </span>
+                    </div>
+                    <div className="v2-face-unit">
+                      {button('A', 'v2-a', 'A button')}
+                      <span className="v2-face-label" aria-hidden="true">
+                        A
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v2-bottom-controls">
+                <div className="v2-system-cluster">
+                  <div className="v2-system-unit">
+                    {button('SELECT', 'v2-system', 'Select')}
+                    <span className="v2-system-label" aria-hidden="true">
+                      SELECT
+                    </span>
+                  </div>
+                  <div className="v2-system-unit">
+                    {button('START', 'v2-system', 'Start')}
+                    <span className="v2-system-label" aria-hidden="true">
+                      START
+                    </span>
+                  </div>
+                </div>
+                <div className="v2-speaker" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              </div>
+
+              <div className="v2-shell-footer" aria-hidden="true">
+                <span>REV 2.0-PREVIEW</span>
+                <span>SERIAL // SB-001000</span>
+              </div>
             </div>
-            <div className="v2-controls">
-              <div className="v2-dpad">{CYCLE_BUTTONS.map(({name,label,className})=>button(name,className,label))}</div>
-              <div className="v2-facepad">{button('B','v2-b','B button')}{button('A','v2-a','A button')}</div>
+
+            {mode === 'game' && (
+              <div className="v2-game-touch" aria-label="Touch controls">
+                <div className="v2-dpad">
+                  {CYCLE_BUTTONS.map(({ name, label, className }) => button(name, className, label))}
+                  <span className="v2-dpad-pivot" aria-hidden="true" />
+                </div>
+                <div className="v2-facepad">
+                  {button('B', 'v2-b', 'B button')}
+                  {button('A', 'v2-a', 'A button')}
+                  {button('START', 'v2-system', 'Start')}
+                </div>
+              </div>
+            )}
+
+            {status !== 'running' && (
+              <div className="v2-status" role="status">
+                {status === 'error'
+                  ? 'Game stopped'
+                  : status === 'loading'
+                  ? 'Loading cartridge…'
+                  : 'Starting isolated runtime…'}
+                {reason && <span>{reason}</span>}
+              </div>
+            )}
+          </div>
+
+          <div className="v2-controlbar">
+            <button
+              type="button"
+              className={mode === 'game' ? 'is-active' : ''}
+              onClick={() => setMode(m => (m === 'game' ? 'console' : 'game'))}
+            >
+              {mode === 'game' ? '▣ Console view' : '▤ Game only'}
+            </button>
+            <button type="button" className={fullscreen ? 'is-active' : ''} onClick={fullscreenClick}>
+              {fullscreen ? '↙ Exit fullscreen' : '⛶ Fullscreen'}
+            </button>
+            <button type="button" onClick={restart}>
+              ↻ Restart
+            </button>
+          </div>
+
+          <div className="v2-footnote" aria-label="Control mapping summary">
+            <span>
+              <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move
+            </span>
+            <span>
+              <kbd>Z</kbd> <kbd>J</kbd> <kbd>Space</kbd> = A
+            </span>
+            <span>
+              <kbd>X</kbd> <kbd>K</kbd> = B
+            </span>
+            <span>
+              <kbd>Enter</kbd> = Start
+            </span>
+            <span>
+              <kbd>Bksp</kbd> = Select
+            </span>
+            <span>Gamepad ready</span>
+          </div>
+        </section>
+
+        <aside className="v2-side">
+          <div className="v2-side-intro">
+            <span className="v2-kicker">THE CONSOLE WORKSHOP / FIRST PLAYABLE SLICE</span>
+            <h1>
+              Little worlds.
+              <br />
+              <em>Your colors.</em>
+            </h1>
+            <p>
+              Meet the flagship Slopboy 1000: a sculpted vertical slab with precision tactile controls, changeable shell
+              finishes, and an optical display pipeline. The game is real—cosmetics only change how you see it.
+            </p>
+          </div>
+
+          <div className="v2-option">
+            <div className="v2-option-header">
+              <h2>
+                Shell finish <small>Cosmetic only</small>
+              </h2>
+              <strong className="v2-active-choice">{V2_SHELLS[shell].name}</strong>
             </div>
-            <div className="v2-bottom-controls">
-              <div>{button('SELECT','v2-system','Select')}{button('START','v2-system','Start')}</div>
-              <div className="v2-speaker" aria-hidden="true"><i/><i/><i/><i/><i/></div>
+            <div className="v2-swatches">
+              {(Object.keys(V2_SHELLS) as V2ShellId[]).map(id => (
+                <button
+                  type="button"
+                  key={id}
+                  className={'v2-swatch' + (shell === id ? ' selected' : '')}
+                  style={
+                    {
+                      background: V2_SHELLS[id].base,
+                      '--swatch-base': V2_SHELLS[id].base,
+                      '--swatch-shadow': V2_SHELLS[id].shadow,
+                      '--swatch-button': V2_SHELLS[id].button,
+                      '--swatch-ink': V2_SHELLS[id].ink
+                    } as CSSProperties
+                  }
+                  title={V2_SHELLS[id].name}
+                  aria-label={'Shell: ' + V2_SHELLS[id].name}
+                  aria-pressed={shell === id}
+                  onClick={() => setShell(id)}
+                >
+                  <span className="v2-swatch-chip" aria-hidden="true">
+                    <i className="v2-swatch-dot" />
+                  </span>
+                  <span className="v2-swatch-name">{V2_SHELLS[id].name}</span>
+                </button>
+              ))}
             </div>
           </div>
-          {mode==='game'&&<div className="v2-game-touch" aria-label="Touch controls">
-            <div className="v2-dpad">{CYCLE_BUTTONS.map(({name,label,className})=>button(name,className,label))}</div>
-            <div className="v2-facepad">{button('B','v2-b','B button')}{button('A','v2-a','A button')}{button('START','v2-system','Start')}</div>
-          </div>}
-          {status!=='running'&&<div className="v2-status" role="status">{status==='error'?'Game stopped':status==='loading'?'Loading cartridge…':'Starting isolated runtime…'}{reason&&<span>{reason}</span>}</div>}
-        </div>
-        <div className="v2-controlbar">
-          <button type="button" onClick={()=>setMode(m=>m==='game'?'console':'game')}>{mode==='game'?'▣ Console':'▤ Game only'}</button>
-          <button type="button" onClick={fullscreenClick}>{fullscreen?'↙ Exit fullscreen':'⛶ Fullscreen'}</button>
-          <button type="button" onClick={restart}>↻ Restart</button>
-        </div>
-        <div className="v2-footnote">Arrow keys / WASD · Z/J/Space = A · X/K = B · Enter = Start · Gamepad supported</div>
-      </section>
-      <aside className="v2-side">
-        <span className="v2-kicker">THE CONSOLE WORKSHOP / FIRST PLAYABLE SLICE</span>
-        <h1>Little worlds.<br/><em>Your colors.</em></h1>
-        <p>Meet the first V2 device: an original rectangular slab, tactile controls and changeable appearance. The game is real—the cosmetics only change how you see it.</p>
-        <div className="v2-option"><h2>Shell finish <small>Cosmetic only</small></h2>
-          <div className="v2-swatches">{(Object.keys(V2_SHELLS) as V2ShellId[]).map(id=><button type="button" key={id}
-            className={'v2-swatch'+(shell===id?' selected':'')} style={{background:V2_SHELLS[id].base}}
-            title={V2_SHELLS[id].name} aria-label={'Shell: '+V2_SHELLS[id].name} aria-pressed={shell===id}
-            onClick={()=>setShell(id)}><span/></button>)}</div>
-          <strong>{V2_SHELLS[shell].name}</strong>
-        </div>
-        <div className="v2-option"><h2>LCD tint <small>Same 4 logical shades</small></h2>
-          <div className="v2-palettes">{(Object.keys(V2_LCD_PALETTES) as V2PaletteId[]).map(id=><button
-            key={id} type="button" className={palette===id?'chosen':''} onClick={()=>setPalette(id)}
-            aria-pressed={palette===id}><span className="v2-palette-bars">{V2_LCD_PALETTES[id].colors.map(c=><i key={c} style={{background:c}}/>)}</span>{V2_LCD_PALETTES[id].name}</button>)}</div>
-        </div>
-        <div className="v2-option v2-fx-panel" aria-label="Retro screen effects settings">
-          <div className="v2-fx-heading v2-toggle"><div><h2>Screen effects <small>WebGL presentation</small></h2>
-            <p>Cosmetic only. The game always runs at its own speed.</p></div>
-            <button type="button" role="switch" aria-label="Screen effects"
-              aria-checked={screenFx.enabled} className={screenFx.enabled?'enabled':''}
-              onClick={()=>setScreenFx(fx=>({...fx,enabled:!fx.enabled}))}><i/></button>
-          </div>
-          <div className="v2-fx-presets" role="group" aria-label="Screen effect presets">
-            {(['clean','lcd','phosphor'] as const).map(preset=><button type="button" key={preset}
-              aria-pressed={screenFx.preset===preset} className={screenFx.preset===preset?'chosen':''}
-              onClick={()=>setScreenFx({...SCREEN_FX_PRESETS[preset]})}>
-              {preset==='clean'?'Clean pixels':preset==='lcd'?'Classic LCD':'Phosphor'}
-            </button>)}
-          </div>
-          <div className="v2-fx-row">
-            <label htmlFor="v2-screen-refresh">Simulated screen refresh</label>
-            <select id="v2-screen-refresh" value={screenFx.refresh} disabled={!screenFx.enabled}
-              onChange={event=>setScreenFx(fx=>({...fx,refresh:event.target.value as ScreenRefresh,preset:'custom'}))}>
-              <option value="native">Native / smooth</option>
-              <option value="30">30 FPS display</option>
-              <option value="20">20 FPS display</option>
-            </select>
-          </div>
-          <details className="v2-fx-details">
-            <summary>Fine-tune effects <span>{screenFx.preset==='custom'?'Custom':screenFx.preset.toUpperCase()}</span></summary>
-            <div className="v2-fx-sliders">
-              {SCREEN_FX_LEVELS.map(({key,label})=><div key={key} className="v2-fx-slider">
-                <label htmlFor={'v2-fx-'+key}>{label} <span>{screenFx[key]}%</span></label>
-                <input id={'v2-fx-'+key} aria-label={label} type="range" min={0} max={100} step={1}
-                  disabled={!screenFx.enabled} value={screenFx[key]}
-                  onChange={event=>setScreenFx(fx=>editScreenFx(fx,key,Number(event.target.value)))}/>
-              </div>)}
+
+          <div className="v2-option">
+            <div className="v2-option-header">
+              <h2>
+                LCD tint <small>Same 4 logical shades</small>
+              </h2>
+              <strong className="v2-active-choice">{paletteInfo.name}</strong>
             </div>
-          </details>
-          <p className="v2-fx-note">{!screenFx.enabled||!isScreenFxActive(screenFx)
-            ?'Raw indexed pixels · no visual processing'
-            :fxAvailable?'GPU effects active · 4-color source unchanged'
-            :'Waiting for WebGL · raw pixels remain visible'}
-            <span> · Preferences saved on this device</span>
+            <div className="v2-palettes">
+              {(Object.keys(V2_LCD_PALETTES) as V2PaletteId[]).map(id => (
+                <button
+                  key={id}
+                  type="button"
+                  className={palette === id ? 'chosen' : ''}
+                  onClick={() => setPalette(id)}
+                  aria-pressed={palette === id}
+                >
+                  <span className="v2-palette-bars">
+                    {V2_LCD_PALETTES[id].colors.map(c => (
+                      <i key={c} style={{ background: c }} />
+                    ))}
+                  </span>
+                  <span className="v2-palette-title">{V2_LCD_PALETTES[id].name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div
+            className={'v2-option v2-fx-panel' + (!screenFx.enabled ? ' is-bypassed' : '')}
+            aria-label="Retro screen effects settings"
+          >
+            <div className="v2-fx-heading v2-toggle">
+              <div>
+                <div className="v2-fx-title-row">
+                  <h2>
+                    Screen effects <small>WebGL presentation</small>
+                  </h2>
+                  <span className={'v2-fx-badge ' + (screenFx.enabled && isScreenFxActive(screenFx) ? 'on' : 'off')}>
+                    {fxStateLabel}
+                  </span>
+                </div>
+                <p>Cosmetic only. The game always runs at its own speed.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Screen effects"
+                aria-checked={screenFx.enabled}
+                className={screenFx.enabled ? 'enabled' : ''}
+                onClick={() => setScreenFx(fx => ({ ...fx, enabled: !fx.enabled }))}
+              >
+                <i />
+              </button>
+            </div>
+
+            <div className="v2-fx-presets-block">
+              <div className="v2-fx-subhead">
+                <span>OPTICAL PRESET</span>
+                <span>
+                  {!screenFx.enabled
+                    ? 'Bypassed — click a preset to enable'
+                    : screenFx.preset === 'custom'
+                    ? 'Custom tuned (' + activeFxCount + ' active)'
+                    : SCREEN_FX_PRESET_META[screenFx.preset].badge}
+                </span>
+              </div>
+              <div className="v2-fx-presets" role="group" aria-label="Screen effect presets">
+                {PRESET_ORDER.map(preset => {
+                  const meta = SCREEN_FX_PRESET_META[preset];
+                  const isSelected = screenFx.preset === preset;
+                  return (
+                    <button
+                      type="button"
+                      key={preset}
+                      aria-pressed={isSelected}
+                      className={(isSelected ? 'chosen' : '') + (screenFx.enabled && isSelected ? ' active-preset' : '')}
+                      onClick={() => setScreenFx({ ...SCREEN_FX_PRESETS[preset] })}
+                    >
+                      <span className="v2-preset-badge">{meta.badge}</span>
+                      <strong className="v2-preset-name">{meta.label}</strong>
+                      <small className="v2-preset-desc">{meta.description}</small>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="v2-fx-row">
+              <div className="v2-fx-row-copy">
+                <label htmlFor="v2-screen-refresh">Simulated screen refresh</label>
+                <small>Throttles display sampling only, never game logic</small>
+              </div>
+              <select
+                id="v2-screen-refresh"
+                value={screenFx.refresh}
+                disabled={!screenFx.enabled}
+                onChange={event =>
+                  setScreenFx(fx => ({
+                    ...fx,
+                    refresh: event.target.value as ScreenRefresh,
+                    preset: 'custom'
+                  }))
+                }
+              >
+                <option value="native">Native / smooth (60Hz)</option>
+                <option value="30">30 FPS LCD cadence</option>
+                <option value="20">20 FPS retro cadence</option>
+              </select>
+            </div>
+
+            <details className="v2-fx-details">
+              <summary>
+                <span className="v2-summary-title">Fine-tune effects</span>
+                <span className="v2-summary-meta">
+                  {screenFx.preset === 'custom' ? 'CUSTOM · ' + activeFxCount + '/8' : screenFx.preset.toUpperCase()}
+                </span>
+              </summary>
+              <div className="v2-fx-sliders">
+                <div className="v2-fx-sliders-bar">
+                  <span>Adjust pixel matrix &amp; glass optics</span>
+                  {screenFx.preset === 'custom' && (
+                    <button
+                      type="button"
+                      className="v2-fx-reset"
+                      onClick={() => setScreenFx({ ...SCREEN_FX_PRESETS.lcd })}
+                    >
+                      Reset to Classic LCD
+                    </button>
+                  )}
+                </div>
+                <div className="v2-fx-sliders-grid">
+                  {SCREEN_FX_LEVELS.map(({ key, label, hint, group }) => (
+                    <div key={key} className={'v2-fx-slider' + (screenFx[key] > 0 ? ' is-nonzero' : '')}>
+                      <label htmlFor={'v2-fx-' + key}>
+                        <span className="v2-slider-label">
+                          <strong>{label}</strong>
+                          <small>{hint}</small>
+                        </span>
+                        <span className="v2-slider-val" data-group={group}>
+                          {screenFx[key]}%
+                        </span>
+                      </label>
+                      <input
+                        id={'v2-fx-' + key}
+                        aria-label={label}
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={1}
+                        disabled={!screenFx.enabled}
+                        value={screenFx[key]}
+                        style={{ '--fx-pct': `${screenFx[key]}%` } as CSSProperties}
+                        onChange={event => setScreenFx(fx => editScreenFx(fx, key, Number(event.target.value)))}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
+
+            <p className="v2-fx-note">
+              <span className={'v2-fx-dot ' + (fxActive ? 'live' : 'raw')} aria-hidden="true" />
+              {!screenFx.enabled || !isScreenFxActive(screenFx)
+                ? 'Raw indexed pixels · no visual processing'
+                : fxAvailable
+                ? 'GPU effects active · 4-color source unchanged'
+                : 'Waiting for WebGL · raw pixels remain visible'}
+              <span> · Preferences saved on this device</span>
+            </p>
+          </div>
+
+          <div className="v2-specs">
+            <div>
+              <span>LOGICAL DISPLAY</span>
+              <strong>160 × 144</strong>
+            </div>
+            <div>
+              <span>SCREEN SHADES</span>
+              <strong>4 indexed</strong>
+            </div>
+            <div>
+              <span>ENGINE</span>
+              <strong>Pixel v1 compatibility</strong>
+            </div>
+            <div>
+              <span>SAVE</span>
+              <strong>Local · legacy adapter</strong>
+            </div>
+          </div>
+          <p className="v2-security">
+            Runs an approved first-party cartridge in the existing isolated iframe + Worker. KAPLAY, accounts, and
+            friend sharing are not enabled in this slice.
           </p>
-        </div>
-        <div className="v2-specs"><div><span>LOGICAL DISPLAY</span><strong>160 × 144</strong></div>
-          <div><span>SCREEN SHADES</span><strong>4 indexed</strong></div>
-          <div><span>ENGINE</span><strong>Pixel v1 compatibility</strong></div>
-          <div><span>SAVE</span><strong>Local · legacy adapter</strong></div></div>
-        <p className="v2-security">Runs an approved first-party cartridge in the existing isolated iframe + Worker. KAPLAY, accounts, and friend sharing are not enabled in this slice.</p>
-      </aside>
-    </div>
-    {cartridge&&saved?.epoch===epoch&&<iframe key={epoch} ref={iframeRef} sandbox="allow-scripts"
-      referrerPolicy="no-referrer" title="Isolated compatibility runtime" srcDoc={SANDBOX_DOCUMENT}
-      className="v2-isolated-frame" tabIndex={-1}/>}
-  </main>;
+        </aside>
+      </div>
+
+      {cartridge && saved?.epoch === epoch && (
+        <iframe
+          key={epoch + ':' + game.id}
+          ref={iframeRef}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          title="Isolated compatibility runtime"
+          srcDoc={SANDBOX_DOCUMENT}
+          className="v2-isolated-frame"
+          tabIndex={-1}
+        />
+      )}
+    </main>
+  );
 }

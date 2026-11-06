@@ -44,6 +44,10 @@ async function main(){
     if(!booted)throw Error('V2 runtime did not become ready');
     const dimensions=String(await evalJs("document.querySelector('.v2-display canvas').width+'x'+document.querySelector('.v2-display canvas').height"));
     if(dimensions!=='160x144')throw Error('Incorrect hardware resolution '+dimensions);
+    const cartridgeLinks=Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip a').length"));
+    if(cartridgeLinks!==3)throw Error('Curated cartridge navigation missing');
+    const backHref=String(await evalJs("document.querySelector('.v2-brand').getAttribute('href')"));
+    if(backHref!=='/v2')throw Error('Brand link must remain a real navigation route');
     const initial=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
     await evalJs("window.__frame=document.querySelector('.v2-isolated-frame');window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));true");
     await sleep(900);
@@ -75,6 +79,8 @@ async function main(){
     await sleep(150);
     const fxSetting=await evalJs("document.querySelector('#v2-fx-glow').value");
     if(String(fxSetting)!=='92')throw Error('Fine-tuning screen effect slider failed');
+    const resetVisible=Boolean(await evalJs("!!document.querySelector('.v2-fx-reset')"));
+    if(!resetVisible)throw Error('Custom preset reset control missing');
     const persisted=String(await evalJs("localStorage.getItem('slopboy:v2:screen-fx:v1')"));
     if(!persisted.includes('"glow":92'))throw Error('Screen settings were not persisted');
     await evalJs("document.querySelector('#v2-screen-refresh').value='20';document.querySelector('#v2-screen-refresh').dispatchEvent(new Event('change',{bubbles:true}));true");
