@@ -15,6 +15,7 @@ export default function createOrbitDodge(kaplay, canvas) {
     background: [220, 233, 177],
     touchToMouse: false,
     debug: false,
+    loadingScreen: false,
   });
   const ink = [40, 72, 62];
   const muted = [100, 132, 104];
@@ -28,8 +29,10 @@ export default function createOrbitDodge(kaplay, canvas) {
   const beacon = k.add([k.rect(8, 8), k.pos(115, 90), k.color(...ink)]);
   let held = new Set();
   let elapsed = 0;
+  let updates = 0;
   const clamp = (v, low, high) => Math.max(low, Math.min(high, v));
   k.onUpdate(() => {
+    updates++;
     const dt = Math.min(k.dt(), 0.05);
     elapsed += dt;
     const speed = held.has("A") ? 115 : 76;
@@ -44,6 +47,9 @@ export default function createOrbitDodge(kaplay, canvas) {
   return {
     setInput(keys) { held = new Set(keys); },
     getPlayerX() { return player.pos.x; },
+    getTicks() { return updates; },
+    getInputCount() { return held.size; },
+    getAssetProgress() { return k.loadProgress(); },
     stop() { k.quit(); },
   };
 }

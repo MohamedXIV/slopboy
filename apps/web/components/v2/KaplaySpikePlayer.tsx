@@ -28,6 +28,9 @@ export default function KaplaySpikePlayer() {
   const [frames, setFrames] = useState(0);
   const [captureMs, setCaptureMs] = useState(0);
   const [playerX, setPlayerX] = useState(0);
+  const [gameTicks, setGameTicks] = useState(0);
+  const [inputCount, setInputCount] = useState(0);
+  const [assetProgress, setAssetProgress] = useState(0);
   const [diagnostic, setDiagnostic] = useState<Diagnostic|null>(null);
   const [palette, setPalette] = useState<V2PaletteId>("moss");
   const display = useRef<HTMLCanvasElement>(null);
@@ -117,6 +120,9 @@ export default function KaplaySpikePlayer() {
           setFrames(frameCount.current);
           if (Number.isFinite(message.captureMs)) setCaptureMs(Math.max(0, Number(message.captureMs)));
           if (Number.isFinite(message.playerX)) setPlayerX(Number(message.playerX));
+          if (Number.isFinite(message.gameTicks)) setGameTicks(Number(message.gameTicks));
+          if (Number.isFinite(message.inputCount)) setInputCount(Number(message.inputCount));
+          if (Number.isFinite(message.assetProgress)) setAssetProgress(Number(message.assetProgress));
         }
       }
     }
@@ -180,6 +186,7 @@ export default function KaplaySpikePlayer() {
   };
   const reset = () => {
     setDiagnostic(null);setFrames(0);setPlayerX(0);setCaptureMs(0);
+    setGameTicks(0);setInputCount(0);setAssetProgress(0);
     setStage("booting");setEpoch(e => e + 1);
   };
   const colors = V2_LCD_PALETTES[palette].colors;
@@ -209,6 +216,9 @@ export default function KaplaySpikePlayer() {
         <dt>Frames received</dt><dd data-testid="kaplay-frames">{frames}</dd>
         <dt>Last readback</dt><dd data-testid="kaplay-capture">{captureMs.toFixed(1)} ms</dd>
         <dt>Player X</dt><dd data-testid="kaplay-player-x">{playerX.toFixed(0)}</dd>
+        <dt>Engine update ticks</dt><dd data-testid="kaplay-ticks">{gameTicks}</dd>
+        <dt>Inputs in cartridge</dt><dd data-testid="kaplay-input-count">{inputCount}</dd>
+        <dt>Asset load</dt><dd data-testid="kaplay-asset-progress">{assetProgress.toFixed(2)}</dd>
         <dt>GPU preservation</dt><dd>{diagnostic ? String(diagnostic.preserveDrawingBuffer) : "unknown"}</dd>
         <dt>Pixel pipeline</dt><dd>WebGL → CPU quantize → 2D</dd>
         <dt>Transfer cap</dt><dd>30 FPS (60 target)</dd>

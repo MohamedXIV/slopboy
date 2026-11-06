@@ -48,6 +48,9 @@ function capture(now) {
     post("frame", {
       pixels,
       playerX: game.getPlayerX(),
+      gameTicks: game.getTicks(),
+      inputCount: game.getInputCount(),
+      assetProgress: game.getAssetProgress(),
       captureMs: performance.now() - started,
       engineFrameTarget: 60,
       transferFrameTarget: 30
