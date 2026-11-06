@@ -40,7 +40,7 @@ async function main() {
       await sleep(200);
     }
     if (!ready) throw Error("KAPLAY sandbox failed to produce real frames");
-    const evidence=JSON.parse(String(await evaluate("JSON.stringify((()=>{const c=document.querySelector('.kaplay-display-wrap canvas');const f=document.querySelector('.kaplay-display-wrap iframe');const data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const unique=new Set();for(let i=0;i<data.length;i+=4)unique.add(data[i]+','+data[i+1]+','+data[i+2]);return {width:c.width,height:c.height,colors:unique.size,sandbox:f.getAttribute('sandbox'),isolated:f.contentDocument===null,hasCsp:f.srcdoc.includes(\"connect-src 'none'\"),visibleRenderer:getComputedStyle(f).opacity==="1"&&f.getBoundingClientRect().width>=160}})())")));
+    const evidence=JSON.parse(String(await evaluate("JSON.stringify((()=>{const c=document.querySelector('.kaplay-display-wrap canvas');const f=document.querySelector('.kaplay-display-wrap iframe');const data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const unique=new Set();for(let i=0;i<data.length;i+=4)unique.add(data[i]+','+data[i+1]+','+data[i+2]);return {width:c.width,height:c.height,colors:unique.size,sandbox:f.getAttribute('sandbox'),isolated:f.contentDocument===null,hasCsp:f.srcdoc.includes(\"connect-src 'none'\"),visibleRenderer:getComputedStyle(f).opacity==='1'&&f.getBoundingClientRect().width>=160}})())")));
     if (evidence.width!==160 || evidence.height!==144 || evidence.colors<2 || evidence.colors>4) {
       throw Error("Indexed framebuffer mismatch "+JSON.stringify(evidence));
     }
