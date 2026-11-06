@@ -28,7 +28,7 @@ export const V2_DEVICE_1000: Readonly<V2HardwareProfile> = Object.freeze({
   revision:'2.0.0-preview',
   family:'vertical-slab',
   display:{width:160,height:144,indexedColors:4,targetFramesPerSecond:60},
-  inputs:['UP','DOWN','LEFT','RIGHT','A','B','START','SELECT'],
+  inputs:['UP','DOWN','LEFT','RIGHT','A','B','START','SELECT'] as const,
   audio:{maxVoices:4},
   limits:{cartridgeBytes:512*1024,unpackedBytes:2*1024*1024,saveBytes:8*1024,codeBytes:64*1024}
 });
