@@ -32,3 +32,7 @@ pnpm security:kaplay-spike
 ```
 
 Actual pass/fail evidence belongs to CI and browser smoke. Do not equate green status with production acceptance.
+
+## Render scheduler diagnostic
+
+The first Chromium run rendered index-validated frames but did not move during a 900ms keypress. The original sandbox canvas was hidden in a 1×1 opacity-zero iframe. A diagnostic run found only 12 KAPLAY update ticks over several seconds despite complete asset loading, consistent with background/occlusion throttling. The follow-up keeps the isolated WebGL iframe at its natural 160×144 dimensions behind the trusted, quantized display and tests sustained keypresses. This change is still a feasibility experiment, not a browser-wide FPS guarantee.

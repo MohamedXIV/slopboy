@@ -49,13 +49,14 @@ async function main() {
     }
     const initialX=Number(await evaluate("document.querySelector('[data-testid=kaplay-player-x]').textContent"));
     await evaluate("window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));true");
-    await sleep(900);
+    await sleep(2400);
+    const pressedEvidence = await evaluate("JSON.stringify({ticks:document.querySelector('[data-testid=kaplay-ticks]')?.textContent,inputs:document.querySelector('[data-testid=kaplay-input-count]')?.textContent,packets:document.querySelector('[data-testid=kaplay-input-packets]')?.textContent,active:document.querySelector('[data-testid=kaplay-active-input-ticks]')?.textContent})");
     await evaluate("window.dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight',bubbles:true}));true");
     await sleep(250);
     const finalX=Number(await evaluate("document.querySelector('[data-testid=kaplay-player-x]').textContent"));
     if (finalX < initialX + 15) {
       const debug = await evaluate("JSON.stringify({ticks:document.querySelector('[data-testid=kaplay-ticks]')?.textContent,inputs:document.querySelector('[data-testid=kaplay-input-count]')?.textContent,assets:document.querySelector('[data-testid=kaplay-asset-progress]')?.textContent})");
-      throw Error("Real KAPLAY game ignored keyboard input: "+initialX+" -> "+finalX+" / "+debug);
+      throw Error("Real KAPLAY game ignored keyboard input: "+initialX+" -> "+finalX+" / "+debug+" / during press "+pressedEvidence);
     }
     const screenshotBefore=String(await evaluate("document.querySelector('.kaplay-display-wrap canvas').toDataURL()"));
     await evaluate("document.querySelector('#kaplay-palette').value='amber';document.querySelector('#kaplay-palette').dispatchEvent(new Event('change',{bubbles:true}));true");

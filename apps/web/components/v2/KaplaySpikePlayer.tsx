@@ -29,6 +29,8 @@ export default function KaplaySpikePlayer() {
   const [captureMs, setCaptureMs] = useState(0);
   const [playerX, setPlayerX] = useState(0);
   const [gameTicks, setGameTicks] = useState(0);
+  const [inputPackets, setInputPackets] = useState(0);
+  const [activeInputTicks, setActiveInputTicks] = useState(0);
   const [inputCount, setInputCount] = useState(0);
   const [assetProgress, setAssetProgress] = useState(0);
   const [diagnostic, setDiagnostic] = useState<Diagnostic|null>(null);
@@ -121,6 +123,8 @@ export default function KaplaySpikePlayer() {
           if (Number.isFinite(message.captureMs)) setCaptureMs(Math.max(0, Number(message.captureMs)));
           if (Number.isFinite(message.playerX)) setPlayerX(Number(message.playerX));
           if (Number.isFinite(message.gameTicks)) setGameTicks(Number(message.gameTicks));
+          if (Number.isFinite(message.inputPackets)) setInputPackets(Number(message.inputPackets));
+          if (Number.isFinite(message.activeInputTicks)) setActiveInputTicks(Number(message.activeInputTicks));
           if (Number.isFinite(message.inputCount)) setInputCount(Number(message.inputCount));
           if (Number.isFinite(message.assetProgress)) setAssetProgress(Number(message.assetProgress));
         }
@@ -186,7 +190,7 @@ export default function KaplaySpikePlayer() {
   };
   const reset = () => {
     setDiagnostic(null);setFrames(0);setPlayerX(0);setCaptureMs(0);
-    setGameTicks(0);setInputCount(0);setAssetProgress(0);
+    setGameTicks(0);setInputCount(0);setAssetProgress(0);setInputPackets(0);setActiveInputTicks(0);
     setStage("booting");setEpoch(e => e + 1);
   };
   const colors = V2_LCD_PALETTES[palette].colors;
@@ -218,6 +222,8 @@ export default function KaplaySpikePlayer() {
         <dt>Player X</dt><dd data-testid="kaplay-player-x">{playerX.toFixed(0)}</dd>
         <dt>Engine update ticks</dt><dd data-testid="kaplay-ticks">{gameTicks}</dd>
         <dt>Inputs in cartridge</dt><dd data-testid="kaplay-input-count">{inputCount}</dd>
+        <dt>Input packets</dt><dd data-testid="kaplay-input-packets">{inputPackets}</dd>
+        <dt>Active input ticks</dt><dd data-testid="kaplay-active-input-ticks">{activeInputTicks}</dd>
         <dt>Asset load</dt><dd data-testid="kaplay-asset-progress">{assetProgress.toFixed(2)}</dd>
         <dt>GPU preservation</dt><dd>{diagnostic ? String(diagnostic.preserveDrawingBuffer) : "unknown"}</dd>
         <dt>Pixel pipeline</dt><dd>WebGL → CPU quantize → 2D</dd>

@@ -49,6 +49,8 @@ function capture(now) {
       pixels,
       playerX: game.getPlayerX(),
       gameTicks: game.getTicks(),
+      inputPackets: game.getInputPackets(),
+      activeInputTicks: game.getActiveInputTicks(),
       inputCount: game.getInputCount(),
       assetProgress: game.getAssetProgress(),
       captureMs: performance.now() - started,
