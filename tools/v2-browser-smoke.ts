@@ -50,10 +50,17 @@ async function main(){
     await evalJs("window.dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight',bubbles:true}));true");
     const moved=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
     if(initial===moved)throw Error('Real game framebuffer did not change on player input');
+    const canvasTintBefore=String(await evalJs("JSON.stringify(Array.from(document.querySelector('.v2-display canvas').getContext('2d').getImageData(1,1,1,1).data).slice(0,3))"));
     await evalJs("document.querySelectorAll('.v2-palettes button')[1].click();true");
+    await sleep(180);
+    const canvasTintAfter=String(await evalJs("JSON.stringify(Array.from(document.querySelector('.v2-display canvas').getContext('2d').getImageData(1,1,1,1).data).slice(0,3))"));
+    if(canvasTintBefore===canvasTintAfter)throw Error('LCD selection did not recolor the actual framebuffer');
     const pal=await evalJs("document.querySelectorAll('.v2-palettes button')[1].getAttribute('aria-pressed')");
     if(pal!=='true')throw Error('LCD palette did not change');
+    const finishBefore=String(await evalJs("getComputedStyle(document.querySelector('.v2-device-stage')).getPropertyValue('--v2-shell')"));
     await evalJs("document.querySelectorAll('.v2-swatches button')[2].click();true");
+    const finishAfter=String(await evalJs("getComputedStyle(document.querySelector('.v2-device-stage')).getPropertyValue('--v2-shell')"));
+    if(finishBefore===finishAfter)throw Error('Shell swatch did not change hardware finish');
     const skin=await evalJs("document.querySelectorAll('.v2-swatches button')[2].getAttribute('aria-pressed')");
     if(skin!=='true')throw Error('Shell finish did not change');
     await evalJs("document.querySelector('.v2-controlbar button').click();true");

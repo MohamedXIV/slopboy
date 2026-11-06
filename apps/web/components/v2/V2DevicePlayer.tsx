@@ -228,7 +228,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     try{
       if(document.fullscreenElement)await document.exitFullscreen();
       else await shellRef.current?.requestFullscreen();
-    }catch{updateStatus('error','Fullscreen is unavailable in this browser');}
+    }catch{ /* Optional fullscreen denial must never interrupt gameplay. */ }
   };
   const colors=V2_SHELLS[shell];
   const shellStyle={'--v2-shell':colors.base,'--v2-shadow':colors.shadow,'--v2-ink':colors.ink,'--v2-face':colors.button} as CSSProperties;
@@ -294,7 +294,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
           <div><span>SCREEN SHADES</span><strong>4 indexed</strong></div>
           <div><span>ENGINE</span><strong>Pixel v1 compatibility</strong></div>
           <div><span>SAVE</span><strong>Local · 8 KiB</strong></div></div>
-        <p className="v2-security">Runs an approved first-party cartridge in the existing isolated iframe + Worker. KAPLAY, accounts, and friend sharing are **not** enabled in this slice.</p>
+        <p className="v2-security">Runs an approved first-party cartridge in the existing isolated iframe + Worker. KAPLAY, accounts, and friend sharing are not enabled in this slice.</p>
       </aside>
     </div>
     {cartridge&&saved?.epoch===epoch&&<iframe key={epoch} ref={iframeRef} sandbox="allow-scripts"
