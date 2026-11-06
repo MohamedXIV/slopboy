@@ -1,6 +1,8 @@
 /**
  * Slopboy 2.0 hardware contract, deliberately independent of any game engine.
- * This is a fresh candidate profile. The public v1 hardware remains unchanged.
+ * Only logical resolution and indexed color count are emulated. Other hardware
+ * properties (CPU, RAM, FPS, audio, ROM, saves) are NOT simulated.
+ * Public v1 compatibility hardware remains unchanged.
  */
 export type V2Button = 'UP'|'DOWN'|'LEFT'|'RIGHT'|'A'|'B'|'START'|'SELECT';
 export type DeviceFamily = 'vertical-slab'|'wide-slab'|'compact-slab'|'folding-slab';
@@ -12,25 +14,16 @@ export interface V2HardwareProfile {
     readonly width: number;
     readonly height: number;
     readonly indexedColors: number;
-    readonly targetFramesPerSecond: number;
   };
+  /** Physical controls for input mapping only, not engine or resource limits. */
   readonly inputs: readonly V2Button[];
-  readonly audio: {readonly maxVoices: number};
-  readonly limits: {
-    readonly cartridgeBytes: number;
-    readonly unpackedBytes: number;
-    readonly saveBytes: number;
-    readonly codeBytes: number;
-  };
 }
 export const V2_DEVICE_1000: Readonly<V2HardwareProfile> = Object.freeze({
   id:'slopboy-1000',
   revision:'2.0.0-preview',
   family:'vertical-slab',
-  display:{width:160,height:144,indexedColors:4,targetFramesPerSecond:60},
+  display:{width:160,height:144,indexedColors:4},
   inputs:['UP','DOWN','LEFT','RIGHT','A','B','START','SELECT'] as const,
-  audio:{maxVoices:4},
-  limits:{cartridgeBytes:512*1024,unpackedBytes:2*1024*1024,saveBytes:8*1024,codeBytes:64*1024}
 });
 export const V2_DEVICE_FAMILIES: ReadonlyArray<{readonly id:DeviceFamily;readonly name:string;readonly status:'concept'|'active'}> = [
   {id:'vertical-slab',name:'Vertical slab',status:'active'},
@@ -59,27 +52,21 @@ export type V2ShellId=keyof typeof V2_SHELLS;
 export function isV2PaletteId(value:string):value is V2PaletteId{return Object.hasOwn(V2_LCD_PALETTES,value);}
 export function isV2ShellId(value:string):value is V2ShellId{return Object.hasOwn(V2_SHELLS,value);}
 export function validateHardwareProfile(profile:V2HardwareProfile):void{
-  const {display,limits,inputs}=profile;
+  const {display,inputs}=profile;
   if(!/^[a-z0-9-]+$/.test(profile.id)||!/^\d+\.\d+\.\d+(?:-[a-z0-9-]+)?$/.test(profile.revision))
     throw Error('Invalid hardware identity/version');
   if(!Number.isInteger(display.width)||!Number.isInteger(display.height)||display.width<=0||display.height<=0||
       display.width*display.height>512*512||!Number.isInteger(display.indexedColors)||
-      display.indexedColors<2||display.indexedColors>256||
-      !Number.isInteger(display.targetFramesPerSecond)||display.targetFramesPerSecond<15||display.targetFramesPerSecond>120)
+      display.indexedColors<2||display.indexedColors>256)
     throw Error('Invalid display capabilities');
   if(!inputs.length||new Set(inputs).size!==inputs.length||!inputs.every(x=>['UP','DOWN','LEFT','RIGHT','A','B','START','SELECT'].includes(x)))
     throw Error('Invalid input capabilities');
-  if(!Number.isInteger(profile.audio.maxVoices)||profile.audio.maxVoices<0)throw Error('Invalid audio budget');
-  if(!Object.values(limits).every(x=>Number.isInteger(x)&&x>0)||
-      limits.codeBytes>limits.unpackedBytes||limits.cartridgeBytes>limits.unpackedBytes)
-    throw Error('Invalid cartridge budgets');
 }
 export function matchesCartridgeRequirements(
   hardware:V2HardwareProfile,
-  required:Readonly<{display:{width:number;height:number;indexedColors:number};buttons:readonly string[]}>
+  required:Readonly<{display:{width:number;height:number;indexedColors:number}}>
 ):boolean{
   return required.display.width===hardware.display.width &&
     required.display.height===hardware.display.height &&
-    required.display.indexedColors<=hardware.display.indexedColors &&
-    required.buttons.every(button=>hardware.inputs.includes(button as V2Button));
+    required.display.indexedColors<=hardware.display.indexedColors;
 }

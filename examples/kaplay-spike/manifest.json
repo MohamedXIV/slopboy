@@ -9,7 +9,10 @@
     "revision": "2.0.0-preview"
   },
   "requirements": {
-    "display": {"width": 160, "height": 144, "indexedColors": 4},
-    "buttons": ["UP", "DOWN", "LEFT", "RIGHT", "A"]
+    "display": {
+      "width": 160,
+      "height": 144,
+      "indexedColors": 4
+    }
   }
 }

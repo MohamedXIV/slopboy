@@ -12,6 +12,7 @@ import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/sa
 import './v2-player.css';
 
 const DEVICE=SLOPBOY_1000; // Explicit v1 compatibility adapter; not a new KAPLAY sandbox.
+const PRESENTATION_TICK_TARGET=60; // Host target, not a virtual hardware ceiling.
 type Status='loading'|'booting'|'running'|'error';
 const KEY_MAP:Record<string,InputName>={
   ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT',
@@ -151,7 +152,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     let animation=0;
     const tick=(now:number)=>{
       animation=requestAnimationFrame(tick);
-      if(!ready.current||statusRef.current!=='running'||now-lastTick.current<1000/V2_DEVICE_1000.display.targetFramesPerSecond)return;
+      if(!ready.current||statusRef.current!=='running'||now-lastTick.current<1000/PRESENTATION_TICK_TARGET)return;
       const dt=lastTick.current?Math.min((now-lastTick.current)/1000,0.05):1/60;
       lastTick.current=now;
       const pad=gamepadButtons();

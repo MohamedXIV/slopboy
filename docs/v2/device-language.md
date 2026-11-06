@@ -13,6 +13,10 @@ All devices are fundamentally rectangular **slabs**; corners may be rounded, cha
 
 Variants are visual shells with consistent placement constraints; users can modify materials, tint, stickers, boot visuals and trim but cannot purchase higher resolution or new physical input via a cosmetic. Limited editions require an entitlement system, never a client-side boolean.
 
+## Display-only fantasy hardware
+
+Games are restricted only by a model's logical display dimensions and indexed color count. Shell geometry and controls express device identity; no fake CPU/RAM/audio-voice/FPS/code/ROM/save limits apply. Operational upload quotas and arbitrary-code security are platform policies, not simulated console specifications.
+
 ## Pixel identity
 
 The gameplay framebuffer uses abstract indexed shades. Players may select Moss, Ocean, Amber or Graphite appearance. Tint changes do not change game logic, number of palette indices or screenshot validity. Scanlines and LCD noise are optional presentation overlays; reduced-motion and contrast needs outrank nostalgia.

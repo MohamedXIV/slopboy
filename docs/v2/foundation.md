@@ -8,7 +8,8 @@
 - Original virtual handheld **slabs**, with largely rectangular exterior silhouettes. Never winged gamepad forms or close replicas of Nintendo/Sony designs. Families: vertical, wide, compact, folding rectangular. A device's look is distinct from its technical capabilities.
 - Players may play offline and on nearby devices without an account. Cloud ownership/sharing, creator publishing and remote AI integrations require authenticated identity.
 - Drafts are playable by their creators without public content review. Friends can be invited to specific immutable revisions after automated checks. Public discovery requires human approval. Private/unlisted access is not a substitute for technical sandbox isolation.
-- One resource-limited virtual hardware profile governs inputs, indexed colors, dimensions, audio, save and cartridge budgets.
+- **Display-only virtual devices:** games target a logical resolution (width × height / aspect ratio) and indexed-color count. No virtual CPU, RAM, GPU capacity, maximum audio voices, FPS ceiling, code/ROM size or save-memory limits. Physical buttons describe interaction and input mapping rather than restricting computation.
+- **Platform safety is separate:** sandboxing, upload/asset validation, storage quotas, protection from runaway scripts and operational limits protect users and infrastructure. Never present these as invented console specifications.
 - Creating and playing a game must work without a paid AI service; ChatGPT, Claude and other agents use the same versioned creator protocol. Agent authorization is scoped and revocable.
 - Default candidate game framework: **KAPLAY 3001 stable**, advanced rigid bodies optional pending KaPlanck/Planck compatibility tests. Native-pixel remains an optional engine. Phaser/Matter are alternatives if KAPLAY tests fail.
 - P2P multiplayer candidate: Trystero/WebRTC, private 2–4-player rooms; host-authoritative physics for a two-player slingshot duel. No dedicated gameplay servers or paid TURN. Connectivity cannot be guaranteed behind all NATs. LAN without internet needs separate signaling, not public Nostr. Same-device multiplayer and Native Nearby are different transports.
@@ -18,7 +19,7 @@
 ## Versioned source of truth
 
 The first new contract is `packages/hardware/src/v2.ts`. Its device has revision
-`2.0.0-preview`, indexed 160×144 four-shade display and original rectangular shell families. Only model 1000 is active. The future three families are **concepts**, not playable products. Colors and shell finishes are presentation-only and cannot increase hardware limits.
+`2.0.0-preview`, indexed 160×144 four-shade display and original rectangular shell families. Only model 1000 is active. The future three families are **concepts**, not playable products. Colors and shell finishes are presentation-only and cannot change the logical display resolution or palette depth.
 
 No arbitrary game code may modify these specs, use account credentials or execute directly in the privileged Next.js document.
 
@@ -45,7 +46,7 @@ All body backgrounds, button colors, and LCD palettes from Gemini are adapted de
 
 ### Acceptance for this slice
 
-- `pnpm test` validates hardware schema, controls, profile isolation from cosmetics.
+- `pnpm test` validates display-only hardware compatibility, controls-as-input-metadata and palette separation from cosmetics.
 - `pnpm typecheck`, `pnpm lint`, Next static export and PWA offline build pass.
 - `pnpm security:browser` still rejects the Worker spoofing/watchdog fixtures.
 - `pnpm security:v2-browser` starts a real game in headless Chrome over local HTTP, checks frame dimensions, keyboard input and a changed framebuffer, palette/shell selection, mode switching without reload, and restart with new iframe. **Chrome alone is not mobile/Safari security approval.**
@@ -66,6 +67,8 @@ Do **not** provision paid resources or commit credentials. Provider configuratio
 ## KAPLAY isolation gate
 
 KAPLAY is Canvas/WebGL-based; the existing restricted Worker frame-buffer API is **not** a drop-in host. Prototype an explicit versioned engine adapter on an isolated branch first. Required: load KAPLAY from a pinned, self-hosted runtime **only when needed**, prove it renders from an opaque-origin sandbox, no unrestricted account DOM, no unrestricted network, hard watchdog behavior for stalls, indexed palette *output enforcement* and bounded frame/asset sizes, responsive touch input, Chromium/Firefox/WebKit and mobile checks. Check whether rendering can be captured under WebGL without expensive frame readbacks and whether a background/hidden document throttles timers. An opaque iframe alone does not impose a CPU/memory quota: untrusted execution risk remains a separate gate.
+
+Performance benchmarks and frame transfer targets are user-experience checks, not emulated per-console FPS caps. CPU/memory isolation is required for untrusted code safety, not retro authenticity.
 
 The first advanced physics test is a 2-player slingshot duel with rotating rigid bodies and destructible structures. Compare KaPlanck and Phaser/Matter if the KAPLAY path cannot meet the budgets. Evaluate Trystero/Nostr separately from truly offline LAN.
 
