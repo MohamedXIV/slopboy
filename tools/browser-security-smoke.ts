@@ -35,6 +35,6 @@ async function run():Promise<void>{
       console.log('Chromium sandbox regression:',report.slice(0,4500));
       if(state!=='pass')throw Error('Browser security regression failed or timed out: '+String(state));
     }finally{browser.close();}
-  }finally{await rm(folder,{recursive:true,force:true});}
+  }finally{await rm(folder,{recursive:true,force:true,maxRetries:20,retryDelay:150}).catch(error=>console.warn('Chromium profile cleanup:',error));}
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});
