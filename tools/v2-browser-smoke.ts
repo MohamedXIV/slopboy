@@ -63,6 +63,32 @@ async function main(){
     if(finishBefore===finishAfter)throw Error('Shell swatch did not change hardware finish');
     const skin=await evalJs("document.querySelectorAll('.v2-swatches button')[2].getAttribute('aria-pressed')");
     if(skin!=='true')throw Error('Shell finish did not change');
+    const fxNode=String(await evalJs("document.querySelector('.v2-display').classList.contains('fx-active')"));
+    if(fxNode!=='true')throw Error('Classic LCD did not enable the real WebGL screen FX layer');
+    const fxOutputBefore=String(await evalJs("document.querySelector('.v2-fx-output').toDataURL()"));
+    await evalJs("document.querySelector('.v2-fx-presets button:nth-child(3)').click();true");
+    await sleep(200);
+    const fxOutputPhosphor=String(await evalJs("document.querySelector('.v2-fx-output').toDataURL()"));
+    if(fxOutputBefore===fxOutputPhosphor)throw Error('Phosphor preset did not change the actual GPU output');
+    await evalJs("document.querySelector('.v2-fx-details summary').click();true");
+    await evalJs("const slider=document.querySelector('#v2-fx-glow');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(slider,'92');slider.dispatchEvent(new Event('input',{bubbles:true}));true");
+    await sleep(150);
+    const fxSetting=await evalJs("document.querySelector('#v2-fx-glow').value");
+    if(String(fxSetting)!=='92')throw Error('Fine-tuning screen effect slider failed');
+    const persisted=String(await evalJs("localStorage.getItem('slopboy:v2:screen-fx:v1')"));
+    if(!persisted.includes('"glow":92'))throw Error('Screen settings were not persisted');
+    await evalJs("document.querySelector('#v2-screen-refresh').value='20';document.querySelector('#v2-screen-refresh').dispatchEvent(new Event('change',{bubbles:true}));true");
+    await sleep(100);
+    if(String(await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:screen-fx:v1')).refresh"))!=='20')
+      throw Error('Display-only refresh cap preference not saved');
+    await evalJs("document.querySelector('[aria-label=\"Screen effects\"]').click();true");
+    const off=await evalJs("document.querySelector('[aria-label=\"Screen effects\"]').getAttribute('aria-checked')==='false'&&!document.querySelector('.v2-display').classList.contains('fx-active')");
+    if(off!==true)throw Error('Complete screen FX bypass not working');
+    const rawStillAvailable=await evalJs("document.querySelector('.v2-raw-frame').getContext('2d').getImageData(0,0,1,1).data[3]===255");
+    if(rawStillAvailable!==true)throw Error('Effect bypass broke the underlying frame');
+    await evalJs("document.querySelector('.v2-fx-presets button:first-child').click();true");
+    const clean=await evalJs("document.querySelector('.v2-display').classList.contains('fx-active')");
+    if(clean!==false)throw Error('Clean pixels must bypass GPU layer');
     await evalJs("document.querySelector('.v2-controlbar button').click();true");
     const same=await evalJs("document.querySelector('.v2-device-stage').classList.contains('v2-game-mode')&&window.__frame===document.querySelector('.v2-isolated-frame')");
     if(same!==true)throw Error('Game mode restarted the live sandbox');
@@ -75,7 +101,7 @@ async function main(){
       await sleep(150);
     }
     if(!restarted)throw Error('Restart failed to recover a fresh sandbox');
-    console.log('V2 Chrome smoke passed: real cartridge / resolution / controls / colors / cosmetics / same-session game mode / restart');
+    console.log('V2 Chrome smoke passed: game / display / real GPU screen FX / presets / sliders / storage / bypass / same-session mode / restart');
   }finally{
     browser?.close();
     await new Promise<void>(resolve=>server.close(()=>resolve()));

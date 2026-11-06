@@ -40,16 +40,18 @@ No arbitrary game code may modify these specs, use account credentials or execut
 
 ## V2 first vertical slice — implemented for testing
 
-Paths `/v2` and `/v2/play/[game]` are the new UI laboratory. The first playable hardware is a rectangular slab with physical input, keyboard, standard gamepad polling, console/game-only mode sharing the same canvas/session, fullscreen, four physical-shell color finishes, four LCD palettes, scanline effect and save isolation. The actual games are **curated V1 cartridges** executed in the existing Worker/iframe, marked as a *pixel-v1 compatibility adapter*. The scope is a playable design/architecture spike, not a KAPLAY adoption or backend launch.
+Paths `/v2` and `/v2/play/[game]` are the new UI laboratory. The first playable hardware is a rectangular slab with physical input, keyboard, standard gamepad polling, console/game-only mode sharing the same canvas/session, fullscreen, four physical-shell color finishes, four LCD palettes, scanline effect and save isolation. The player now adds an **engine-independent, display-only WebGL1 post-process** after the validated 160×144 four-shade framebuffer. Screen FX includes Clean (true bypass), LCD and Phosphor presets, per-effect sliders (matrix, glow, scanlines, persistence, curvature, glass, grain and vignette), and optional 30/20 FPS **visual refresh sampling only**. Physics, sandbox ticks and inputs remain unchanged. Preferences persist locally with validation; on WebGL failure/loss the raw indexed 2D canvas remains visible. Fine-tuning is entirely optional. This is a first 2D implementation, NOT a fully physical CRT simulation or 3D model. FPS throttling affects displayed frames only and does not guarantee device performance.
+
+The actual games are **curated V1 cartridges** executed in the existing Worker/iframe, marked as a *pixel-v1 compatibility adapter*. The scope is a playable design/architecture spike, not a KAPLAY adoption or backend launch.
 
 All body backgrounds, button colors, and LCD palettes from Gemini are adapted design ideas rather than copied source. No `new Function`, mock authentication, staged WebRTC success, fake currency, pseudo-review or source-code execution in the privileged app.
 
 ### Acceptance for this slice
 
-- `pnpm test` validates display-only hardware compatibility, controls-as-input-metadata and palette separation from cosmetics.
+- `pnpm test` validates display-only hardware compatibility, controls-as-input-metadata, palette separation from cosmetics, and screen-preset sanitization/bypass.
 - `pnpm typecheck`, `pnpm lint`, Next static export and PWA offline build pass.
 - `pnpm security:browser` still rejects the Worker spoofing/watchdog fixtures.
-- `pnpm security:v2-browser` starts a real game in headless Chrome over local HTTP, checks frame dimensions, keyboard input and a changed framebuffer, palette/shell selection, mode switching without reload, and restart with new iframe. **Chrome alone is not mobile/Safari security approval.**
+- `pnpm security:v2-browser` starts a real game in headless Chrome over local HTTP, checks frame dimensions, keyboard input and a changed framebuffer, palette/shell selection, real GPU preset changes and no-WebGL FX bypass, locally saved settings, mode switching without reload, and restart with new iframe. **Chrome alone is not mobile/Safari security approval.**
 
 ## Neon candidate evaluation gates (not implementation claims)
 

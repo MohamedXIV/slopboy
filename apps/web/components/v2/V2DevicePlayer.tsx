@@ -9,6 +9,10 @@ import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartr
 import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
 import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
+import {RetroScreenRenderer} from './RetroScreenRenderer';
+import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
+  sanitizeScreenFx,isScreenFxActive,editScreenFx,
+  type ScreenFxSettings,type ScreenRefresh} from './screen-fx-config';
 import './v2-player.css';
 
 const DEVICE=SLOPBOY_1000; // Explicit v1 compatibility adapter; not a new KAPLAY sandbox.
@@ -58,12 +62,20 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   const [reason,setReason]=useState('');
   const [shell,setShell]=useState<V2ShellId>('bone');
   const [palette,setPalette]=useState<V2PaletteId>('moss');
-  const [scanlines,setScanlines]=useState(false);
+  const [screenFx,setScreenFx]=useState<ScreenFxSettings>(DEFAULT_SCREEN_FX);
+  const [fxAvailable,setFxAvailable]=useState(false);
   const [mode,setMode]=useState<'console'|'game'>('console');
   const [fullscreen,setFullscreen]=useState(false);
   const [keyHeld,setKeyHeld]=useState<ReadonlyArray<InputName>>([]);
   const shellRef=useRef<HTMLDivElement>(null);
   const canvasRef=useRef<HTMLCanvasElement>(null);
+  const fxCanvasRef=useRef<HTMLCanvasElement>(null);
+  const displayRef=useRef<HTMLDivElement>(null);
+  const screenFxRef=useRef<ScreenFxSettings>(DEFAULT_SCREEN_FX);
+  const fxRenderer=useRef<RetroScreenRenderer|null>(null);
+  const fxAttempted=useRef(false);
+  const fxReady=useRef(false);
+  const fxStorageReady=useRef(false);
   const iframeRef=useRef<HTMLIFrameElement>(null);
   const sessionKey=useRef('');
   const statusRef=useRef<Status>('loading');
@@ -84,12 +96,56 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   const post=useCallback((type:string,extra:Record<string,unknown>={})=>{
     iframeRef.current?.contentWindow?.postMessage({scope:'slopboy-v1',type,key:sessionKey.current,...extra},'*');
   },[]);
+  const onFxAvailability=useCallback((available:boolean)=>{
+    fxReady.current=available;setFxAvailable(available);
+  },[]);
+  const presentFx=useCallback((force=false)=>{
+    const source=canvasRef.current,output=fxCanvasRef.current,settings=screenFxRef.current;
+    if(!source||!output||!isScreenFxActive(settings))return;
+    if(!fxRenderer.current&&!fxAttempted.current){
+      fxAttempted.current=true;
+      const renderer=new RetroScreenRenderer(output,onFxAvailability);
+      if(renderer.available)fxRenderer.current=renderer;
+      else renderer.dispose();
+    }
+    if(fxRenderer.current?.present(source,settings,force)&&!fxReady.current){
+      onFxAvailability(true);
+    }
+  },[onFxAvailability]);
+  // Guest-local, versioned presentation preference; auth sync can later use same contract.
+  useEffect(()=>{
+    const frame=requestAnimationFrame(()=>{
+      try{
+        const saved=window.localStorage.getItem(SCREEN_FX_STORAGE_KEY);
+        if(saved)setScreenFx(sanitizeScreenFx(JSON.parse(saved)));
+      }catch{/* Private browsing and corrupt preferences fall back to LCD. */}
+      fxStorageReady.current=true;
+    });
+    return()=>cancelAnimationFrame(frame);
+  },[]);
+  useEffect(()=>{
+    screenFxRef.current=screenFx;
+    if(fxStorageReady.current){
+      try{window.localStorage.setItem(SCREEN_FX_STORAGE_KEY,JSON.stringify(screenFx));}
+      catch{/* Storage denial never stops games. */}
+    }
+    if(lastImage.current)presentFx(true);
+  },[screenFx,presentFx]);
+  useEffect(()=>{
+    const screen=displayRef.current;
+    if(!screen||typeof ResizeObserver==='undefined')return;
+    const observer=new ResizeObserver(()=>{if(lastImage.current)presentFx(true);});
+    observer.observe(screen);
+    return()=>observer.disconnect();
+  },[presentFx]);
+  useEffect(()=>()=>{fxRenderer.current?.dispose();fxRenderer.current=null;},[]);
   const draw=useCallback((pixels:Uint8Array,paletteColors:readonly string[])=>{
     const ctx=canvasRef.current?.getContext('2d',{alpha:false});
     if(!ctx)return;
     ctx.imageSmoothingEnabled=false;
     ctx.putImageData(rasterizeFrame(pixels,DEVICE.display.width,DEVICE.display.height,paletteColors),0,0);
-  },[]);
+    presentFx();
+  },[presentFx]);
   useEffect(()=>{
     currentPalette.current=V2_LCD_PALETTES[palette].colors;
     if(lastImage.current)draw(lastImage.current,currentPalette.current);
@@ -244,9 +300,10 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
           <div className="v2-hardware-body">
             <div className="v2-shell-logo"><strong>SLOPBOY <em>1000</em></strong><span className={'v2-led'+(status==='running'?' on':'')}/></div>
             <div className="v2-screen-bezel">
-              <div className={'v2-display'+(scanlines?' scanlines':'')}>
-                <canvas width={V2_DEVICE_1000.display.width} height={V2_DEVICE_1000.display.height}
+              <div ref={displayRef} className={'v2-display'+(fxAvailable&&isScreenFxActive(screenFx)?' fx-active':'')}>
+                <canvas className="v2-raw-frame" width={V2_DEVICE_1000.display.width} height={V2_DEVICE_1000.display.height}
                   ref={canvasRef} role="img" aria-label={game.title+' game screen'}/>
+                <canvas className="v2-fx-output" ref={fxCanvasRef} aria-hidden="true"/>
               </div>
               <div className="v2-screen-note">PIXEL POCKET · FOUR SHADES</div>
             </div>
@@ -288,13 +345,51 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
             key={id} type="button" className={palette===id?'chosen':''} onClick={()=>setPalette(id)}
             aria-pressed={palette===id}><span className="v2-palette-bars">{V2_LCD_PALETTES[id].colors.map(c=><i key={c} style={{background:c}}/>)}</span>{V2_LCD_PALETTES[id].name}</button>)}</div>
         </div>
-        <div className="v2-option v2-toggle"><div><h2>LCD scanlines</h2><p>Visual overlay only · never game logic</p></div>
-          <button type="button" role="switch" aria-checked={scanlines} aria-label="LCD scanlines"
-            className={scanlines?'enabled':''} onClick={()=>setScanlines(v=>!v)}><i/></button></div>
+        <div className="v2-option v2-fx-panel" aria-label="Retro screen effects settings">
+          <div className="v2-fx-heading v2-toggle"><div><h2>Screen effects <small>WebGL presentation</small></h2>
+            <p>Cosmetic only. The game always runs at its own speed.</p></div>
+            <button type="button" role="switch" aria-label="Screen effects"
+              aria-checked={screenFx.enabled} className={screenFx.enabled?'enabled':''}
+              onClick={()=>setScreenFx(fx=>({...fx,enabled:!fx.enabled}))}><i/></button>
+          </div>
+          <div className="v2-fx-presets" role="group" aria-label="Screen effect presets">
+            {(['clean','lcd','phosphor'] as const).map(preset=><button type="button" key={preset}
+              aria-pressed={screenFx.preset===preset} className={screenFx.preset===preset?'chosen':''}
+              onClick={()=>setScreenFx({...SCREEN_FX_PRESETS[preset]})}>
+              {preset==='clean'?'Clean pixels':preset==='lcd'?'Classic LCD':'Phosphor'}
+            </button>)}
+          </div>
+          <div className="v2-fx-row">
+            <label htmlFor="v2-screen-refresh">Simulated screen refresh</label>
+            <select id="v2-screen-refresh" value={screenFx.refresh} disabled={!screenFx.enabled}
+              onChange={event=>setScreenFx(fx=>({...fx,refresh:event.target.value as ScreenRefresh,preset:'custom'}))}>
+              <option value="native">Native / smooth</option>
+              <option value="30">30 FPS display</option>
+              <option value="20">20 FPS display</option>
+            </select>
+          </div>
+          <details className="v2-fx-details">
+            <summary>Fine-tune effects <span>{screenFx.preset==='custom'?'Custom':screenFx.preset.toUpperCase()}</span></summary>
+            <div className="v2-fx-sliders">
+              {SCREEN_FX_LEVELS.map(({key,label})=><div key={key} className="v2-fx-slider">
+                <label htmlFor={'v2-fx-'+key}>{label} <span>{screenFx[key]}%</span></label>
+                <input id={'v2-fx-'+key} aria-label={label} type="range" min={0} max={100} step={1}
+                  disabled={!screenFx.enabled} value={screenFx[key]}
+                  onChange={event=>setScreenFx(fx=>editScreenFx(fx,key,Number(event.target.value)))}/>
+              </div>)}
+            </div>
+          </details>
+          <p className="v2-fx-note">{!screenFx.enabled||!isScreenFxActive(screenFx)
+            ?'Raw indexed pixels · no visual processing'
+            :fxAvailable?'GPU effects active · 4-color source unchanged'
+            :'Waiting for WebGL · raw pixels remain visible'}
+            <span> · Preferences saved on this device</span>
+          </p>
+        </div>
         <div className="v2-specs"><div><span>LOGICAL DISPLAY</span><strong>160 × 144</strong></div>
           <div><span>SCREEN SHADES</span><strong>4 indexed</strong></div>
           <div><span>ENGINE</span><strong>Pixel v1 compatibility</strong></div>
-          <div><span>SAVE</span><strong>Local · 8 KiB</strong></div></div>
+          <div><span>SAVE</span><strong>Local · legacy adapter</strong></div></div>
         <p className="v2-security">Runs an approved first-party cartridge in the existing isolated iframe + Worker. KAPLAY, accounts, and friend sharing are not enabled in this slice.</p>
       </aside>
     </div>

@@ -17,7 +17,8 @@
 .v2-screen-bezel{background:#34464a;padding:15px 15px 11px;border-radius:17px;box-shadow:inset 2px 3px 7px #172527}
 .v2-display{position:relative;line-height:0;aspect-ratio:160/144;background:#bbd1a2;overflow:hidden;border-radius:5px;box-shadow:0 0 0 3px #172a2b}
 .v2-display canvas{display:block;width:100%;height:100%;aspect-ratio:160/144;image-rendering:pixelated}
-.v2-display.scanlines:after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,#07170a30 0px,#07170a30 1px,transparent 1px,transparent 4px);pointer-events:none}
+.v2-display .v2-fx-output{position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none;image-rendering:auto}
+.v2-display.fx-active .v2-fx-output{opacity:1}
 .v2-screen-note{font:800 8px monospace;letter-spacing:1.1px;color:#afc6b7;text-align:center;margin-top:11px}
 .v2-controls{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:29px 0 27px}
 .v2-dpad{position:relative;display:grid;grid-template-columns:repeat(3,33px);grid-template-rows:repeat(3,33px)}
@@ -85,3 +86,24 @@
 @media(max-width:1040px){.v2-player-grid{grid-template-columns:1fr}.v2-side{max-width:660px;margin:auto;width:100%;padding-top:0}.v2-device-stage{min-height:530px}}
 @media(max-width:540px){.v2-header-right span{display:none}.v2-player-grid{padding:18px 12px 55px}.v2-device-stage{padding:27px 10px 35px;min-height:520px}.v2-hardware-body{width:min(100%,295px);padding:18px}.v2-screen-bezel{padding:12px}.v2-side h1{letter-spacing:-1.5px}.v2-palettes{grid-template-columns:repeat(2,1fr)}.v2-game-mode .v2-game-touch{gap:8px}.v2-game-touch .v2-facepad{gap:5px}.v2-game-touch .v2-dpad{grid-template-columns:repeat(3,29px);grid-template-rows:repeat(3,29px)}.v2-game-touch .v2-dpad:before{top:29px;left:29px;width:29px;height:29px}.v2-game-touch .v2-facepad .v2-button{width:42px;height:42px}}
 @media(prefers-reduced-motion:reduce){.v2-hardware-body,.v2-button,.v2-toggle i{transition:none}}
+
+/* Engine-independent GPU display pass: preference controls never touch game input or runtime. */
+.v2-fx-panel{display:grid;gap:16px}
+.v2-fx-heading{gap:12px}
+.v2-fx-heading h2{margin:0}
+.v2-fx-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.v2-fx-presets button{padding:11px 6px;background:#192b2e;color:#c5d3c7;border:1px solid #3e5550;border-radius:9px;font-size:11px;font-weight:800;cursor:pointer}
+.v2-fx-presets button.chosen{border-color:#d1e995;background:#294237;color:#f6ffd8}
+.v2-fx-presets button:focus-visible,.v2-fx-row select:focus-visible,.v2-fx-slider input:focus-visible{outline:2px solid #d1e995;outline-offset:3px}
+.v2-fx-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.v2-fx-row label{font-size:12px;color:#b8cbbf}
+.v2-fx-row select{max-width:165px;padding:9px 7px;background:#1b3030;color:#f3f4e7;border:1px solid #506b61;border-radius:8px;font:inherit;font-size:11px}
+.v2-fx-row select:disabled,.v2-fx-slider input:disabled{opacity:.45}
+.v2-fx-details{border:1px solid #3d5550;border-radius:10px;background:#16282b;overflow:hidden}
+.v2-fx-details summary{padding:12px 14px;cursor:pointer;font-size:12px;font-weight:800;user-select:none}
+.v2-fx-details summary span{float:right;color:#a3c693;font:700 10px monospace}
+.v2-fx-sliders{display:grid;gap:13px;padding:14px;border-top:1px solid #3d5550}
+.v2-fx-slider label{display:flex;justify-content:space-between;gap:12px;color:#b6c8be;font-size:12px}
+.v2-fx-slider label span{font:700 11px monospace;color:#d1e995}
+.v2-fx-slider input{display:block;width:100%;margin:8px 0 0;accent-color:#c4de8d;cursor:pointer}
+.v2-fx-note{font-size:11px!important;color:#9eb7ac!important;line-height:1.5!important;margin:0!important}
