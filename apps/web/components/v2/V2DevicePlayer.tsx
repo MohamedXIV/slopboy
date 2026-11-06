@@ -52,6 +52,8 @@ const CYCLE_BUTTONS:ReadonlyArray<{name:InputName;label:string;className:string}
   {name:'DOWN',label:'Down',className:'south'}
 ];
 
+const PRESET_ORDER=['clean','lcd','phosphor'] as const;
+
 export default function V2DevicePlayer({gameId}:{gameId:string}){
   const game=getCatalogGame(gameId);
   if(!game)throw Error('Unknown curated game '+gameId);
