@@ -5,6 +5,7 @@ import {V2_DEVICE_1000, V2_LCD_PALETTES, type V2PaletteId, type V2Button} from "
 import {validateFrame, rasterizeFrame} from "@slopboy/runtime/protocol";
 
 const SCOPE = "slopboy-v2-kaplay-spike";
+const SOURCE_BUDGET = 8 * 1024 * 1024;
 const KEYS: Record<string, V2Button> = {
   ArrowUp:"UP", ArrowDown:"DOWN", ArrowLeft:"LEFT", ArrowRight:"RIGHT",
   KeyW:"UP", KeyA:"LEFT", KeyS:"DOWN", KeyD:"RIGHT",
@@ -39,7 +40,6 @@ export default function KaplaySpikePlayer() {
   const started = useRef(false);
   const currentStage = useRef<Stage>("loading");
   const pointerKeys = useRef(new Map<number,V2Button>());
-  const sourceBudget = 8 * 1024 * 1024;
 
   function setStage(stage: Stage, message = "") {
     currentStage.current = stage;
@@ -59,9 +59,9 @@ export default function KaplaySpikePlayer() {
     let live = true;
     fetch("/v2/kaplay-spike.html", {credentials:"omit", redirect:"error", cache:"no-store"})
       .then(async response => {
-        if (!response.ok || Number(response.headers.get("content-length") || 0) > sourceBudget) throw Error("Sandbox bundle unavailable or too large");
+        if (!response.ok || Number(response.headers.get("content-length") || 0) > SOURCE_BUDGET) throw Error("Sandbox bundle unavailable or too large");
         const document = await response.text();
-        if (new TextEncoder().encode(document).byteLength > sourceBudget ||
+        if (new TextEncoder().encode(document).byteLength > SOURCE_BUDGET ||
             !document.includes("Content-Security-Policy") ||
             !document.includes("connect-src 'none'")) throw Error("Invalid local KAPLAY sandbox document");
         return document;
@@ -77,10 +77,6 @@ export default function KaplaySpikePlayer() {
     lastFrame.current = Date.now();
     started.current = false;
     pressed.current.clear();
-    setDiagnostic(null);
-    setFrames(0);
-    setPlayerX(0);
-    if (html) setStage("booting");
     function onMessage(event: MessageEvent) {
       if (event.source !== iframe.current?.contentWindow || event.origin !== "null") return;
       const message = event.data;
@@ -168,8 +164,10 @@ export default function KaplaySpikePlayer() {
     };
   }, []);
 
-  const downPointer = (button:V2Button) => (event:ReactPointerEvent<HTMLButtonElement>) => {
+  const downPointer = (event:ReactPointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
+    const button = event.currentTarget.dataset.button as V2Button;
+    if (!V2_DEVICE_1000.inputs.includes(button)) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     pointerKeys.current.set(event.pointerId, button);
     press(button);
@@ -180,7 +178,10 @@ export default function KaplaySpikePlayer() {
     pointerKeys.current.delete(event.pointerId);
     if (![...pointerKeys.current.values()].includes(button)) release(button);
   };
-  const reset = () => {setStage("booting");setEpoch(e => e + 1);};
+  const reset = () => {
+    setDiagnostic(null);setFrames(0);setPlayerX(0);setCaptureMs(0);
+    setStage("booting");setEpoch(e => e + 1);
+  };
   const colors = V2_LCD_PALETTES[palette].colors;
   return <div className="kaplay-card">
     <div>
@@ -192,9 +193,9 @@ export default function KaplaySpikePlayer() {
       </div>
       <div className="kaplay-controls">
         <div className="kaplay-control-pad">{INPUTS.map(({key,label}) =>
-          <button key={key} type="button" aria-label={key} onPointerDown={downPointer(key)}
+          <button key={key} type="button" aria-label={key} data-button={key} onPointerDown={downPointer}
             onPointerUp={upPointer} onPointerCancel={upPointer} onLostPointerCapture={upPointer}>{label}</button>)}</div>
-        <button className="kaplay-action" type="button" aria-label="A button" onPointerDown={downPointer("A")}
+        <button className="kaplay-action" type="button" aria-label="A button" data-button="A" onPointerDown={downPointer}
           onPointerUp={upPointer} onPointerCancel={upPointer} onLostPointerCapture={upPointer}>A</button>
       </div>
     </div>
