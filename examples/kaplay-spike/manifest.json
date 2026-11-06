@@ -1,0 +1,15 @@
+{
+  "format": "slopboy-v2-spike-cartridge",
+  "id": "orbit-dodge",
+  "title": "Orbit Dodge",
+  "engine": "kaplay",
+  "engineVersion": "3001.0.19",
+  "hardware": {
+    "id": "slopboy-1000",
+    "revision": "2.0.0-preview"
+  },
+  "requirements": {
+    "display": {"width": 160, "height": 144, "indexedColors": 4},
+    "buttons": ["UP", "DOWN", "LEFT", "RIGHT", "A"]
+  }
+}

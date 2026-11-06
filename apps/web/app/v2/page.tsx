@@ -39,6 +39,7 @@ export default function V2LabHome(){
           <Link href={'/v2/play/'+game.id}>Insert &amp; play <span aria-hidden="true">↗</span></Link></div>
       </article>)}</div>
     </section>
+    <section className="v2-hub-concepts"><div><p className="v2-hub-kicker">ENGINE FEASIBILITY / REAL WEBGL</p><h2>Try a KAPLAY cartridge</h2><p>A separate test game with four-color WebGL capture, an opaque sandbox and instrumentation. Not a public cartridge uploader.</p><Link href="/v2/spikes/kaplay">Open KAPLAY spike ↗</Link></div></section>
     <section className="v2-hub-concepts">
       <div><p className="v2-hub-kicker">HARDWARE IS A CONTRACT</p><h2>{V2_DEVICE_1000.display.width} × {V2_DEVICE_1000.display.height}</h2>
       <p>Every game respects a versioned virtual device. Cosmetics only change appearance; the actual resolution, palette and inputs remain enforced.</p></div>
