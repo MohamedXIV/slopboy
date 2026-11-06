@@ -10,7 +10,7 @@ import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
 import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
 import {RetroScreenRenderer} from './RetroScreenRenderer';
-import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
+import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_PRESET_META,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
   sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
   type ScreenFxSettings,type ScreenRefresh} from './screen-fx-config';
 import './v2-player.css';
