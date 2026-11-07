@@ -67,7 +67,8 @@ export default function V2GameLibrary(){
     setPending(gameId);setNotice('');
     try{
       await op();
-      setSnapshots(prev=>({...prev,[gameId]:await listLocalSnapshots(gameId)}));
+      const refreshed=await listLocalSnapshots(gameId);
+      setSnapshots(prev=>({...prev,[gameId]:refreshed}));
       setNotice(success);
     }catch(error){setNotice(error instanceof Error?error.message:'Unable to access local saves.');}
     finally{setPending(null);}

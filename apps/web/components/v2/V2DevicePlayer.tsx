@@ -98,7 +98,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   const currentPalette=useRef(V2_LCD_PALETTES.moss.colors as readonly string[]);
   const writeChain=useRef<Promise<void>>(Promise.resolve());
   const lastSave=useRef(0);
-  const bootTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const bootTimer=useRef<number|null>(null);
 
   const updateStatus=useCallback((state:Status,message='')=>{
     statusRef.current=state;setStatus(state);setReason(message);
