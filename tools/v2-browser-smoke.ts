@@ -57,9 +57,9 @@ async function main(){
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
     if(sharedLight!==true)throw Error('Shared theme did not propagate into player without duplicate controls');
     const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
-    const brandRgb=/^rgb\\((\\d+), (\\d+), (\\d+)\\)$/.exec(brandedButton);
-    if(!brandRgb||Number(brandRgb[1])<170||Number(brandRgb[2])<Number(brandRgb[1])+5
-      ||Number(brandRgb[2])<Number(brandRgb[3])+5)
+    const brandRgb=brandedButton.match(/[0-9]+/g)?.map(Number);
+    if(!brandRgb||brandRgb.length!==3||Number(brandRgb[0])<170||Number(brandRgb[1])<Number(brandRgb[0])+5
+      ||Number(brandRgb[1])<Number(brandRgb[2])+5)
       throw Error('HeroUI toggle uses blue/gray defaults rather than a light Slopboy sage tone: '+brandedButton);
     const brandedText=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).color"));
     if(brandedText!=='rgb(48, 71, 68)')throw Error('HeroUI theme toggle text must use Slopboy ink: '+brandedText);
