@@ -191,8 +191,14 @@ async function main(){
     if(libraryCount!==3)throw Error('Curated library cartridges missing: '+libraryCount);
     const librarySharedChrome=await evalJs("document.querySelectorAll('.sb-v2-header').length===1&&document.querySelectorAll('.sb-v2-footer').length===1&&!document.querySelector('.v2-library-header,.v2-library-footer')");
     if(librarySharedChrome!==true)throw Error('Library incorrectly rendered a duplicated local header or footer');
-    const lightPersisted=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-library').dataset.v2Theme==='light'");
-    if(lightPersisted!==true)throw Error('One shared theme did not persist across library navigation');
+    let lightPersisted=false;
+    const themeReloadDeadline=Date.now()+5000;
+    while(Date.now()<themeReloadDeadline){
+      lightPersisted=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-library').dataset.v2Theme==='light'")===true;
+      if(lightPersisted)break;
+      await sleep(120);
+    }
+    if(!lightPersisted)throw Error('One shared theme did not persist after rehydration on library navigation');
     const libraryHeroControl=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).color"));
     if(libraryHeroControl!=='rgb(48, 71, 68)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
 
