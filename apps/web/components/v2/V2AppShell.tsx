@@ -50,7 +50,7 @@ export default function V2AppShell({children}:{children:ReactNode}){
             <Link href="/v2/library" aria-current={pathname==='/v2/library'?'page':undefined}>My library</Link>
             <Button size="sm" variant="secondary" className="sb-control sb-v2-theme-toggle"
               onPress={toggleTheme} aria-label={theme==='dark'?'Switch to light theme':'Switch to dark theme'}
-              title={theme==='dark'?'Switch to light theme':'Switch to dark theme'}>
+>
               <span aria-hidden="true">{theme==='dark'?'☀':'☾'}</span>
               <span>{theme==='dark'?'Light':'Dark'}</span>
             </Button>
