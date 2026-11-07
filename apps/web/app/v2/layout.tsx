@@ -1,4 +1,7 @@
 import './heroui.css';
+import V2AppShell from '../../components/v2/V2AppShell';
 
-/** HeroUI v3 is used in V2 only. V1 pages keep their established styling. */
-export default function V2Layout({children}:{children:React.ReactNode}){return children;}
+/** Shared V2-only chrome. The V1 site keeps its independent layout. */
+export default function V2Layout({children}:{children:React.ReactNode}){
+  return <V2AppShell>{children}</V2AppShell>;
+}
