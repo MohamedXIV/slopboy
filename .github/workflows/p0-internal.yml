@@ -37,8 +37,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install without lifecycle scripts (lockfile pending)
-        run: pnpm install --ignore-scripts --frozen-lockfile
+      - name: Resolve HeroUI v3 with npm registry and regenerate lockfile
+        run: pnpm install --ignore-scripts --no-frozen-lockfile
+      - name: Emit regenerated pnpm lockfile for reviewed GitHub commit
+        run: |
+          echo SLOPBOY_HEROUI_LOCK_BEGIN
+          cat pnpm-lock.yaml
+          echo SLOPBOY_HEROUI_LOCK_END
       - name: Unit tests
         run: pnpm test
       - name: Chromium sandbox isolation regression
