@@ -2,7 +2,10 @@
 
 import {useCallback,useEffect,useRef,useState,type CSSProperties,type PointerEvent as ReactPointerEvent} from 'react';
 import Link from 'next/link';
-import {GAMES,getCatalogGame} from '@slopboy/catalog';
+import {Button,Drawer} from '@heroui/react';
+import {trackBrowserLaunch,trackBrowserPlaytime} from './library-history';
+import {makeCartridgeAppearance} from './cartridge-cover';
+import {getCatalogGame} from '@slopboy/catalog';
 import {SLOPBOY_1000,type InputName} from '@slopboy/hardware';
 import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId} from '@slopboy/hardware/v2';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
@@ -67,6 +70,10 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   const [screenFx,setScreenFx]=useState<ScreenFxSettings>(DEFAULT_SCREEN_FX);
   const [fxAvailable,setFxAvailable]=useState(false);
   const [mode,setMode]=useState<'console'|'game'>('console');
+  const [compact,setCompact]=useState(false);
+  const [mobileSettingsOpen,setMobileSettingsOpen]=useState(false);
+  const [theme,setTheme]=useState<'dark'|'light'>('dark');
+  const [bootComplete,setBootComplete]=useState(false);
   const [fullscreen,setFullscreen]=useState(false);
   const [keyHeld,setKeyHeld]=useState<ReadonlyArray<InputName>>([]);
   const shellRef=useRef<HTMLDivElement>(null);
@@ -91,6 +98,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   const currentPalette=useRef(V2_LCD_PALETTES.moss.colors as readonly string[]);
   const writeChain=useRef<Promise<void>>(Promise.resolve());
   const lastSave=useRef(0);
+  const bootTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
 
   const updateStatus=useCallback((state:Status,message='')=>{
     statusRef.current=state;setStatus(state);setReason(message);
@@ -141,6 +149,35 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     return()=>observer.disconnect();
   },[presentFx]);
   useEffect(()=>()=>{fxRenderer.current?.dispose();fxRenderer.current=null;},[]);
+  useEffect(()=>{
+    const media=window.matchMedia('(max-width:1120px)');
+    const sync=()=>{setCompact(media.matches);if(!media.matches)setMobileSettingsOpen(false);};
+    const frame=requestAnimationFrame(sync);
+    media.addEventListener('change',sync);
+    return()=>{cancelAnimationFrame(frame);media.removeEventListener('change',sync);};
+  },[]);
+  useEffect(()=>{
+    const frame=requestAnimationFrame(()=>{
+      try{if(localStorage.getItem('slopboy:v2:theme')==='light')setTheme('light');}catch{/* optional */}
+    });
+    return()=>cancelAnimationFrame(frame);
+  },[]);
+  const toggleTheme=()=>{
+    const next=theme==='dark'?'light':'dark';setTheme(next);
+    try{localStorage.setItem('slopboy:v2:theme',next);}catch{/* optional */}
+  };
+  useEffect(()=>{
+    let last=performance.now();
+    const flush=()=>{
+      const now=performance.now(),elapsed=now-last;last=now;
+      if(ready.current&&statusRef.current==='running'&&document.visibilityState==='visible')
+        trackBrowserPlaytime(game.id,elapsed);
+    };
+    const visibility=()=>{last=performance.now();};
+    const interval=window.setInterval(flush,5000);
+    document.addEventListener('visibilitychange',visibility);
+    return()=>{flush();clearInterval(interval);document.removeEventListener('visibilitychange',visibility);};
+  },[game.id]);
   const draw=useCallback((pixels:Uint8Array,paletteColors:readonly string[])=>{
     const ctx=canvasRef.current?.getContext('2d',{alpha:false});
     if(!ctx)return;
@@ -186,7 +223,12 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
         return;
       }
       if(msg.key!==sessionKey.current)return;
-      if(msg.type==='ready'){ready.current=true;updateStatus('running');return;}
+      if(msg.type==='ready'){
+        ready.current=true;trackBrowserLaunch(game.id);updateStatus('running');
+        if(bootTimer.current)clearTimeout(bootTimer.current);
+        bootTimer.current=window.setTimeout(()=>setBootComplete(true),1100);
+        return;
+      }
       if(msg.type==='error'){ready.current=false;updateStatus('error',String(msg.reason||'Game stopped').slice(0,120));return;}
       if(msg.type==='frame'&&ready.current){
         const pixels:unknown=msg.pixels;
@@ -223,6 +265,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     animation=requestAnimationFrame(tick);
     return()=>{
       cancelAnimationFrame(animation);
+      if(bootTimer.current)clearTimeout(bootTimer.current);
       window.removeEventListener('message',onMessage);
       ready.current=false;
       post('stop');
@@ -281,7 +324,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   };
   const restart=()=>{
     post('stop');ready.current=false;physical.current.clear();pointerButtons.current.clear();pressed.current.clear();
-    syncKeys();updateStatus('booting');setEpoch(n=>n+1);
+    syncKeys();setBootComplete(false);updateStatus('booting');setEpoch(n=>n+1);
   };
   const fullscreenClick=async()=>{
     try{
@@ -310,265 +353,23 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     ? 'GPU ACTIVE'
     : 'FALLBACK';
 
-  return (
-    <main className="v2-player">
-      <header className="v2-header">
-        <div className="v2-header-left">
-          <Link className="v2-brand" href="/v2">SLOPBOY <span>2.0</span></Link>
-          <span className="v2-header-divider" aria-hidden="true" />
-          <span className="v2-header-model">UNIT 1000 · VERTICAL SLAB</span>
-        </div>
-        <nav className="v2-cartridge-strip" aria-label="Curated cartridges">
-          {GAMES.map(item => (
-          <Link key={item.id} href={'/v2/play/' + item.id}
-            className={'v2-cartridge-pill' + (item.id === game.id ? ' active' : '')}
-            aria-current={item.id === game.id ? 'page' : undefined}>
-            <span className="v2-cartridge-emblem" aria-hidden="true">{item.artwork.emblem}</span>
-            <span>{item.title}</span>
-          </Link>
-        ))}
-        </nav>
-        <div className="v2-header-right">
-          <Link href="/v2">← Devices &amp; games</Link>
-          <span>LIVE COMPATIBILITY LAB</span>
-        </div>
-      </header>
-
-      <div className="v2-player-grid">
-        <section className="v2-device-section" aria-label="Interactive virtual handheld">
-          <div className="v2-topline">
-            <div className="v2-topline-left">
-              <span className="v2-topline-tag">MODEL / 001</span>
-              <span>
-                {V2_DEVICE_1000.display.width}×{V2_DEVICE_1000.display.height} ·{' '}
-                {V2_DEVICE_1000.display.indexedColors} SHADES
-              </span>
-            </div>
-            <div className="v2-topline-right">
-              <span className={'v2-runtime-pill ' + status}>
-                <i aria-hidden="true" />
-                {status === 'running' ? 'PLAYING · ' + game.title.toUpperCase() : status.toUpperCase()}
-              </span>
-            </div>
-          </div>
-
-          <div
-            className={
-              'v2-device-stage' +
-              (mode === 'game' ? ' v2-game-mode' : '') +
-              ' shell-' +
-              shell +
-              ' preset-' +
-              (screenFx.enabled ? screenFx.preset : 'bypass')
-            }
-            ref={shellRef}
-            style={shellStyle}
-          >
-            <div className="v2-stage-hud v2-stage-hud-tl" aria-hidden="true">
-              <span>DISPLAY // {paletteInfo.name.toUpperCase()}</span>
-              <span>OPTICS // {screenFx.enabled ? screenFx.preset.toUpperCase() : 'RAW BYPASS'}</span>
-            </div>
-            <div className="v2-stage-hud v2-stage-hud-tr" aria-hidden="true">
-              <span>CADENCE // {screenFx.refresh === 'native' ? 'NATIVE / SMOOTH' : screenFx.refresh + 'FPS SAMPLE'}</span>
-              <span>SHELL // {colors.name.toUpperCase()}</span>
-            </div>
-
-            <div className="v2-hardware-body">
-              <div className="v2-cartridge-slot" aria-hidden="true">
-                <span className="v2-slot-grip" />
-                <span className="v2-slot-label">CART · {game.id.toUpperCase()}</span>
-                <span className="v2-slot-grip" />
-              </div>
-
-              <div className="v2-shell-logo">
-                <div className="v2-logo-lockup">
-                  <strong>
-                    SLOPBOY <em>1000</em>
-                  </strong>
-                  <span className="v2-model-sub">POCKET SYSTEM</span>
-                </div>
-                <div className="v2-power-cluster">
-                  <span className="v2-power-label">PWR</span>
-                  <span className={'v2-led' + (status === 'running' ? ' on' : '')} />
-                </div>
-              </div>
-
-              <div className="v2-screen-bezel">
-                <div className="v2-bezel-top" aria-hidden="true">
-                  <span className="v2-bezel-spec">DOT MATRIX · 4-SHADE</span>
-                  <span className="v2-bezel-fx-tag">
-                    {!screenFx.enabled || !isScreenFxActive(screenFx)
-                      ? '1:1 RAW'
-                      : screenFx.preset === 'phosphor'
-                      ? 'CRT PHOSPHOR'
-                      : 'OPTICAL LCD'}
-                  </span>
-                </div>
-                <div className="v2-display-well">
-                  <div
-                    ref={displayRef}
-                    className={
-                      'v2-display' +
-                      (fxActive ? ' fx-active' : '') +
-                      ' fx-mode-' +
-                      (screenFx.enabled ? screenFx.preset : 'clean')
-                    }
-                  >
-                    <canvas
-                      className="v2-raw-frame"
-                      width={V2_DEVICE_1000.display.width}
-                      height={V2_DEVICE_1000.display.height}
-                      ref={canvasRef}
-                      role="img"
-                      aria-label={game.title + ' game screen'}
-                    />
-                    <canvas className="v2-fx-output" ref={fxCanvasRef} aria-hidden="true" />
-                    <div className="v2-display-glass" aria-hidden="true"
-                        style={{opacity:fxActive?screenFx.glass/100:0}} />
-                  </div>
-                </div>
-                <div className="v2-screen-note">
-                  <span className="v2-bezel-tick" aria-hidden="true" />
-                  <span>PIXEL POCKET · FOUR SHADES</span>
-                  <span className="v2-bezel-tick" aria-hidden="true" />
-                </div>
-              </div>
-
-              <div className="v2-controls">
-                <div className="v2-dpad-well">
-                  <div className="v2-dpad">
-                    {CYCLE_BUTTONS.map(({ name, label, className }) => button(name, className, label))}
-                    <span className="v2-dpad-pivot" aria-hidden="true" />
-                  </div>
-                  <span className="v2-control-caption" aria-hidden="true">
-                    DIRECTIONAL
-                  </span>
-                </div>
-                <div className="v2-facepad-well">
-                  <div className="v2-facepad">
-                    <div className="v2-face-unit">
-                      {button('B', 'v2-b', 'B button')}
-                      <span className="v2-face-label" aria-hidden="true">
-                        B
-                      </span>
-                    </div>
-                    <div className="v2-face-unit">
-                      {button('A', 'v2-a', 'A button')}
-                      <span className="v2-face-label" aria-hidden="true">
-                        A
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="v2-bottom-controls">
-                <div className="v2-system-cluster">
-                  <div className="v2-system-unit">
-                    {button('SELECT', 'v2-system', 'Select')}
-                    <span className="v2-system-label" aria-hidden="true">
-                      SELECT
-                    </span>
-                  </div>
-                  <div className="v2-system-unit">
-                    {button('START', 'v2-system', 'Start')}
-                    <span className="v2-system-label" aria-hidden="true">
-                      START
-                    </span>
-                  </div>
-                </div>
-                <div className="v2-speaker" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </div>
-              </div>
-
-              <div className="v2-shell-footer" aria-hidden="true">
-                <span>REV 2.0-PREVIEW</span>
-                <span>SERIAL // SB-001000</span>
-              </div>
-            </div>
-
-            {mode === 'game' && (
-              <div className="v2-game-touch" aria-label="Touch controls">
-                <div className="v2-dpad">
-                  {CYCLE_BUTTONS.map(({ name, label, className }) => button(name, className, label))}
-                  <span className="v2-dpad-pivot" aria-hidden="true" />
-                </div>
-                <div className="v2-facepad">
-                  {button('B', 'v2-b', 'B button')}
-                  {button('A', 'v2-a', 'A button')}
-                  {button('START', 'v2-system', 'Start')}
-                </div>
-              </div>
-            )}
-
-            {status !== 'running' && (
-              <div className="v2-status" role="status">
-                {status === 'error'
-                  ? 'Game stopped'
-                  : status === 'loading'
-                  ? 'Loading cartridge…'
-                  : 'Starting isolated runtime…'}
-                {reason && <span>{reason}</span>}
-              </div>
-            )}
-          </div>
-
-          <div className="v2-controlbar">
-            <button
-              type="button"
-              className={mode === 'game' ? 'is-active' : ''}
-              onClick={() => setMode(m => (m === 'game' ? 'console' : 'game'))}
-            >
-              {mode === 'game' ? '▣ Console view' : '▤ Game only'}
-            </button>
-            <button type="button" className={fullscreen ? 'is-active' : ''} onClick={fullscreenClick}>
-              {fullscreen ? '↙ Exit fullscreen' : '⛶ Fullscreen'}
-            </button>
-            <button type="button" onClick={restart}>
-              ↻ Restart
-            </button>
-          </div>
-
-          <div className="v2-footnote" aria-label="Control mapping summary">
-            <span>
-              <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move
-            </span>
-            <span>
-              <kbd>Z</kbd> <kbd>J</kbd> <kbd>Space</kbd> = A
-            </span>
-            <span>
-              <kbd>X</kbd> <kbd>K</kbd> = B
-            </span>
-            <span>
-              <kbd>Enter</kbd> = Start
-            </span>
-            <span>
-              <kbd>Bksp</kbd> = Select
-            </span>
-            <span>Gamepad ready</span>
-          </div>
-        </section>
-
+  const cartridgeAppearance=makeCartridgeAppearance(game.id);
+  const settingsPanel=(
         <aside className="v2-side">
           <div className="v2-side-intro">
-            <span className="v2-kicker">THE CONSOLE WORKSHOP / FIRST PLAYABLE SLICE</span>
-            <h1>
-              Little worlds.
-              <br />
-              <em>Your colors.</em>
-            </h1>
+            <span className="v2-kicker">DEVICE APPEARANCE / YOUR SETTINGS</span>
+            <h1>Make it <em>yours.</em></h1>
             <p>
-              Meet the flagship Slopboy 1000: a sculpted vertical slab with precision tactile controls, changeable shell
-              finishes, and an optical display pipeline. The game is real—cosmetics only change how you see it.
+              Customize your screen and shell without changing the game. Open your library to insert another cartridge.
             </p>
           </div>
 
+          <div className="v2-option v2-appearance-mode">
+            <h2>Interface theme</h2>
+            <Button size="sm" variant="secondary" onPress={toggleTheme}>
+              {theme==='dark'?'☀ Use light mode':'☾ Use dark mode'}
+            </Button>
+          </div>
           <div className="v2-option">
             <div className="v2-option-header">
               <h2>
@@ -795,12 +596,283 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
             </div>
           </div>
           <p className="v2-security">
-            Runs an approved first-party cartridge in the existing isolated iframe + Worker. KAPLAY, accounts, and
-            friend sharing are not enabled in this slice.
+            First-party preview cartridge with isolated execution. Local saves work offline; cloud sync requires a future authenticated service.
           </p>
         </aside>
+  );
+  return (
+    <main className="v2-player" data-v2-theme={theme}>
+      <header className="v2-header">
+        <div className="v2-header-left">
+          <Link className="v2-brand" href="/v2">SLOPBOY <span>2.0</span></Link>
+          <span className="v2-header-divider" aria-hidden="true" />
+          <span className="v2-header-model">UNIT 1000 · VERTICAL SLAB</span>
+        </div>
+        <nav className="v2-library-shortcut" aria-label="Game library">
+          <Link href="/v2/library">▦ My library <span>Change cartridge</span></Link>
+        </nav>
+        <div className="v2-header-right">
+          <Button size="sm" variant="secondary" className="v2-theme-button"
+            onPress={toggleTheme} aria-label="Toggle light and dark theme">
+            {theme==='dark'?'☀ Light':'☾ Dark'}
+          </Button>
+          <Button size="sm" variant="secondary" className="v2-mobile-settings"
+            onPress={()=>setMobileSettingsOpen(true)} aria-label="Open device settings">
+            ⚙ Settings
+          </Button>
+          <Link href="/v2">Devices</Link>
+        </div>
+      </header>
+
+      <div className="v2-player-grid">
+        <section className="v2-device-section" aria-label="Interactive virtual handheld">
+          <div className="v2-topline">
+            <div className="v2-topline-left">
+              <span className="v2-topline-tag">MODEL / 001</span>
+              <span>
+                {V2_DEVICE_1000.display.width}×{V2_DEVICE_1000.display.height} ·{' '}
+                {V2_DEVICE_1000.display.indexedColors} SHADES
+              </span>
+            </div>
+            <div className="v2-topline-right">
+              <span className={'v2-runtime-pill ' + status}>
+                <i aria-hidden="true" />
+                {status === 'running' ? 'PLAYING · ' + game.title.toUpperCase() : status.toUpperCase()}
+              </span>
+            </div>
+          </div>
+
+          <div
+            className={
+              'v2-device-stage' +
+              (mode === 'game' ? ' v2-game-mode' : '') +
+              ' shell-' +
+              shell +
+              ' preset-' +
+              (screenFx.enabled ? screenFx.preset : 'bypass')
+            }
+            ref={shellRef}
+            style={shellStyle}
+          >
+            <div className="v2-stage-hud v2-stage-hud-tl" aria-hidden="true">
+              <span>DISPLAY // {paletteInfo.name.toUpperCase()}</span>
+              <span>OPTICS // {screenFx.enabled ? screenFx.preset.toUpperCase() : 'RAW BYPASS'}</span>
+            </div>
+            <div className="v2-stage-hud v2-stage-hud-tr" aria-hidden="true">
+              <span>CADENCE // {screenFx.refresh === 'native' ? 'NATIVE / SMOOTH' : screenFx.refresh + 'FPS SAMPLE'}</span>
+              <span>SHELL // {colors.name.toUpperCase()}</span>
+            </div>
+
+            <div className="v2-hardware-body">
+              <div key={'insert-'+epoch} className="v2-cartridge-entrant" aria-hidden="true"
+                style={{'--v2-cart':cartridgeAppearance.primary} as CSSProperties}>
+                <span>{game.title.toUpperCase()}</span><small>SLOPBOY / LOADING</small>
+              </div>
+              <div className="v2-cartridge-slot" aria-hidden="true">
+                <span className="v2-slot-grip" />
+                <span className="v2-slot-label">CART · {game.id.toUpperCase()}</span>
+                <span className="v2-slot-grip" />
+              </div>
+
+              <div className="v2-shell-logo">
+                <div className="v2-logo-lockup">
+                  <strong>
+                    SLOPBOY <em>1000</em>
+                  </strong>
+                  <span className="v2-model-sub">POCKET SYSTEM</span>
+                </div>
+                <div className="v2-power-cluster">
+                  <span className="v2-power-label">PWR</span>
+                  <span className={'v2-led' + (status === 'running' ? ' on' : '')} />
+                </div>
+              </div>
+
+              <div className="v2-screen-bezel">
+                <div className="v2-bezel-top" aria-hidden="true">
+                  <span className="v2-bezel-spec">DOT MATRIX · 4-SHADE</span>
+                  <span className="v2-bezel-fx-tag">
+                    {!screenFx.enabled || !isScreenFxActive(screenFx)
+                      ? '1:1 RAW'
+                      : screenFx.preset === 'phosphor'
+                      ? 'CRT PHOSPHOR'
+                      : 'OPTICAL LCD'}
+                  </span>
+                </div>
+                <div className="v2-display-well">
+                  <div
+                    ref={displayRef}
+                    className={
+                      'v2-display' +
+                      (fxActive ? ' fx-active' : '') +
+                      ' fx-mode-' +
+                      (screenFx.enabled ? screenFx.preset : 'clean')
+                    }
+                  >
+                    <canvas
+                      className="v2-raw-frame"
+                      width={V2_DEVICE_1000.display.width}
+                      height={V2_DEVICE_1000.display.height}
+                      ref={canvasRef}
+                      role="img"
+                      aria-label={game.title + ' game screen'}
+                    />
+                    <canvas className="v2-fx-output" ref={fxCanvasRef} aria-hidden="true" />
+                    <div className="v2-display-glass" aria-hidden="true"
+                        style={{opacity:fxActive?screenFx.glass/100:0}} />
+                    <div className={'v2-boot-screen'+(status==='running'&&bootComplete?' v2-boot-done':'')} aria-hidden="true">
+                      <strong>SLOPBOY 1000</strong><span>{status==='running'?'READY / GAME LOADED':'CHECKING CARTRIDGE'}</span>
+                      <i/>
+                    </div>
+                  </div>
+                </div>
+                <div className="v2-screen-note">
+                  <span className="v2-bezel-tick" aria-hidden="true" />
+                  <span>PIXEL POCKET · FOUR SHADES</span>
+                  <span className="v2-bezel-tick" aria-hidden="true" />
+                </div>
+              </div>
+
+              <div className="v2-controls">
+                <div className="v2-dpad-well">
+                  <div className="v2-dpad">
+                    {CYCLE_BUTTONS.map(({ name, label, className }) => button(name, className, label))}
+                    <span className="v2-dpad-pivot" aria-hidden="true" />
+                  </div>
+                  <span className="v2-control-caption" aria-hidden="true">
+                    DIRECTIONAL
+                  </span>
+                </div>
+                <div className="v2-facepad-well">
+                  <div className="v2-facepad">
+                    <div className="v2-face-unit">
+                      {button('B', 'v2-b', 'B button')}
+                      <span className="v2-face-label" aria-hidden="true">
+                        B
+                      </span>
+                    </div>
+                    <div className="v2-face-unit">
+                      {button('A', 'v2-a', 'A button')}
+                      <span className="v2-face-label" aria-hidden="true">
+                        A
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="v2-bottom-controls">
+                <div className="v2-system-cluster">
+                  <div className="v2-system-unit">
+                    {button('SELECT', 'v2-system', 'Select')}
+                    <span className="v2-system-label" aria-hidden="true">
+                      SELECT
+                    </span>
+                  </div>
+                  <div className="v2-system-unit">
+                    {button('START', 'v2-system', 'Start')}
+                    <span className="v2-system-label" aria-hidden="true">
+                      START
+                    </span>
+                  </div>
+                </div>
+                <div className="v2-speaker" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                  <i />
+                </div>
+              </div>
+
+              <div className="v2-shell-footer" aria-hidden="true">
+                <span>REV 2.0-PREVIEW</span>
+                <span>SERIAL // SB-001000</span>
+              </div>
+            </div>
+
+            {mode === 'game' && (
+              <div className="v2-game-touch" aria-label="Touch controls">
+                <div className="v2-dpad">
+                  {CYCLE_BUTTONS.map(({ name, label, className }) => button(name, className, label))}
+                  <span className="v2-dpad-pivot" aria-hidden="true" />
+                </div>
+                <div className="v2-facepad">
+                  {button('B', 'v2-b', 'B button')}
+                  {button('A', 'v2-a', 'A button')}
+                  {button('START', 'v2-system', 'Start')}
+                </div>
+              </div>
+            )}
+
+            {status !== 'running' && (
+              <div className="v2-status" role="status">
+                {status === 'error'
+                  ? 'Game stopped'
+                  : status === 'loading'
+                  ? 'Loading cartridge…'
+                  : 'Starting isolated runtime…'}
+                {reason && <span>{reason}</span>}
+              </div>
+            )}
+          </div>
+
+          <div className="v2-controlbar">
+            <button
+              type="button"
+              className={mode === 'game' ? 'is-active' : ''}
+              onClick={() => setMode(m => (m === 'game' ? 'console' : 'game'))}
+            >
+              {mode === 'game' ? '▣ Console view' : '▤ Game only'}
+            </button>
+            <button type="button" className={fullscreen ? 'is-active' : ''} onClick={fullscreenClick}>
+              {fullscreen ? '↙ Exit fullscreen' : '⛶ Fullscreen'}
+            </button>
+            <button type="button" onClick={restart}>
+              ↻ Restart
+            </button>
+          </div>
+
+          <div className="v2-footnote" aria-label="Control mapping summary">
+            <span>
+              <kbd>WASD</kbd> / <kbd>Arrows</kbd> Move
+            </span>
+            <span>
+              <kbd>Z</kbd> <kbd>J</kbd> <kbd>Space</kbd> = A
+            </span>
+            <span>
+              <kbd>X</kbd> <kbd>K</kbd> = B
+            </span>
+            <span>
+              <kbd>Enter</kbd> = Start
+            </span>
+            <span>
+              <kbd>Bksp</kbd> = Select
+            </span>
+            <span>Gamepad ready</span>
+          </div>
+        </section>
+
+        {!compact && settingsPanel}
       </div>
 
+      {compact && <Drawer>
+        <Drawer.Backdrop isOpen={mobileSettingsOpen} onOpenChange={setMobileSettingsOpen} variant="blur">
+          <Drawer.Content placement="right">
+            <Drawer.Dialog className="v2-mobile-drawer" aria-label="Slopboy display and shell settings"
+              data-v2-theme={theme}>
+              <Drawer.Header>
+                <Drawer.Heading>Device settings</Drawer.Heading>
+                <Drawer.CloseTrigger aria-label="Close device settings">✕</Drawer.CloseTrigger>
+              </Drawer.Header>
+              <Drawer.Body>{settingsPanel}</Drawer.Body>
+              <Drawer.Footer>
+                <Button variant="secondary" onPress={()=>setMobileSettingsOpen(false)}>Done</Button>
+              </Drawer.Footer>
+            </Drawer.Dialog>
+          </Drawer.Content>
+        </Drawer.Backdrop>
+      </Drawer>}
       {cartridge && saved?.epoch === epoch && (
         <iframe
           key={epoch + ':' + game.id}

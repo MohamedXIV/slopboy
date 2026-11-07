@@ -12,8 +12,8 @@ export default function V2LabHome(){
       <div className="v2-hub-copy">
         <p className="v2-hub-kicker">SMALL DEVICES · INFINITE WORLDS</p>
         <h1>A pocket full<br/>of <em>possibility.</em></h1>
-        <p>We are rebuilding Slopboy with original collectible handhelds, real device limits, and a game-making platform for humans and AI.</p>
-        <Link className="v2-hub-cta" href="/v2/play/tiny-catcher">Try the new handheld <span>↗</span></Link>
+        <p>We are rebuilding Slopboy with original collectible handhelds, visual display limits, and a game-making platform for humans and AI.</p>
+        <Link className="v2-hub-cta" href="/v2/library">Open my game library <span>↗</span></Link>
         <div className="v2-hub-status"><span className="v2-dot"/> REAL PLAYABLE SLICE · NO FAKE ACCOUNT OR ONLINE FEATURES</div>
       </div>
       <div className="v2-hub-product" aria-label="Original slab-shaped handheld concept">
@@ -42,7 +42,7 @@ export default function V2LabHome(){
     <section className="v2-hub-concepts"><div><p className="v2-hub-kicker">ENGINE FEASIBILITY / REAL WEBGL</p><h2>Try a KAPLAY cartridge</h2><p>A separate test game with four-color WebGL capture, an opaque sandbox and instrumentation. Not a public cartridge uploader.</p><Link href="/v2/spikes/kaplay">Open KAPLAY spike ↗</Link></div></section>
     <section className="v2-hub-concepts">
       <div><p className="v2-hub-kicker">HARDWARE IS A CONTRACT</p><h2>{V2_DEVICE_1000.display.width} × {V2_DEVICE_1000.display.height}</h2>
-      <p>Every game respects a versioned virtual device. Cosmetics only change appearance; the actual resolution, palette and inputs remain enforced.</p></div>
+      <p>Every game respects a versioned virtual device. Cosmetics change appearance; resolution and indexed color count define display limits. Inputs describe the device controls, not CPU or RAM caps.</p></div>
       <div className="v2-family-list">{V2_DEVICE_FAMILIES.map(family=><div key={family.id}><span>{family.name}</span><small>{family.status==='active'?'Playable profile':'Concept only'}</small></div>)}</div>
     </section>
     <footer className="v2-hub-footer"><Link href="/">← V1 reference</Link><span>Slopboy is a working title · 2.0 design lab</span></footer>

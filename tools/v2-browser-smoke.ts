@@ -44,10 +44,14 @@ async function main(){
     if(!booted)throw Error('V2 runtime did not become ready');
     const dimensions=String(await evalJs("document.querySelector('.v2-display canvas').width+'x'+document.querySelector('.v2-display canvas').height"));
     if(dimensions!=='160x144')throw Error('Incorrect hardware resolution '+dimensions);
-    const cartridgeLinks=Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip a').length"));
-    if(cartridgeLinks!==3)throw Error('Curated cartridge navigation missing');
+    const shelf=String(await evalJs("document.querySelector('.v2-library-shortcut a').getAttribute('href')"));
+    if(shelf!=='/v2/library')throw Error('Device header must return to full game library');
+    if(Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip a').length"))!==0)
+      throw Error('Old cartridge list should not occupy player header');
     const backHref=String(await evalJs("document.querySelector('.v2-brand').getAttribute('href')"));
     if(backHref!=='/v2')throw Error('Brand link must remain a real navigation route');
+    const animation=await evalJs("!!document.querySelector('.v2-cartridge-entrant')&&!!document.querySelector('.v2-boot-screen')");
+    if(animation!==true)throw Error('Cartridge insertion or real boot overlay is missing');
     const initial=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
     await evalJs("window.__frame=document.querySelector('.v2-isolated-frame');window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));true");
     await sleep(900);
