@@ -5,7 +5,9 @@ import Link from 'next/link';
 import {Button,Drawer} from '@heroui/react';
 import {trackBrowserLaunch,trackBrowserPlaytime} from './library-history';
 import {makeCartridgeAppearance} from './cartridge-cover';
-import {getCatalogGame} from '@slopboy/catalog';
+import V2CartridgeArt from './V2CartridgeArt';
+import {useV2Theme} from './V2AppShell';
+import {GAMES,getCatalogGame} from '@slopboy/catalog';
 import {SLOPBOY_1000,type InputName} from '@slopboy/hardware';
 import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId} from '@slopboy/hardware/v2';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
@@ -72,7 +74,8 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   const [mode,setMode]=useState<'console'|'game'>('console');
   const [compact,setCompact]=useState(false);
   const [mobileSettingsOpen,setMobileSettingsOpen]=useState(false);
-  const [theme,setTheme]=useState<'dark'|'light'>('dark');
+  const {theme}=useV2Theme();
+  const [libraryOpen,setLibraryOpen]=useState(false);
   const [bootComplete,setBootComplete]=useState(false);
   const [fullscreen,setFullscreen]=useState(false);
   const [keyHeld,setKeyHeld]=useState<ReadonlyArray<InputName>>([]);
@@ -156,16 +159,6 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     media.addEventListener('change',sync);
     return()=>{cancelAnimationFrame(frame);media.removeEventListener('change',sync);};
   },[]);
-  useEffect(()=>{
-    const frame=requestAnimationFrame(()=>{
-      try{if(localStorage.getItem('slopboy:v2:theme')==='light')setTheme('light');}catch{/* optional */}
-    });
-    return()=>cancelAnimationFrame(frame);
-  },[]);
-  const toggleTheme=()=>{
-    const next=theme==='dark'?'light':'dark';setTheme(next);
-    try{localStorage.setItem('slopboy:v2:theme',next);}catch{/* optional */}
-  };
   useEffect(()=>{
     let last=performance.now();
     const flush=()=>{
@@ -286,12 +279,13 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   },[syncKeys]);
   useEffect(()=>{
     const down=(event:KeyboardEvent)=>{
-      if(event.altKey||event.ctrlKey||event.metaKey||isTextTarget(event.target))return;
+      if(libraryOpen||mobileSettingsOpen||event.altKey||event.ctrlKey||event.metaKey||isTextTarget(event.target))return;
       const name=KEY_MAP[event.code];
       if(!name)return;
       event.preventDefault();press(name);
     };
     const up=(event:KeyboardEvent)=>{
+      if(libraryOpen||mobileSettingsOpen)return;
       const name=KEY_MAP[event.code];
       if(!name)return;
       event.preventDefault();release(name);
@@ -299,7 +293,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     const blur=()=>{physical.current.clear();pointerButtons.current.clear();pressed.current.clear();syncKeys();};
     window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',blur);
     return()=>{window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);};
-  },[press,release,syncKeys]);
+  },[press,release,syncKeys,libraryOpen,mobileSettingsOpen]);
   useEffect(()=>{
     const onChange=()=>setFullscreen(document.fullscreenElement===shellRef.current);
     document.addEventListener('fullscreenchange',onChange);
@@ -364,12 +358,6 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
             </p>
           </div>
 
-          <div className="v2-option v2-appearance-mode">
-            <h2>Interface theme</h2>
-            <Button size="sm" variant="secondary" onPress={toggleTheme}>
-              {theme==='dark'?'☀ Use light mode':'☾ Use dark mode'}
-            </Button>
-          </div>
           <div className="v2-option">
             <div className="v2-option-header">
               <h2>
@@ -602,27 +590,30 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   );
   return (
     <main className="v2-player" data-v2-theme={theme}>
-      <header className="v2-header">
-        <div className="v2-header-left">
-          <Link className="v2-brand" href="/v2">SLOPBOY <span>2.0</span></Link>
-          <span className="v2-header-divider" aria-hidden="true" />
-          <span className="v2-header-model">UNIT 1000 · VERTICAL SLAB</span>
+      <section className="v2-player-toolbar" aria-label="Current game controls">
+        <div className="v2-session-id">
+          <span className="v2-player-toolbar-kicker">CARTRIDGE INSERTED / SLOPBOY 1000</span>
+          <strong>{game.title}</strong>
         </div>
-        <nav className="v2-library-shortcut" aria-label="Game library">
-          <Link href="/v2/library">▦ My library <span>Change cartridge</span></Link>
-        </nav>
-        <div className="v2-header-right">
-          <Button size="sm" variant="secondary" className="v2-theme-button"
-            onPress={toggleTheme} aria-label="Toggle light and dark theme">
-            {theme==='dark'?'☀ Light':'☾ Dark'}
+        <div className="v2-player-toolbar-actions">
+          <Button size="sm" variant="secondary" className="sb-control sb-control-primary v2-change-game"
+            aria-label="Open quick game library"
+            onPress={()=>{
+              physical.current.clear();pressed.current.clear();syncKeys();
+              setLibraryOpen(true);
+            }}>
+            ↧ Change cartridge
           </Button>
-          <Button size="sm" variant="secondary" className="v2-mobile-settings"
-            onPress={()=>setMobileSettingsOpen(true)} aria-label="Open device settings">
+          <Link href="/v2/library" className="v2-full-library-link">Full library</Link>
+          <Button size="sm" variant="secondary" className="sb-control v2-mobile-settings"
+            onPress={()=>{
+              physical.current.clear();pressed.current.clear();syncKeys();
+              setMobileSettingsOpen(true);
+            }} aria-label="Open device settings">
             ⚙ Settings
           </Button>
-          <Link href="/v2">Devices</Link>
         </div>
-      </header>
+      </section>
 
       <div className="v2-player-grid">
         <section className="v2-device-section" aria-label="Interactive virtual handheld">
@@ -856,10 +847,48 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
         {!compact && settingsPanel}
       </div>
 
+      <Drawer>
+        <Drawer.Backdrop isOpen={libraryOpen} onOpenChange={setLibraryOpen} variant="blur">
+          <Drawer.Content placement="left">
+            <Drawer.Dialog className="v2-quick-library-drawer sb-v2-dialog"
+              data-v2-theme={theme} aria-label="Change game from your library">
+              <Drawer.Header>
+                <Drawer.Heading>Change cartridge</Drawer.Heading>
+                <Drawer.CloseTrigger aria-label="Close quick game library">✕</Drawer.CloseTrigger>
+              </Drawer.Header>
+              <Drawer.Body>
+                <p className="v2-quick-library-description">Select a cartridge to insert into this Slopboy. Your current game remains running until you choose another.</p>
+                <div className="v2-quick-cartridge-list" role="list">
+                  {GAMES.map((item,index)=><div role="listitem" key={item.id}>
+                    <Link href={'/v2/play/'+item.id} scroll={false}
+                      className={'v2-quick-cartridge'+(item.id===game.id?' is-current':'')}
+                      aria-current={item.id===game.id?'page':undefined}
+                      onClick={event=>{
+                        if(item.id===game.id)event.preventDefault();
+                        setLibraryOpen(false);
+                      }}>
+                      <V2CartridgeArt id={item.id} title={item.title} emblem={item.artwork.emblem} index={index} compact/>
+                      <span className="v2-quick-cartridge-copy">
+                        <strong>{item.title}</strong>
+                        <small>{item.genre} · Slopboy 1000</small>
+                        <span>{item.id===game.id?'● Currently inserted':'↧ Insert cartridge'}</span>
+                      </span>
+                    </Link>
+                  </div>)}
+                </div>
+                <Link className="v2-quick-library-all" href="/v2/library">Browse your full library ↗</Link>
+              </Drawer.Body>
+              <Drawer.Footer>
+                <Button className="sb-control" variant="secondary" onPress={()=>setLibraryOpen(false)}>Continue playing</Button>
+              </Drawer.Footer>
+            </Drawer.Dialog>
+          </Drawer.Content>
+        </Drawer.Backdrop>
+      </Drawer>
       {compact && <Drawer>
         <Drawer.Backdrop isOpen={mobileSettingsOpen} onOpenChange={setMobileSettingsOpen} variant="blur">
           <Drawer.Content placement="right">
-            <Drawer.Dialog className="v2-mobile-drawer" aria-label="Slopboy display and shell settings"
+            <Drawer.Dialog className="v2-mobile-drawer sb-v2-dialog" aria-label="Slopboy display and shell settings"
               data-v2-theme={theme}>
               <Drawer.Header>
                 <Drawer.Heading>Device settings</Drawer.Heading>
@@ -867,7 +896,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
               </Drawer.Header>
               <Drawer.Body>{settingsPanel}</Drawer.Body>
               <Drawer.Footer>
-                <Button variant="secondary" onPress={()=>setMobileSettingsOpen(false)}>Done</Button>
+                <Button className="sb-control" variant="secondary" onPress={()=>setMobileSettingsOpen(false)}>Done</Button>
               </Drawer.Footer>
             </Drawer.Dialog>
           </Drawer.Content>
