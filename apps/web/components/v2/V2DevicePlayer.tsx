@@ -150,7 +150,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   },[presentFx]);
   useEffect(()=>()=>{fxRenderer.current?.dispose();fxRenderer.current=null;},[]);
   useEffect(()=>{
-    const media=window.matchMedia('(max-width:1120px)');
+    const media=window.matchMedia('(max-width:760px)');
     const sync=()=>{setCompact(media.matches);if(!media.matches)setMobileSettingsOpen(false);};
     const frame=requestAnimationFrame(sync);
     media.addEventListener('change',sync);

@@ -1572,7 +1572,7 @@
 .v2-mobile-drawer[data-v2-theme='light'] .v2-option h2,.v2-mobile-drawer[data-v2-theme='light'] .v2-specs strong{color:#304744}
 .v2-mobile-drawer[data-v2-theme='light'] .v2-side-intro>p{color:#58726a}
 .v2-mobile-drawer[data-v2-theme='light'] .v2-fx-row label,.v2-mobile-drawer[data-v2-theme='light'] .v2-fx-details summary{color:#dce9df}
-@media(max-width:1120px){
+@media(max-width:760px){
  .v2-player-grid>.v2-side{display:none}
  .v2-mobile-settings{display:inline-flex!important}
  .v2-theme-button{display:none!important}
