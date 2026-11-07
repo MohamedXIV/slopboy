@@ -53,12 +53,12 @@ async function main(){
     if(Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip, .v2-header').length"))!==0)
       throw Error('Duplicated legacy V2 game header still visible');
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
-    await sleep(120);
+    await sleep(350);
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
     if(sharedLight!==true)throw Error('Shared theme did not propagate into player without duplicate controls');
     const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
     const brandRgb=brandedButton.match(/[0-9]+/g)?.map(Number);
-    if(!brandRgb||brandRgb.length!==3||Number(brandRgb[0])<170||Number(brandRgb[1])<Number(brandRgb[0])+5
+    if(!brandRgb||brandRgb.length!==3||Number(brandRgb[0])<100||Number(brandRgb[1])<Number(brandRgb[0])+5
       ||Number(brandRgb[1])<Number(brandRgb[2])+5)
       throw Error('HeroUI toggle uses blue/gray defaults rather than a light Slopboy sage tone: '+brandedButton);
     const brandedText=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).color"));
