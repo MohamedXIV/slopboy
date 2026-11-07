@@ -105,3 +105,21 @@ button.sb-control.sb-v2-dialog-control:focus-visible,
  .sb-v2-footer-inner{flex-wrap:wrap;gap:10px}
  .sb-v2-footer nav{margin-left:0;width:100%}
 }
+
+/* Never let HeroUI's per-button variables override the V2 light palette. */
+.sb-v2-shell[data-v2-theme='light'] button.sb-control{
+  background-color:#e5eee4!important;color:#304744!important;
+  border-color:#bbcbbd!important;
+}
+.sb-v2-shell[data-v2-theme='light'] button.sb-control:hover:not(:disabled){
+  background-color:#d6e5d3!important;border-color:#66885d!important;
+}
+.sb-v2-shell[data-v2-theme='light'] button.sb-control.sb-control-primary{
+  background-color:#66885d!important;color:#fffdf5!important;border-color:#66885d!important;
+}
+.sb-v2-dialog[data-v2-theme='light'] button.sb-control{
+  background-color:#e5eee4!important;color:#304744!important;border-color:#bbcbbd!important;
+}
+.sb-v2-dialog[data-v2-theme='light'] button.sb-control.sb-control-primary{
+  background-color:#66885d!important;color:#fffdf5!important;
+}

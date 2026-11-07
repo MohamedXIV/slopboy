@@ -30,12 +30,10 @@ export default function V2AppShell({children}:{children:ReactNode}){
     return()=>cancelAnimationFrame(frame);
   },[]);
   const toggleTheme=useCallback(()=>{
-    setTheme(previous=>{
-      const next=previous==='dark'?'light':'dark';
-      try{window.localStorage.setItem(V2_THEME_STORAGE_KEY,next);}catch{/* Optional guest preference. */}
-      return next;
-    });
-  },[]);
+    const next=theme==='dark'?'light':'dark';
+    setTheme(next);
+    try{window.localStorage.setItem(V2_THEME_STORAGE_KEY,next);}catch{/* Optional guest preference. */}
+  },[theme]);
   const state=useMemo(()=>({theme,toggleTheme}),[theme,toggleTheme]);
   return <ThemeContext.Provider value={state}>
     <div className="sb-v2-shell" data-v2-theme={theme} data-theme={theme}>
