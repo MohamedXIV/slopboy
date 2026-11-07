@@ -105,7 +105,8 @@ export default function V2GameLibrary(){
               <div className="v2-library-history">
                 <div><span>Played</span><strong>{active?formatActiveTime(record.activeMs):'Not yet'}</strong></div>
                 <div><span>Last played</span><strong>{active&&record.lastPlayedAt?new Date(record.lastPlayedAt).toLocaleDateString():'Never'}</strong></div>
-                <div><span>Main story</span><strong>{record?.story?`${record.story.completed} / ${record.story.total} milestones`:'Not tracked'}</strong></div>
+                <div><span>Main story</span><strong>{game.mainStory&&record?.story&&record.story.total===game.mainStory.milestoneCount
+                    ?`${record.story.completed} / ${record.story.total} milestones`:'Not tracked'}</strong></div>
               </div>
               <div className="v2-library-actions">
                 <Link className="v2-library-play" href={'/v2/play/'+game.id}>↧ Insert &amp; play</Link>

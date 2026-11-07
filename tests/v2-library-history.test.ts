@@ -33,3 +33,9 @@ test('procedural cartridge covers are deterministic and varied',()=>{
   assert.match(a.primary,/^#[0-9a-f]{6}$/i);
   assert.ok(a.stripes>=3&&a.stripes<=8);
 });
+
+test('current arcade catalog never fabricates story completion percentages',async()=>{
+  const {GAMES}=await import('../packages/catalog/src/index.ts');
+  assert.equal(GAMES.length,3);
+  assert.ok(GAMES.every(game=>!game.mainStory));
+});

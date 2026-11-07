@@ -10,6 +10,8 @@ export interface CatalogGame {
   readonly genre: 'Arcade' | 'Shooter' | 'Puzzle';
   readonly hardware: { readonly id: string; readonly version: string };
   readonly controls: readonly string[];
+  /** Optional spoiler-free authored milestone count. Absent for current arcade games. */
+  readonly mainStory?: {readonly milestoneCount:number};
   readonly cartridge: `/cartridges/${string}.slop`;
   readonly artwork: { readonly background: string; readonly foreground: string; readonly emblem: string };
   readonly source: { readonly manifest: string; readonly game: string };
