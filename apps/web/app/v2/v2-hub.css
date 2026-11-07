@@ -40,3 +40,22 @@
 .v2-hub-footer a{color:#d6ec9b}
 @media(max-width:930px){.v2-hub-hero{grid-template-columns:1fr;padding-top:45px}.v2-hub-product{min-height:460px}.v2-hub-games{grid-template-columns:1fr 1fr}.v2-hub-concepts{grid-template-columns:1fr}}
 @media(max-width:620px){.v2-hub-header>div span{display:none}.v2-hub-hero{gap:35px;padding:45px 17px}.v2-hub-copy h1{font-size:52px;letter-spacing:-3px}.v2-hub-copy>p:not(.v2-hub-kicker){font-size:16px}.v2-hub-product{min-height:430px}.v2-hub-device{transform:rotate(-6deg) scale(.88)}.v2-hub-library{padding:50px 17px}.v2-hub-games{grid-template-columns:1fr}.v2-hub-concepts{padding:50px 20px}.v2-hub-footer{flex-wrap:wrap}}
+
+/* The same persisted light theme as the V2 device player / library. */
+.v2-hub[data-v2-theme='light']{background:#f4f0e5;color:#304744}
+.v2-hub[data-v2-theme='light'] .v2-hub-header{background:#fffdf6;border-color:#c6cebe}
+.v2-hub[data-v2-theme='light'] .v2-hub-header>div{color:#577169}
+.v2-hub[data-v2-theme='light'] .v2-hub-header a{color:#365f4a}
+.v2-hub[data-v2-theme='light'] .v2-hub-copy>p:not(.v2-hub-kicker){color:#536d65}
+.v2-hub[data-v2-theme='light'] .v2-hub-copy h1 em{color:#608059}
+.v2-hub[data-v2-theme='light'] .v2-hub-kicker{color:#467a50}
+.v2-hub[data-v2-theme='light'] .v2-hub-status{color:#58766b}
+.v2-hub[data-v2-theme='light'] .v2-hub-library{background:#edece2;border-color:#c6cfbf}
+.v2-hub[data-v2-theme='light'] .v2-hub-card{background:#fffdf7;border-color:#cad4c5}
+.v2-hub[data-v2-theme='light'] .v2-hub-card p,.v2-hub[data-v2-theme='light'] .v2-hub-concepts p:not(.v2-hub-kicker){color:#536d65}
+.v2-hub[data-v2-theme='light'] .v2-hub-card a{color:#396a4c}
+.v2-hub[data-v2-theme='light'] .v2-hub-footer{border-color:#c5cdbf;color:#576e66}
+.v2-hub[data-v2-theme='light'] .v2-hub-footer a{color:#386749}
+.v2-hub[data-v2-theme='light'] .v2-family-list>div{border-color:#c8d1c4}
+.v2-hub[data-v2-theme='light'] .v2-family-list small{color:#56766b}
+.v2-hub-header button{white-space:nowrap;font-size:11px}
