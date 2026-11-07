@@ -44,12 +44,23 @@ async function main(){
     if(!booted)throw Error('V2 runtime did not become ready');
     const dimensions=String(await evalJs("document.querySelector('.v2-display canvas').width+'x'+document.querySelector('.v2-display canvas').height"));
     if(dimensions!=='160x144')throw Error('Incorrect hardware resolution '+dimensions);
-    const shelf=String(await evalJs("document.querySelector('.v2-library-shortcut a').getAttribute('href')"));
-    if(shelf!=='/v2/library')throw Error('Device header must return to full game library');
-    if(Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip a').length"))!==0)
-      throw Error('Old cartridge list should not occupy player header');
-    const backHref=String(await evalJs("document.querySelector('.v2-brand').getAttribute('href')"));
-    if(backHref!=='/v2')throw Error('Brand link must remain a real navigation route');
+    const headerFooter=await evalJs("document.querySelectorAll('.sb-v2-header').length===1 && document.querySelectorAll('.sb-v2-footer').length===1");
+    if(headerFooter!==true)throw Error('Shared V2 header and footer missing or duplicated');
+    const sharedBrand=String(await evalJs("document.querySelector('.sb-v2-brand').getAttribute('href')"));
+    if(sharedBrand!=='/v2')throw Error('Shared brand must point to the devices home');
+    const quickTrigger=await evalJs("!!document.querySelector('.v2-change-game') && !!document.querySelector('.v2-full-library-link')");
+    if(quickTrigger!==true)throw Error('Player must provide in-place cartridge selection and full library');
+    if(Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip, .v2-header').length"))!==0)
+      throw Error('Duplicated legacy V2 game header still visible');
+    await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
+    await sleep(120);
+    const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
+    if(sharedLight!==true)throw Error('Shared theme did not propagate into player without duplicate controls');
+    const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
+    if(brandedButton!=='rgb(229, 238, 228)')throw Error('HeroUI toggle uses default palette instead of Slopboy branding: '+brandedButton);
+    const duplicateTheme=await evalJs("!!document.querySelector('.v2-appearance-mode, .v2-theme-button')");
+    if(duplicateTheme===true)throw Error('Redundant theme switches were not removed');
+
     const animation=await evalJs("!!document.querySelector('.v2-cartridge-entrant')&&!!document.querySelector('.v2-boot-screen')");
     if(animation!==true)throw Error('Cartridge insertion or real boot overlay is missing');
     const initial=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
@@ -113,6 +124,36 @@ async function main(){
       await sleep(150);
     }
     if(!restarted)throw Error('Restart failed to recover a fresh sandbox');
+    // The quick shelf must not navigate to a separate library page just to choose a new game.
+    const oldGameFrame=await evalJs("window.__frame=document.querySelector('.v2-isolated-frame');true");
+    if(oldGameFrame!==true)throw Error('Current game iframe missing before cartridge swap');
+    await evalJs("document.querySelector('.v2-change-game').click();true");
+    const quickDeadline=Date.now()+6000;
+    let quickVisible=false;
+    while(Date.now()<quickDeadline){
+      quickVisible=await evalJs("!!document.querySelector('.v2-quick-library-drawer')")===true;
+      if(quickVisible)break;
+      await sleep(130);
+    }
+    if(!quickVisible)throw Error('Quick cartridge Drawer never opened');
+    const simultaneous=await evalJs("!!document.querySelector('.v2-led.on')&&window.__frame===document.querySelector('.v2-isolated-frame')");
+    if(simultaneous!==true)throw Error('Opening quick cartridge Drawer restarted or paused the active runtime');
+    const quickCount=Number(await evalJs("document.querySelectorAll('.v2-quick-cartridge-list .v2-quick-cartridge').length"));
+    if(quickCount!==3)throw Error('Quick cartridge shelf must show every curated title');
+    await evalJs("document.querySelector('.v2-quick-cartridge[href=\"/v2/play/star-patrol\"]').click();true");
+    const swappedDeadline=Date.now()+15000;
+    let swapped=false;
+    while(Date.now()<swappedDeadline){
+      try{
+        swapped=await evalJs("location.pathname==='/v2/play/star-patrol' && !!document.querySelector('.v2-led.on') && document.querySelector('.v2-session-id strong')?.textContent==='Star Patrol' && window.__frame!==document.querySelector('.v2-isolated-frame')")===true;
+        if(swapped)break;
+      }catch{/* Client navigation may briefly replace the execution context. */}
+      await sleep(180);
+    }
+    if(!swapped)throw Error('New cartridge failed to boot in the same Play workspace after quick selection');
+    const persistentHeader=await evalJs("document.querySelectorAll('.sb-v2-header').length===1 && document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'");
+    if(persistentHeader!==true)throw Error('Changing a cartridge lost the shared V2 header or theme');
+
     // Exercise the actual HeroUI mobile drawer on a device-width viewport.
     await browser.setViewport(390,844);
     await sleep(450);
@@ -143,11 +184,18 @@ async function main(){
     if(!libraryReady)throw Error('Library route failed to render');
     const libraryCount=Number(await evalJs("document.querySelectorAll('.v2-cart-grid .v2-library-game').length"));
     if(libraryCount!==3)throw Error('Curated library cartridges missing: '+libraryCount);
+    const librarySharedChrome=await evalJs("document.querySelectorAll('.sb-v2-header').length===1&&document.querySelectorAll('.sb-v2-footer').length===1&&!document.querySelector('.v2-library-header,.v2-library-footer')");
+    if(librarySharedChrome!==true)throw Error('Library incorrectly rendered a duplicated local header or footer');
+    const lightPersisted=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-library').dataset.v2Theme==='light'");
+    if(lightPersisted!==true)throw Error('One shared theme did not persist across library navigation');
+    const libraryHeroControl=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).color"));
+    if(libraryHeroControl!=='rgb(48, 71, 68)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
+
     const libraryStats=await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:history:v1:tiny-catcher')||'{}').launches>=1");
     if(libraryStats!==true)throw Error('Real game launch was not recorded locally');
     const cloudStatus=String(await evalJs("document.querySelector('.v2-cloud-state')?.textContent||''"));
     if(!cloudStatus.includes('Not connected'))throw Error('Cloud saves must not claim unsupported sync');
-    console.log('V2 Chrome smoke passed: real games / GPU optics / controls / bypass / restart / HeroUI mobile drawer / full offline cartridge library');
+    console.log('V2 Chrome smoke passed: shared V2 chrome / unified theme / branded HeroUI / in-player cartridge swap / GPU optics / mobile drawer / full library');
   }finally{
     browser?.close();
     await new Promise<void>(resolve=>server.close(()=>resolve()));
