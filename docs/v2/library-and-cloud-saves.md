@@ -25,3 +25,14 @@
 
 ## Future UX
 A future V2 device can use a physical power button, animated removable cartridge and authentic boot process. Cosmetic entry/exit animation may not falsify game/runtime status or prevent basic controls; respect reduced motion and always allow clean bypass.
+
+## Implemented in V2 experimental branch (2026-11-07)
+
+- `/v2/library` lists the actual curated cartridges with deterministic seeded procedural cover graphics. Current library is **available-to-play curated games**, not a falsely claimed authenticated collection of owned purchases.
+- Player header now opens Library instead of displaying every game. Existing `/v2/play/[game]` routes continue to work unchanged.
+- Game launch count, last played and foreground active duration persist guest-locally. No guessed story-completion percentages; the arcade titles show “Not tracked”.
+- Users can create, view, restore and delete up to five **local** save snapshots per game via the existing IndexedDB host save driver; restore requires confirmation. No cloud network requests are made.
+- V2 shell, library and device showroom now share locally saved dark/light display preferences. On phones the device FX settings use HeroUI Drawer rather than forcing the user to scroll past the game.
+- Current CSS cartridge insertion and boot animations are **visual-first**; real user-controlled physical shutdown and an engine lifecycle contract are future gates. The animation must never claim that a cloud backup is complete.
+
+QA evidence: https://github.com/MohamedXIV/slopboy/actions/runs/42372481719 — TypeScript, lint, static export, real Chromium device/sandbox/mobile Drawer/library regression and KAPLAY spike passed.

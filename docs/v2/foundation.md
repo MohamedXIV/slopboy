@@ -16,6 +16,14 @@
 - Coins/achievements with global consequences must be trusted server-side. Host-authoritative P2P is **not** trustworthy for global spendable rewards.
 - Keep operating costs at $0 where quotas allow; do not claim unlimited free scale.
 
+## V2 library and UI vertical slice (2026-11-07)
+
+- `/v2/library` is the curated cartridge shelf and game picker; device player routes remain stable and do not list every cartridge in the header.
+- Play history is local-first and tracks launches, last played and active foreground duration; game story progress is optional and never invented when a title does not publish milestone data.
+- Real local IndexedDB save snapshots support explicit backup/restore in library. Cloud saves are **planned, not connected**; the proposed free-tier policy is 10 MiB/account, five cloud revisions/game and 256 KiB/snapshot with server-side enforcement and conflict resolution.
+- HeroUI v3 is installed with a frozen pnpm lockfile; phone-sized screens use its right-side Drawer for device settings. V2 has optional Light/Dark visuals inspired by the experimental KAPLAY lab, while keeping original dark styling as default.
+- Device insertion + boot animation is currently visual only. Future real power controls and device-specific cartridge form factors have not yet been implemented.
+
 ## Versioned source of truth
 
 The first new contract is `packages/hardware/src/v2.ts`. Its device has revision
