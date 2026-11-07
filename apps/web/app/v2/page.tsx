@@ -1,31 +1,10 @@
-'use client';
-
-import {useEffect,useState} from 'react';
-import {Button} from '@heroui/react';
 import Link from 'next/link';
 import {GAMES} from '@slopboy/catalog';
 import {V2_DEVICE_1000,V2_DEVICE_FAMILIES} from '@slopboy/hardware/v2';
 import './v2-hub.css';
 
 export default function V2LabHome(){
-  const [theme,setTheme]=useState<'dark'|'light'>('dark');
-  useEffect(()=>{
-    const frame=requestAnimationFrame(()=>{
-      try{if(localStorage.getItem('slopboy:v2:theme')==='light')setTheme('light');}catch{/* optional */}
-    });
-    return()=>cancelAnimationFrame(frame);
-  },[]);
-  const toggleTheme=()=>{
-    const next=theme==='dark'?'light':'dark';setTheme(next);
-    try{localStorage.setItem('slopboy:v2:theme',next);}catch{/* optional */}
-  };
-  return <main className="v2-hub" data-v2-theme={theme}>
-    <header className="v2-hub-header"><Link href="/" className="v2-hub-logo">SLOPBOY <em>2.0</em></Link>
-      <div><span>INDEPENDENT DESIGN LAB</span><Link href="/v2/library">My library</Link>
-      <Button size="sm" variant="secondary" onPress={toggleTheme} aria-label="Toggle light and dark theme">
-        {theme==='dark'?'☀ Light':'☾ Dark'}
-      </Button><Link href="/library">V1 prototype ↗</Link></div>
-    </header>
+  return <main className="v2-hub">
     <section className="v2-hub-hero">
       <div className="v2-hub-copy">
         <p className="v2-hub-kicker">SMALL DEVICES · INFINITE WORLDS</p>
@@ -63,6 +42,5 @@ export default function V2LabHome(){
       <p>Each game targets a versioned fantasy display. Cosmetics change appearance; resolution and indexed color count define display limits. Inputs describe the device controls, not CPU or RAM caps.</p></div>
       <div className="v2-family-list">{V2_DEVICE_FAMILIES.map(family=><div key={family.id}><span>{family.name}</span><small>{family.status==='active'?'Playable profile':'Concept only'}</small></div>)}</div>
     </section>
-    <footer className="v2-hub-footer"><Link href="/">← V1 reference</Link><span>Slopboy is a working title · 2.0 design lab</span></footer>
   </main>;
 }
