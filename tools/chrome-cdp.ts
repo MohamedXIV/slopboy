@@ -72,7 +72,13 @@ export async function openChromePage(url:string,profile:string){
       if(!result||!('value' in result))return null;
       return result.value;
     }
-    return {evaluate,close:()=>{
+    async function setViewport(width:number,height:number){
+      if(!Number.isInteger(width)||!Number.isInteger(height)||width<240||height<240)
+        throw Error('Invalid Chrome viewport');
+      await send('Emulation.setDeviceMetricsOverride',
+        {width,height,deviceScaleFactor:1,mobile:width<=760},validatedSessionId);
+    }
+    return {evaluate,setViewport,close:()=>{
       socket?.close();
       process.kill('SIGTERM');
     }};

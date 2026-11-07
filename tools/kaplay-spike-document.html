@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' blob:; style-src 'unsafe-inline'; connect-src 'none'; img-src data: blob:; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; form-action 'none'; base-uri 'none'">
+<style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#dce9b1}canvas{width:100%;height:100%;display:block;image-rendering:pixelated;touch-action:none}</style>
+</head><body><canvas id="game" width="160" height="144"></canvas>
+<script type="module">
+/* Both strings are generated from pinned, locally installed files at build time. */
+const engineSource = __KAPLAY_ENGINE_SOURCE__;
+const cartridgeSource = __SLOPBOY_CARTRIDGE_SOURCE__;
+const scope = "slopboy-v2-kaplay-spike";
+const allowedButtons = new Set(["UP","DOWN","LEFT","RIGHT","A","B","START","SELECT"]);
+const width = 160, height = 144, shades = 4;
+const canvas = document.getElementById("game");
+const captureCanvas = document.createElement("canvas");
+captureCanvas.width = width;
+captureCanvas.height = height;
+const captureContext = captureCanvas.getContext("2d", {willReadFrequently:true, alpha:false});
+let state = "waiting", key = "", game = null, previousCapture = 0;
+const post = (type, extra = {}, transfer = []) => parent.postMessage(
+  {scope, type, key, ...extra}, "*", transfer
+);
+function fail(error) {
+  if (state === "stopped") return;
+  state = "stopped";
+  try { game?.stop(); } catch {}
+  post("error", {reason: String(error?.message || error).slice(0, 140)});
+}
+async function loadModule(source) {
+  const url = URL.createObjectURL(new Blob([source], {type:"text/javascript"}));
+  try { return await import(url); } finally { URL.revokeObjectURL(url); }
+}
+function capture(now) {
+  if (state !== "running") return;
+  requestAnimationFrame(capture);
+  if (now - previousCapture < 1000 / 30) return;
+  previousCapture = now;
+  try {
+    const started = performance.now();
+    captureContext.drawImage(canvas, 0, 0, width, height);
+    const rgba = captureContext.getImageData(0, 0, width, height).data;
+    const pixels = new Uint8Array(width * height);
+    for (let i = 0; i < pixels.length; i++) {
+      const p = i * 4;
+      const value = (rgba[p] * 299 + rgba[p+1] * 587 + rgba[p+2] * 114) / 1000;
+      pixels[i] = value >= 199 ? 0 : value >= 147 ? 1 : value >= 76 ? 2 : 3;
+    }
+    post("frame", {
+      pixels,
+      playerX: game.getPlayerX(),
+      gameTicks: game.getTicks(),
+      inputPackets: game.getInputPackets(),
+      activeInputTicks: game.getActiveInputTicks(),
+      inputCount: game.getInputCount(),
+      assetProgress: game.getAssetProgress(),
+      captureMs: performance.now() - started,
+      engineFrameTarget: 60,
+      transferFrameTarget: 30
+    }, [pixels.buffer]);
+  } catch (error) { fail(error); }
+}
+window.addEventListener("message", async event => {
+  if (event.source !== parent) return;
+  const message = event.data;
+  if (!message || message.scope !== scope) return;
+  if (message.type === "start" && state === "waiting" &&
+      typeof message.key === "string" && /^[0-9a-f-]{36}$/.test(message.key)) {
+    key = message.key;
+    state = "starting";
+    try {
+      const imported = await loadModule(engineSource);
+      const cart = await loadModule(cartridgeSource);
+      if (typeof imported.default !== "function" || typeof cart.default !== "function") throw Error("Missing KAPLAY entrypoint");
+      game = cart.default(imported.default, canvas);
+      if (!game || typeof game.setInput !== "function" || typeof game.getPlayerX !== "function") throw Error("Invalid cartridge lifecycle");
+      const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+      state = "running";
+      post("ready", {
+        opaque: location.origin === "null",
+        webgl: Boolean(gl),
+        dimensions: [canvas.width, canvas.height],
+        preserveDrawingBuffer: gl?.getContextAttributes()?.preserveDrawingBuffer ?? null
+      });
+      requestAnimationFrame(capture);
+    } catch (error) { fail(error); }
+  } else if (message.type === "input" && state === "running" && message.key === key) {
+    if (!Array.isArray(message.down) || message.down.length > allowedButtons.size ||
+        !message.down.every(button => typeof button === "string" && allowedButtons.has(button))) return;
+    game.setInput(message.down);
+  } else if (message.type === "stop" && message.key === key) {
+    state = "stopped";
+    try { game?.stop(); } catch {}
+  }
+});
+post("boot");
+</script></body></html>

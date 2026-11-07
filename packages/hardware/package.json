@@ -1,1 +1,10 @@
-{"name":"@slopboy/hardware","version":"0.1.0","private":true,"type":"module","exports":{".":"./src/index.ts"}}
+{
+  "name": "@slopboy/hardware",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./v2": "./src/v2.ts"
+  }
+}

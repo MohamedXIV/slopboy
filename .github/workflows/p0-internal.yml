@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install without lifecycle scripts (lockfile pending)
+      - name: Install without lifecycle scripts
         run: pnpm install --ignore-scripts --frozen-lockfile
       - name: Unit tests
         run: pnpm test
@@ -59,6 +59,10 @@ jobs:
         run: pnpm lint
       - name: Static export build
         run: pnpm build
+      - name: V2 real-browser playable device regression
+        run: pnpm security:v2-browser
+      - name: Real Chromium KAPLAY isolated rendering spike
+        run: pnpm security:kaplay-spike
       - name: Verify playable build artifacts
         run: |
           pnpm cartridge:verify
@@ -70,6 +74,11 @@ jobs:
           test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
           test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
           test -f apps/web/out/create.html || test -f apps/web/out/create/index.html
+          test -f apps/web/out/v2.html || test -f apps/web/out/v2/index.html
+          test -f apps/web/out/v2/play/tiny-catcher.html || test -f apps/web/out/v2/play/tiny-catcher/index.html
+          test -f apps/web/out/v2/library.html || test -f apps/web/out/v2/library/index.html
+          test -f apps/web/out/v2/kaplay-spike.html
+          test -f apps/web/out/v2/spikes/kaplay.html || test -f apps/web/out/v2/spikes/kaplay/index.html
           test -f apps/web/out/sw.js
           node --check apps/web/out/sw.js
           test -f apps/web/out/offline-build.json

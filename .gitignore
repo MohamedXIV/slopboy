@@ -15,3 +15,6 @@ coverage/
 
 # Creator-produced bundles, never auto-published
 /creations/*/dist/
+
+# Generated pinned KAPLAY feasibility sandbox
+/apps/web/public/v2/kaplay-spike.html
