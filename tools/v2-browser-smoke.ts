@@ -113,7 +113,41 @@ async function main(){
       await sleep(150);
     }
     if(!restarted)throw Error('Restart failed to recover a fresh sandbox');
-    console.log('V2 Chrome smoke passed: game / display / real GPU screen FX / presets / sliders / storage / bypass / same-session mode / restart');
+    // Exercise the actual HeroUI mobile drawer on a device-width viewport.
+    await browser.setViewport(390,844);
+    await sleep(450);
+    const mobileReady=await evalJs("window.matchMedia('(max-width:760px)').matches && getComputedStyle(document.querySelector('.v2-mobile-settings')).display!=='none'");
+    if(mobileReady!==true)throw Error('Mobile settings trigger not visible');
+    await evalJs("document.querySelector('.v2-mobile-settings').click();true");
+    let drawerOpen=false;
+    const drawerDeadline=Date.now()+5000;
+    while(Date.now()<drawerDeadline){
+      drawerOpen=await evalJs("!!document.querySelector('.v2-mobile-drawer')")===true;
+      if(drawerOpen)break;
+      await sleep(150);
+    }
+    if(!drawerOpen)throw Error('HeroUI mobile device settings drawer failed to open');
+    const liveDuringSettings=await evalJs("!!document.querySelector('.v2-led.on')&&!!document.querySelector('.v2-isolated-frame')");
+    if(liveDuringSettings!==true)throw Error('Opening mobile drawer interrupted live cartridge');
+    // Back to game library: real curated cartridges, not a header game strip.
+    await evalJs("window.location.assign('/v2/library');true");
+    let libraryReady=false;
+    const libraryDeadline=Date.now()+12000;
+    while(Date.now()<libraryDeadline){
+      try{
+        libraryReady=await evalJs("!!document.querySelector('.v2-cart-grid')&&!!document.querySelector('.v2-library-game')")===true;
+        if(libraryReady)break;
+      }catch{/* Navigation can replace execution context. */}
+      await sleep(180);
+    }
+    if(!libraryReady)throw Error('Library route failed to render');
+    const libraryCount=Number(await evalJs("document.querySelectorAll('.v2-cart-grid .v2-library-game').length"));
+    if(libraryCount!==3)throw Error('Curated library cartridges missing: '+libraryCount);
+    const libraryStats=await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:history:v1:tiny-catcher')||'{}').launches>=1");
+    if(libraryStats!==true)throw Error('Real game launch was not recorded locally');
+    const cloudStatus=String(await evalJs("document.querySelector('.v2-cloud-state')?.textContent||''"));
+    if(!cloudStatus.includes('Not connected'))throw Error('Cloud saves must not claim unsupported sync');
+    console.log('V2 Chrome smoke passed: real games / GPU optics / controls / bypass / restart / HeroUI mobile drawer / full offline cartridge library');
   }finally{
     browser?.close();
     await new Promise<void>(resolve=>server.close(()=>resolve()));

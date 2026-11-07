@@ -76,6 +76,7 @@ jobs:
           test -f apps/web/out/create.html || test -f apps/web/out/create/index.html
           test -f apps/web/out/v2.html || test -f apps/web/out/v2/index.html
           test -f apps/web/out/v2/play/tiny-catcher.html || test -f apps/web/out/v2/play/tiny-catcher/index.html
+          test -f apps/web/out/v2/library.html || test -f apps/web/out/v2/library/index.html
           test -f apps/web/out/v2/kaplay-spike.html
           test -f apps/web/out/v2/spikes/kaplay.html || test -f apps/web/out/v2/spikes/kaplay/index.html
           test -f apps/web/out/sw.js
