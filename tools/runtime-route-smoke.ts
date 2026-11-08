@@ -33,6 +33,11 @@ async function main(){
     assert.equal(sw.status,200);
     assert.match(await sw.text(),/slopboy-installed-index-v3/);
     assert.match(String(sw.headers.get('cache-control')),/no-store/);
+    const manifest=await get('/manifest.webmanifest');
+    assert.equal(manifest.status,200,'Next App Router-generated PWA manifest route');
+    assert.match(String(manifest.headers.get('content-type')),/json/);
+    assert.equal((await get('/icons/slopboy-192.png')).status,200);
+    assert.equal((await get('/icons/slopboy-512.png')).status,200);
     assert.equal((await get('/library')).status,200);
     assert.equal((await get('/legacy')).status,200);
     console.log('Runtime Next server smoke PASS: fresh runtime UUID, reviewed API, unknown 404, canonical fixtures, public PWA assets');

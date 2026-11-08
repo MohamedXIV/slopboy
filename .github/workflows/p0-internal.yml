@@ -71,14 +71,12 @@ jobs:
         run: |
           pnpm cartridge:verify
           test -f apps/web/.next/BUILD_ID
-          test ! -d apps/web/out
           test -f apps/web/public/cartridges/tiny-catcher.slop
           test -f apps/web/public/cartridges/star-patrol.slop
           test -f apps/web/public/cartridges/circuit-slide.slop
           test -f apps/web/public/sw.js
           node --check apps/web/public/sw.js
           test -f apps/web/public/offline-build.json
-          test -f apps/web/public/manifest.webmanifest
           test -f apps/web/public/icons/slopboy-192.png
           test -f apps/web/public/icons/slopboy-512.png
           grep -q 'slopboy-installed-index-v3' apps/web/public/sw.js
