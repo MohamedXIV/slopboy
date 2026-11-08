@@ -3,6 +3,7 @@
 **Updated:** 2026-11-08 · **Status:** Proposed; [Draft PR #14](https://github.com/MohamedXIV/slopboy/pull/14) contains the working V2 UI/runtime baseline. No production cutover has been merged.
 
 **GitHub Project:** [Slopboy — Agent-Native Platform Roadmap](https://github.com/users/MohamedXIV/projects/7)  
+**Long-term product register:** [Long-Term Vision](docs/product/long-term-vision.md) · [Agents' entrypoint](AGENTS.md)
 **Architecture:** [ADR-002](docs/architecture/adr-002-production-cutover.md) (UUIDs/Legacy) · [ADR-003](docs/architecture/adr-003-agent-native-platform.md) (ChatGPT/Claude MCP, SaaS roles, hosting) · [ADR-004](docs/architecture/adr-004-approved-game-frameworks.md) (approved frameworks/cartridge runtime)
 
 ## Locked product direction
@@ -30,6 +31,21 @@
 | **M5 · Reliability/launch** | [#21](https://github.com/MohamedXIV/slopboy/issues/21): [#40 offline](https://github.com/MohamedXIV/slopboy/issues/40), [#41 hosting portability](https://github.com/MohamedXIV/slopboy/issues/41), [#42 release QA](https://github.com/MohamedXIV/slopboy/issues/42) | Dynamic PWA, mobile/WebKit, security/permissions/quotas, Vercel↔Render Next.js guide and rollback evidence |
 
 M0/M1/M2 are partially parallelizable: the OAuth contract and remote MCP tool schemas can start while canonical routes are being migrated, but *success* depends on real data ownership and a safe game bundle.
+
+## Long-term Product Vision (deliberately deferred)
+
+The MVP roadmap above is **not** the full planned platform. The persistent future-feature register lives in [Long-Term Product Vision](docs/product/long-term-vision.md), with six GitHub parent Epics and 12 execution issues. Agents must read it for architecture compatibility but **must not implement deferred features as scaffolding in current Sprints**.
+
+| Long-term track | Epic | Detailed Issues | When to revisit |
+| --- | --- | --- | --- |
+| Slop Coins, achievements, unlockables | [#50](https://github.com/MohamedXIV/slopboy/issues/50) | [#56](https://github.com/MohamedXIV/slopboy/issues/56), [#57](https://github.com/MohamedXIV/slopboy/issues/57) | P2: verified identity/events, after beta |
+| Multi-file games, assets, cartridge art | [#51](https://github.com/MohamedXIV/slopboy/issues/51) | [#58](https://github.com/MohamedXIV/slopboy/issues/58), [#59](https://github.com/MohamedXIV/slopboy/issues/59) | P1: after secure one-file drafts |
+| P2P / local multiplayer | [#52](https://github.com/MohamedXIV/slopboy/issues/52) | [#60](https://github.com/MohamedXIV/slopboy/issues/60), [#61](https://github.com/MohamedXIV/slopboy/issues/61) | P2: optional measured pilot |
+| Discoverability, creator profiles, collections | [#53](https://github.com/MohamedXIV/slopboy/issues/53) | [#62](https://github.com/MohamedXIV/slopboy/issues/62), [#63](https://github.com/MohamedXIV/slopboy/issues/63) | P1: published catalog and moderation |
+| IP/rights, privacy, backups, cost governance | [#54](https://github.com/MohamedXIV/slopboy/issues/54) | [#64](https://github.com/MohamedXIV/slopboy/issues/64), [#65](https://github.com/MohamedXIV/slopboy/issues/65) | P1: minimums before public UGC |
+| Physical shutdown/boot, personalization, future 3D | [#55](https://github.com/MohamedXIV/slopboy/issues/55) | [#66](https://github.com/MohamedXIV/slopboy/issues/66), [#67](https://github.com/MohamedXIV/slopboy/issues/67) | P1 lifecycle, P2 cosmetics/3D |
+
+**The current implementation order does not change:** #23 → #22 → #24, with #44 SDK and #25/#28 readiness in parallel. Future tracks are preserved as architecture and documentation requirements, not as a reason to block or inflate the first launch.
 
 ## Sprint 1 — Start here
 

@@ -1,6 +1,9 @@
 # Slopboy Platform Constitution — v0.1
 
-**Status:** Initial proposed project contract (2026-10-29). **Brand:** Slopboy is a temporary codename. **Scope:** MVP and compatibility principles, not final hardware numbers.
+**Status:** Historical v0.1 proposal (2026-10-29), **superseded in specific areas** by later ADR-002/003/004/005 and [Long-Term Product Vision](../docs/product/long-term-vision.md). **Brand:** Slopboy is a temporary codename. **Scope:** MVP and compatibility principles, not final hardware numbers.
+
+
+> **Current-contract correction (2026-11-08):** The v0.1 Hardware Profile paragraphs about CPU, audio channel budgets, cartridge code/asset size, save capacity and fixed FPS are **not current product policy**. Slopboy virtual devices constrain logical screen resolution, aspect ratio, displayed indexed color count and map their actual physical inputs. Display shaders/refresh effects are optional presentation only. Platform upload/storage/performance quotas are real service/abuse safety rules, not fantasy hardware limitations. Likewise the older static-export-first, deferred backend/MCP and single custom SDK game-format assumptions have been superseded by Next.js dynamic routing, Neon backend candidate, OAuth MCP creation and approved KAPLAY/Phaser engine templates. Preserve historical reasoning here, but follow current [Roadmap](../ROADMAP.md), [ADR-004](architecture/adr-004-approved-game-frameworks.md), [ADR-005](architecture/adr-005-manual-source-ingestion.md), and [Long-Term Vision](product/long-term-vision.md) in all new implementation.
 
 ## 1. Mission and identity
 

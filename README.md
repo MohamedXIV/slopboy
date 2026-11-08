@@ -24,6 +24,8 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [Architecture & security](docs/architecture-and-security.md)
 - [Slopboy 1000 draft hardware contract](docs/hardware/slopboy-1000.md)
 - [**Agent-native Roadmap — Epics, Issues, Sprint 1**](ROADMAP.md)
+- [**Long-Term Product Vision — progression, assets, multiplayer, community, governance and device UX**](docs/product/long-term-vision.md)
+- [**AI Agent onboarding and architecture guardrails**](AGENTS.md)
 - [Legacy prototype roadmap](docs/roadmap.md)
 - [ADR-002: Canonical routes and UUIDs](docs/architecture/adr-002-production-cutover.md)
 - [ADR-003: ChatGPT/Claude MCP, roles, hosting](docs/architecture/adr-003-agent-native-platform.md)
@@ -31,7 +33,7 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [ADR-005: Manual code paste, private drafts and upload security](docs/architecture/adr-005-manual-source-ingestion.md)
 - [Development setup and P0 validation](docs/development.md)
 
-## Proposed implementation
+## Legacy V1 implementation (historical — not the current production cutover plan)
 
 Next.js + React + TypeScript, Tailwind + shadcn/ui, pnpm monorepo, standalone TypeScript SDK and browser runtime, static export/PWA, GitHub-driven submissions and bounded CI. Backend **deferred**; Neon and Supabase are candidates, not a commitment. Remote MCP connector **deferred** until manual cartridge workflow passes.
 
@@ -39,7 +41,7 @@ Next.js + React + TypeScript, Tailwind + shadcn/ui, pnpm monorepo, standalone Ty
 
 Run a separately packaged, validated demo cartridge on an original virtual console in both Console and Game modes, with keyboard/touch controls and no backend. See `/play` after starting `pnpm dev`.
 
-This repository is at planning stage. See the roadmap before beginning implementation.
+These notes describe the V1 prototype. For current implementation priorities, use [ROADMAP.md](ROADMAP.md); the V2 app remains in Draft PR #14.
 
 ## Play the curated games
 
