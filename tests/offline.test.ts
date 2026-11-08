@@ -1,31 +1,40 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {allowedPrecachePath,renderServiceWorker} from '../tools/build-offline.ts';
+import {readFile} from 'node:fs/promises';
+import {renderServiceWorker,OFFLINE_SHELL_PATHS} from '../tools/build-offline.ts';
 import {GAMES} from '../packages/catalog/src/index.ts';
-test('offline builder only accepts static assets, no credentials or dynamic endpoints',()=>{
-  for(const asset of ['/index.html','/library.html','/_next/static/chunk.js','/cartridges/tiny-catcher.slop','/icons/slopboy-192.png','/manifest.webmanifest']) assert.equal(allowedPrecachePath(asset),true,asset);
-  for(const path of ['/api/me','/sw.js','/../config.json','https://evil.com/app.js','/x.js?auth=secret','/foo/bar'])assert.equal(allowedPrecachePath(path),false,path);
-});
-test('generated offline worker precaches exact files and isolates cache names',()=>{
-  const script=renderServiceWorker(['/library.html','/index.html','/cartridges/tiny-catcher.slop'],'deadbeef12345678');
-  assert.match(script,/CACHE='slopboy-static-deadbeef12345678'/);
-  assert.match(script,/cache.addAll/);
-  assert.match(script,/credentials:'omit'/);
-  assert.match(script,/request.mode==='navigate'/);
-  assert.match(script,/url.origin!==self.location.origin/);
-  assert.ok(script.includes("k.startsWith('slopboy-static-')"));
-  assert.ok(!script.includes('/api/me'));
-});
 
-test('UUID play pages and legacy bookmarks remain eligible for the static offline worker',()=>{
-  const game=GAMES[0];
-  const paths=[
-    '/index.html','/library.html',
-    '/play/'+game.gameId+'.html','/play/'+game.legacySlug+'.html',
-    '/legacy.html','/legacy/library.html','/legacy/play/'+game.legacySlug+'.html',
-    '/v2/play/'+game.gameId+'.html','/v2/play/'+game.legacySlug+'.html'
-  ];
-  for(const path of paths)assert.ok(allowedPrecachePath(path),path);
-  const worker=renderServiceWorker(paths,'0123456789abcdef');
-  for(const path of paths)assert.ok(worker.includes(path),path);
+const readSource=()=>readFile(new URL('../tools/offline-worker-source.js',import.meta.url),'utf8');
+test('runtime offline worker is generated from reviewed source and seeded immutable UUIDs',async()=>{
+  const script=renderServiceWorker(await readSource(),'deadbeef12345678');
+  assert.match(script,/slopboy-shell-v3-deadbeef12345678/);
+  assert.match(script,/slopboy-games-v3/);
+  assert.match(script,/slopboy-installed-index-v3/);
+  assert.ok(!script.includes('__RELEASE__')&&!script.includes('__CURATED__'));
+  for(const game of GAMES){
+    assert.ok(script.includes(game.gameId));
+    assert.ok(script.includes(game.cartridge));
+    assert.ok(script.includes(game.revisionId));
+  }
+  assert.deepEqual(OFFLINE_SHELL_PATHS,['/','/library','/manifest.webmanifest',
+    '/icons/slopboy-192.png','/icons/slopboy-512.png']);
+  assert.throws(()=>renderServiceWorker('wrong','deadbeef12345678'),/Incomplete/);
+  assert.throws(()=>renderServiceWorker(await readSource(),'invalid'),/Invalid/);
+});
+test('public shell and explicit installs only; private API and RSC requests bypass persistent cache',async()=>{
+  const code=await readSource();
+  assert.match(code,/event\.request/);
+  assert.match(code,/request\.headers\.has\('RSC'\)/);
+  assert.match(code,/request\.headers\.has\('Next-Router-Prefetch'\)/);
+  assert.match(code,/request\.headers\.has\('Next-Router-State-Tree'\)/);
+  assert.match(code,/request\.mode==='navigate'/);
+  assert.match(code,/request\.method!=='GET'/);
+  assert.match(code,/url\.origin!==self\.location\.origin/);
+  assert.match(code,/data\.type==='SL_OP_INSTALL'/);
+  assert.match(code,/data\.type==='SL_OP_REMOVE'/);
+  assert.match(code,/fetch\(noCredentials\('\/api\/public-games\/'/);
+  assert.match(code,/MAX_CARTRIDGE_BYTES/);
+  assert.match(code,/slopboy-static-/); // old implicit installs preserved on activation
+  assert.ok(!code.includes("caches.delete('slopboy-local-saves')"));
+  assert.ok(!code.includes("indexedDB.deleteDatabase"));
 });
