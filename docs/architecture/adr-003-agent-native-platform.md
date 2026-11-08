@@ -4,6 +4,12 @@
 **Status:** Proposed for review; supersedes ADR-002's assumption that the on-site Studio is a priority.  
 **Product:** Slopboy is a multi-sided creator/game platform. **Creating games from ChatGPT and Claude using the user's own subscriptions and accounts is the core user journey**, not a future assistant feature.
 
+## Two complementary creation inputs — no plugin dependency for manual drafts
+
+A real signed-in creator may ask ChatGPT, Claude or another AI to write **Slopboy framework-template source**, copy the generated `.ts`/`.js` code, and submit it through **Dashboard → My Games → Paste code**. This is the fallback when official ChatGPT/Claude plugin listings are delayed or a user does not want to connect an account to a third-party AI client. After receipt the private draft is owned by the server-derived logged-in subject, not by the model or pasted metadata.
+
+**Manual paste and OAuth MCP use the exact same domain upload/validation/build path.** A saved private draft is not automatically safe or playable; the isolated build + hostile-code runtime gate is mandatory before preview. Public library access requires human approval in either route. The detailed threat model, statuses and rollout are in [ADR-005](adr-005-manual-source-ingestion.md) and [Issue #49](https://github.com/MohamedXIV/slopboy/issues/49).
+
 ## Product roles and interfaces
 
 One Slopboy account can be **player and creator simultaneously**; reviewer/operator powers are separate privileged roles, not a second identity.

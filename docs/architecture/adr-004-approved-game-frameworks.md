@@ -69,6 +69,10 @@ The adapter maps this interface to a given engine without making V2DevicePlayer 
 
 **Renderer performance gate:** Current KAPLAY spike does GPU → CPU readback → quantize → 2D display, and hid GPU context stalls unless the raw renderer is visible. That is a diagnostic, **not an approved production pipeline**. Prototype zero-/low-copy GPU palette quantization and final FX where appropriate; profile actual visible + paused/hidden iframe, tab background, WebGL context loss and Safari/WebKit before selecting a design. No fictional hardware FPS cap; an optional screen refresh effect never changes game simulation or inputs.
 
+## Manual paste is a first-class authoring path
+
+Approved engine templates are not exclusive to remote MCP. A creator can copy a Slopboy-compatible KAPLAY or later Phaser module from any AI assistant and submit it in `/dashboard` using **Paste Code**. The server constructs/checks its framework manifest; the upload is an owner-only, non-executing draft until validated, isolated-built and safe to preview. Do not allow the manual path to bypass the same framework allowlist, upload quotas, ownership or sandbox gates as MCP. See [ADR-005](adr-005-manual-source-ingestion.md) and [#49](https://github.com/MohamedXIV/slopboy/issues/49).
+
 ## What the AI clients receive
 
 Remote MCP should expose current approved capabilities using tools such as:

@@ -28,6 +28,7 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [ADR-002: Canonical routes and UUIDs](docs/architecture/adr-002-production-cutover.md)
 - [ADR-003: ChatGPT/Claude MCP, roles, hosting](docs/architecture/adr-003-agent-native-platform.md)
 - [ADR-004: Approved game frameworks and engine-neutral cartridges](docs/architecture/adr-004-approved-game-frameworks.md)
+- [ADR-005: Manual code paste, private drafts and upload security](docs/architecture/adr-005-manual-source-ingestion.md)
 - [Development setup and P0 validation](docs/development.md)
 
 ## Proposed implementation
