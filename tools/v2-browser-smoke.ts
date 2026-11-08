@@ -250,7 +250,7 @@ async function main(){
       await sleep(80);
     }
     if(!migratedHistory)throw Error('Guest play history did not recover from legacy slug after reload');
-    await evalJs("document.querySelectorAll('.v2-library-actions button')[2].click();true");
+    await evalJs("document.querySelectorAll('.v2-library-actions button[aria-controls^="v2-save-"]')[2].click();true");
     let foundBackup=false;
     for(let i=0;i<80;i++){
       foundBackup=await evalJs("document.querySelectorAll('.v2-local-slot').length===1")===true;
