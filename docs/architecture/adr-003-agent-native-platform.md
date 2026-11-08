@@ -20,6 +20,10 @@ One Slopboy account can be **player and creator simultaneously**; reviewer/opera
 
 **There is no web-based game code editor in initial scope.** Replace the old (`/studio`) route proposal with (`/dashboard`) and a game's manage page. A future web creator studio is optional, not a dependency. Slopboy itself does **not** need paid model APIs; the user creates code in ChatGPT/Claude and sends it using the authenticated connector.
 
+## Approved game frameworks for agent-generated source
+
+Per [ADR-004](adr-004-approved-game-frameworks.md) / [Epic #43](https://github.com/MohamedXIV/slopboy/issues/43), AI-generated new games must follow an approved version-pinned engine template. **KAPLAY** is the first candidate but its current iframe spike is not a production runtime; **Phaser 4** is the planned rich-2D adapter; **PixiJS 8** remains a rendering-focused option that requires a gameplay toolkit. ChatGPT and Claude use MCP engine discovery/templates; the submitted artifact is not a standalone custom HTML/CSS/JS page. Framework usage does not relax hostile-code isolation, OAuth ownership, private preview or public review requirements.
+
 ## Core end-to-end flow
 
 1. Creator signs into Slopboy and connects the Slopboy plugin/remote MCP connector from **their own ChatGPT/Claude account**.

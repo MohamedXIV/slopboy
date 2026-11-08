@@ -12,6 +12,7 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 
 - **Invented hardware, real constraints.** Consoles are not clones of Game Boy, PSP, or any commercial device.
 - **Two play modes.** Interact with the complete handheld shell, or maximize the game display without stretching or changing aspect ratio.
+- **Approved framework cartridges.** New agent-authored games use vetted pinned frameworks (KAPLAY first candidate, Phaser 4 next, PixiJS if justified) and the same Slopboy host adapter; no arbitrary web page upload.
 - **One SDK, many creators.** Human developers, ChatGPT, Claude, and other assistants use the same build and validation contracts.
 - **Player-friendly collection.** A single earned currency eventually unlocks consoles, games, shell colors, stickers, editions, and boot animations.
 - **Safety and quality first.** Imported code is untrusted; validation and human publication review are mandatory.
@@ -26,6 +27,7 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [Legacy prototype roadmap](docs/roadmap.md)
 - [ADR-002: Canonical routes and UUIDs](docs/architecture/adr-002-production-cutover.md)
 - [ADR-003: ChatGPT/Claude MCP, roles, hosting](docs/architecture/adr-003-agent-native-platform.md)
+- [ADR-004: Approved game frameworks and engine-neutral cartridges](docs/architecture/adr-004-approved-game-frameworks.md)
 - [Development setup and P0 validation](docs/development.md)
 
 ## Proposed implementation
