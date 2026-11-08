@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "gameId": "7d2e8b91-4f3a-49c0-a8d6-1e5b2c3d4e5f",
+  "revisionId": "a1b2c3d4-e5f6-4789-8012-3456789abcde",
+  "title": "Bouncy Square",
+  "deviceProfile": "slopboy-1000",
+  "engine": {
+    "id": "pixel-v1",
+    "version": "0.1.0",
+    "adapterProtocol": 1
+  },
+  "entrypoint": "src/game.ts",
+  "assets": [
+    {
+      "path": "assets/palette.txt",
+      "type": "text"
+    }
+  ],
+  "controls": ["LEFT", "RIGHT", "UP", "DOWN", "A", "B", "START", "SELECT"]
+}

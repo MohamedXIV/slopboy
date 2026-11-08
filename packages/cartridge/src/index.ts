@@ -185,3 +185,7 @@ export function compileGameSource(source: string): string {
   inspect(result.outputText,64*1024);
   return result.outputText;
 }
+
+export * from './engine-registry.ts';
+export * from './manifest-v2.ts';
+export * from './package-v2.ts';
