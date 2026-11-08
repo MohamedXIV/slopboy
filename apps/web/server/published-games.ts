@@ -6,7 +6,7 @@
  * Replace this adapter with the publication database in the backend sprint.
  */
 import {GAMES,getCatalogGame,getLegacyCatalogGame,isGameUuid,type PlayableGame}
-  from '../../../packages/catalog/src/index.ts';
+  from '@slopboy/catalog';
 
 export const RUNTIME_FIXTURES_ENV='SLOPBOY_RUNTIME_FIXTURES_JSON';
 const MAX_RUNTIME_FIXTURES=16;
