@@ -12,6 +12,7 @@
     "./protocol": "./src/protocol.ts",
     "./save-store": "./src/save-store.ts",
     "./host-api": "./src/host-api.ts",
+    "./kaplay-adapter": "./src/kaplay-adapter.ts",
     ".": "./src/host-api.ts"
   }
 }

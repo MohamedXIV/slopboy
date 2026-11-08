@@ -63,15 +63,30 @@ window.addEventListener("message", async event => {
   if (event.source !== parent) return;
   const message = event.data;
   if (!message || message.scope !== scope) return;
-  if (message.type === "start" && state === "waiting" &&
-      typeof message.key === "string" && /^[0-9a-f-]{36}$/.test(message.key)) {
+  if (message.type === "start" && (state === "waiting" || state === "stopped") &&
+      typeof message.key === "string" && /^[0-9a-zA-Z-]{20,80}$/.test(message.key)) {
     key = message.key;
     state = "starting";
     try {
       const imported = await loadModule(engineSource);
       const cart = await loadModule(cartridgeSource);
       if (typeof imported.default !== "function" || typeof cart.default !== "function") throw Error("Missing KAPLAY entrypoint");
-      game = cart.default(imported.default, canvas);
+      let storedSave = typeof message.save === "string" ? message.save : null;
+      const hostContext = {
+        storage: {
+          load: () => storedSave,
+          save: (val) => {
+            if (typeof val !== "string" || new TextEncoder().encode(val).byteLength > 8192) throw Error("Save budget exceeded");
+            storedSave = val;
+            post("save", { value: val });
+          },
+          erase: () => {
+            storedSave = null;
+            post("save", { value: null });
+          }
+        }
+      };
+      game = cart.default(imported.default, canvas, hostContext);
       if (!game || typeof game.setInput !== "function" || typeof game.getPlayerX !== "function") throw Error("Invalid cartridge lifecycle");
       const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
       state = "running";
@@ -87,6 +102,17 @@ window.addEventListener("message", async event => {
     if (!Array.isArray(message.down) || message.down.length > allowedButtons.size ||
         !message.down.every(button => typeof button === "string" && allowedButtons.has(button))) return;
     game.setInput(message.down);
+  } else if (message.type === "pause" && state === "running" && message.key === key) {
+    state = "paused";
+    try { if (typeof game?.pause === "function") game.pause(); } catch {}
+  } else if (message.type === "resume" && state === "paused" && message.key === key) {
+    state = "running";
+    try { if (typeof game?.resume === "function") game.resume(); } catch {}
+    requestAnimationFrame(capture);
+  } else if (message.type === "restart" && message.key === key) {
+    try { if (typeof game?.restart === "function") game.restart(); } catch {}
+    state = "running";
+    requestAnimationFrame(capture);
   } else if (message.type === "stop" && message.key === key) {
     state = "stopped";
     try { game?.stop(); } catch {}

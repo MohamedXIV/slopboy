@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "gameId": "39b1f7c2-9a4d-45e8-b8c1-6204d9c3a810",
+  "revisionId": "c8d9e0f1-2345-4678-9012-345678abcdef",
+  "title": "Gem Miner",
+  "deviceProfile": "slopboy-1000",
+  "engine": {
+    "id": "kaplay",
+    "version": "3001.0.19",
+    "adapterProtocol": 1
+  },
+  "entrypoint": "src/game.ts",
+  "assets": [
+    {
+      "path": "assets/game-data.json",
+      "type": "data"
+    }
+  ],
+  "controls": ["UP", "DOWN", "LEFT", "RIGHT", "A"]
+}
