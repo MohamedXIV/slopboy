@@ -62,7 +62,7 @@ async function main(){
     await browser.setOffline(true);
     await evalJs(`window.location.assign('/play/${game.gameId}');true`);
     try{
-      await wait('installed game boots offline',"location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')",26000);
+      await wait('installed game boots offline',`location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')`,26000);
     }catch(error){
       await evalJs(`(async()=>{window.__offlineProbe='pending';
         try{const r=await fetch('${game.cartridge}',{credentials:'omit',cache:'no-store'});
@@ -115,11 +115,11 @@ async function main(){
       throw Error('Removing offline installation deleted a guest autosave');
     await evalJs(`window.location.assign('/play/${game.gameId}');true`);
     await wait('uninstalled game intentionally unavailable offline',
-      "location.pathname==='/play/${game.gameId}'&&document.body?.textContent?.includes('not installed for offline play')",15000);
+      `location.pathname==='/play/${game.gameId}'&&document.body?.textContent?.includes('not installed for offline play')`,15000);
     await browser.setOffline(false);
     await evalJs(`window.location.assign('/play/${BROWSER_RUNTIME_FIXTURE.gameId}');true`);
     await wait('new UUID unknown during build boots runtime',
-      "location.pathname==='/play/${BROWSER_RUNTIME_FIXTURE.gameId}'&&!!document.querySelector('.v2-led.on')",24000);
+      `location.pathname==='/play/${BROWSER_RUNTIME_FIXTURE.gameId}'&&!!document.querySelector('.v2-led.on')`,24000);
     const rendered=String(await evalJs("document.querySelector('.v2-session-id strong').textContent"));
     if(rendered!==BROWSER_RUNTIME_FIXTURE.title)throw Error('Runtime game did not have server metadata: '+rendered);
     console.log('Next PWA Chromium smoke PASS: opt-in installed cartridge offline boot, shell reload, guest IDB persistence, uninstall, fresh runtime UUID play');
