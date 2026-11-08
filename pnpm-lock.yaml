@@ -26,12 +26,18 @@ importers:
       '@heroui/styles':
         specifier: 3.0.0
         version: 3.0.0(tailwind-merge@3.4.0)(tailwindcss@4.3.3)
+      '@slopboy/cartridge':
+        specifier: workspace:*
+        version: link:../../packages/cartridge
       '@slopboy/catalog':
         specifier: workspace:*
         version: link:../../packages/catalog
       '@slopboy/hardware':
         specifier: workspace:*
         version: link:../../packages/hardware
+      '@slopboy/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@slopboy/runtime':
         specifier: workspace:*
         version: link:../../packages/runtime
@@ -79,6 +85,15 @@ importers:
   packages/catalog: {}
 
   packages/hardware: {}
+
+  packages/mcp:
+    dependencies:
+      '@slopboy/cartridge':
+        specifier: workspace:*
+        version: link:../cartridge
+      '@slopboy/hardware':
+        specifier: workspace:*
+        version: link:../hardware
 
   packages/runtime:
     dependencies:

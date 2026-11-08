@@ -17,6 +17,8 @@
     "react-dom": "^19.0.0",
     "@slopboy/runtime": "workspace:*",
     "@slopboy/catalog": "workspace:*",
+    "@slopboy/cartridge": "workspace:*",
+    "@slopboy/mcp": "workspace:*",
     "@heroui/react": "3.0.0",
     "@heroui/styles": "3.0.0"
   },
