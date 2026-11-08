@@ -9,6 +9,7 @@ import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
 import {listLocalSnapshots,saveLocalSnapshot,restoreLocalSnapshot,deleteLocalSnapshot,LOCAL_SNAPSHOT_SLOTS,
   type LocalSnapshot} from './local-save-slots';
+import OfflineInstallControl from './OfflineInstallControl';
 import './v2-library.css';
 
 export default function V2GameLibrary(){
@@ -73,6 +74,7 @@ export default function V2GameLibrary(){
               </div>
               <div className="v2-library-actions">
                 <Link className="v2-library-play" href={'/play/'+game.gameId}>↧ Insert &amp; play</Link>
+                <OfflineInstallControl gameId={game.gameId}/>
                 <Button className="sb-control" size="sm" variant="secondary" onPress={()=>void expandSaves(game.gameId)}
                   aria-expanded={openSaves===game.gameId} aria-controls={'v2-save-'+game.gameId}>Local saves</Button>
               </div>

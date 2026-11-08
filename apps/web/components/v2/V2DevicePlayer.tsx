@@ -18,6 +18,7 @@ import {RetroScreenRenderer} from './RetroScreenRenderer';
 import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_PRESET_META,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
   sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
   type ScreenFxSettings,type ScreenRefresh} from './screen-fx-config';
+import OfflineInstallControl from './OfflineInstallControl';
 import './v2-player.css';
 
 const DEVICE=SLOPBOY_1000; // Explicit v1 compatibility adapter; not a new KAPLAY sandbox.
@@ -603,6 +604,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             ↧ Change cartridge
           </Button>
           <Link href="/library" className="v2-full-library-link">Full library</Link>
+          <OfflineInstallControl gameId={game.gameId}/>
           <Button size="sm" variant="secondary" className="sb-control v2-mobile-settings"
             onPress={()=>{
               physical.current.clear();pressed.current.clear();syncKeys();
