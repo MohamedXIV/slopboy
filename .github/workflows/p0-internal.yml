@@ -70,13 +70,19 @@ jobs:
           test -f apps/web/out/cartridges/star-patrol.slop
           test -f apps/web/out/cartridges/circuit-slide.slop
           test -f apps/web/out/library.html || test -f apps/web/out/library/index.html
-          test -f apps/web/out/play/star-patrol.html || test -f apps/web/out/play/star-patrol/index.html
+          test -f apps/web/out/play/f8067e25-7c16-4e9d-b496-69b1b8fe7ccc.html || test -f apps/web/out/play/f8067e25-7c16-4e9d-b496-69b1b8fe7ccc/index.html
+          test -f apps/web/out/play/3ce74eec-ca3c-484b-8d16-2af4840c539b.html || test -f apps/web/out/play/3ce74eec-ca3c-484b-8d16-2af4840c539b/index.html
           test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
           test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
           test -f apps/web/out/create.html || test -f apps/web/out/create/index.html
+          test -f apps/web/out/legacy.html || test -f apps/web/out/legacy/index.html
+          test -f apps/web/out/legacy/library.html || test -f apps/web/out/legacy/library/index.html
+          test -f apps/web/out/legacy/play/circuit-slide.html || test -f apps/web/out/legacy/play/circuit-slide/index.html
+          test -f apps/web/out/legacy/create.html || test -f apps/web/out/legacy/create/index.html
           test -f apps/web/out/v2.html || test -f apps/web/out/v2/index.html
           test -f apps/web/out/v2/play/tiny-catcher.html || test -f apps/web/out/v2/play/tiny-catcher/index.html
           test -f apps/web/out/v2/library.html || test -f apps/web/out/v2/library/index.html
+          test -f apps/web/out/labs/kaplay.html || test -f apps/web/out/labs/kaplay/index.html
           test -f apps/web/out/v2/kaplay-spike.html
           test -f apps/web/out/v2/spikes/kaplay.html || test -f apps/web/out/v2/spikes/kaplay/index.html
           test -f apps/web/out/sw.js

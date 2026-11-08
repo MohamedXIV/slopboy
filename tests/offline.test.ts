@@ -22,6 +22,7 @@ test('UUID play pages and legacy bookmarks remain eligible for the static offlin
   const paths=[
     '/index.html','/library.html',
     '/play/'+game.gameId+'.html','/play/'+game.legacySlug+'.html',
+    '/legacy.html','/legacy/library.html','/legacy/play/'+game.legacySlug+'.html',
     '/v2/play/'+game.gameId+'.html','/v2/play/'+game.legacySlug+'.html'
   ];
   for(const path of paths)assert.ok(allowedPrecachePath(path),path);

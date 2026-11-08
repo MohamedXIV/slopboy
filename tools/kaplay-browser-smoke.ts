@@ -29,7 +29,7 @@ async function main() {
   const port=(server.address() as {port:number}).port;
   let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
   try {
-    browser = await openChromePage("http://127.0.0.1:"+port+"/v2/spikes/kaplay",join(profile,"chrome"));
+    browser = await openChromePage("http://127.0.0.1:"+port+"/labs/kaplay",join(profile,"chrome"));
     const evaluate=browser.evaluate;
     let ready=false;
     const deadline=Date.now()+20000;

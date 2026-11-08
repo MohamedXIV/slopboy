@@ -32,7 +32,7 @@ async function main(){
   const port=(server.address() as {port:number}).port;
   let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
   try{
-    browser=await openChromePage('http://127.0.0.1:'+port+'/v2/play/tiny-catcher',join(profile,'chrome'));
+    browser=await openChromePage('http://127.0.0.1:'+port+'/play/tiny-catcher',join(profile,'chrome'));
     const evalJs=browser.evaluate;
     const deadline=Date.now()+15000;
     let booted=false;
@@ -43,13 +43,15 @@ async function main(){
       if(state.error.includes('Game stopped'))throw Error('V2 playback error: '+state.error);
       await sleep(150);
     }
-    if(!booted)throw Error('V2 runtime did not become ready');
+    if(!booted)throw Error('Canonical player runtime did not become ready');
+    const firstPath=String(await evalJs('location.pathname'));
+    if(firstPath!=='/play/'+GAMES[0].gameId)throw Error('Legacy slug bookmark did not redirect to canonical game UUID: '+firstPath);
     const dimensions=String(await evalJs("document.querySelector('.v2-display canvas').width+'x'+document.querySelector('.v2-display canvas').height"));
     if(dimensions!=='160x144')throw Error('Incorrect hardware resolution '+dimensions);
     const headerFooter=await evalJs("document.querySelectorAll('.sb-v2-header').length===1 && document.querySelectorAll('.sb-v2-footer').length===1");
     if(headerFooter!==true)throw Error('Shared V2 header and footer missing or duplicated');
     const sharedBrand=String(await evalJs("document.querySelector('.sb-v2-brand').getAttribute('href')"));
-    if(sharedBrand!=='/v2')throw Error('Shared brand must point to the devices home');
+    if(sharedBrand!=='/')throw Error('Shared brand must point to the devices home');
     const quickTrigger=await evalJs("!!document.querySelector('.v2-change-game') && !!document.querySelector('.v2-full-library-link')");
     if(quickTrigger!==true)throw Error('Player must provide in-place cartridge selection and full library');
     if(Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip, .v2-header').length"))!==0)
@@ -147,12 +149,12 @@ async function main(){
     if(simultaneous!==true)throw Error('Opening quick cartridge Drawer restarted or paused the active runtime');
     const quickCount=Number(await evalJs("document.querySelectorAll('.v2-quick-cartridge-list .v2-quick-cartridge').length"));
     if(quickCount!==3)throw Error('Quick cartridge shelf must show every curated title');
-    await evalJs(`document.querySelector('.v2-quick-cartridge[href="/v2/play/${STAR_GAME_ID}"]').click();true`);
+    await evalJs(`document.querySelector('.v2-quick-cartridge[href="/play/${STAR_GAME_ID}"]').click();true`);
     const swappedDeadline=Date.now()+15000;
     let swapped=false;
     while(Date.now()<swappedDeadline){
       try{
-        swapped=await evalJs(`location.pathname==='/v2/play/${STAR_GAME_ID}' && !!document.querySelector('.v2-led.on') && document.querySelector('.v2-session-id strong')?.textContent==='Star Patrol' && window.__frame!==document.querySelector('.v2-isolated-frame')`)===true;
+        swapped=await evalJs(`location.pathname==='/play/${STAR_GAME_ID}' && !!document.querySelector('.v2-led.on') && document.querySelector('.v2-session-id strong')?.textContent==='Star Patrol' && window.__frame!==document.querySelector('.v2-isolated-frame')`)===true;
         if(swapped)break;
       }catch{/* Client navigation may briefly replace the execution context. */}
       await sleep(180);
@@ -178,7 +180,7 @@ async function main(){
     const liveDuringSettings=await evalJs("!!document.querySelector('.v2-led.on')&&!!document.querySelector('.v2-isolated-frame')");
     if(liveDuringSettings!==true)throw Error('Opening mobile drawer interrupted live cartridge');
     // Back to game library: real curated cartridges, not a header game strip.
-    await evalJs("window.location.assign('/v2/library');true");
+    await evalJs("window.location.assign('/library');true");
     let libraryReady=false;
     const libraryDeadline=Date.now()+12000;
     while(Date.now()<libraryDeadline){
@@ -257,11 +259,11 @@ async function main(){
       await sleep(60);
     }
     if(!foundBackup)throw Error('Legacy local backup not visible in UUID library after migration');
-    await evalJs(`window.location.assign('/v2/play/${circuit.gameId}');true`);
+    await evalJs(`window.location.assign('/play/${circuit.gameId}');true`);
     let circuitBoot=false;
     for(let i=0;i<180;i++){
       try{
-        circuitBoot=await evalJs(`location.pathname==='/v2/play/${circuit.gameId}'&&!!document.querySelector('.v2-led.on')`)===true;
+        circuitBoot=await evalJs(`location.pathname==='/play/${circuit.gameId}'&&!!document.querySelector('.v2-led.on')`)===true;
         if(circuitBoot)break;
       }catch{}
       await sleep(80);
@@ -293,7 +295,48 @@ async function main(){
     if(values[legacySave]!==gameProgress||values[oldBackup]!==backupValue||values[uuidBackup]!==backupValue
       ||migratedSave?.format!=='slopboy-save-v2'||migratedSave.gameId!==circuit.gameId||migratedSave.data!==gameProgress)
       throw Error('Guest autosave or backup was not copied exactly and non-destructively to UUID identity');
-    console.log('V2 Chrome smoke passed: shared V2 chrome / unified theme / branded HeroUI / in-player cartridge swap / GPU optics / mobile drawer / full library / real UUID save migration');
+    // Routing cutover: canonical app must not load the legacy layout.
+    const navigate=async(path:string,expected:string,expression:string)=>{
+      try{await evalJs('window.location.assign('+JSON.stringify(path)+');true');}catch{}
+      const until=Date.now()+12000;
+      while(Date.now()<until){
+        try{
+          const ok=await evalJs('location.pathname==='+JSON.stringify(expected)+'&&('+expression+')');
+          if(ok===true)return;
+        }catch{/* Navigation tears down the previous execution context. */}
+        await sleep(120);
+      }
+      throw Error('Navigation failed: '+path+' -> '+expected+' with '+expression);
+    };
+    await navigate('/','/',"!!document.querySelector('.sb-v2-header')&&!!document.querySelector('.v2-hub')&&!document.querySelector('.hero')");
+    const homeLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.v2-hub-card a')].map(a=>a.getAttribute('href')))");
+    const actualLinks=JSON.parse(String(homeLinks)) as string[];
+    if(actualLinks.length!==3||actualLinks.some((url,i)=>url!=='/play/'+GAMES[i].gameId))
+      throw Error('Canonical home must link to UUID games, not /v2 slugs');
+    await navigate('/v2','/',"!!document.querySelector('.sb-v2-header')");
+    await navigate('/v2/library?source=bookmark#shelf','/library',
+      "location.search==='?source=bookmark'&&location.hash==='#shelf'&&!!document.querySelector('.v2-cart-grid')");
+    await navigate('/v2/play/star-patrol','/play/'+STAR_GAME_ID,
+      "!!document.querySelector('.v2-led.on')");
+    await navigate('/legacy','/legacy',"!!document.querySelector('.hero')&&!document.querySelector('.sb-v2-header')");
+    const legacyHubLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.links a')].map(a=>a.getAttribute('href')))");
+    if(!String(legacyHubLinks).includes('/legacy/library'))throw Error('Legacy home links to canonical rather than legacy library');
+    await navigate('/legacy/library','/legacy/library',
+      "document.querySelectorAll('.game-card-grid .game-card').length===3&&!document.querySelector('.sb-v2-header')");
+    const legacyLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.game-card-play')].map(a=>a.getAttribute('href')))");
+    const legacyExpected=GAMES.map(g=>'/legacy/play/'+g.legacySlug);
+    if(JSON.stringify(JSON.parse(String(legacyLinks)))!==JSON.stringify(legacyExpected))
+      throw Error('Legacy game shelf links must keep old slug-based V1 pages');
+    await navigate('/legacy/play/circuit-slide','/legacy/play/circuit-slide',
+      "!!document.querySelector('.player-root')&&!!document.querySelector('.isolated-game-frame')");
+    await navigate('/create','/legacy/create',
+      "!!document.querySelector('.creator-main')&&!document.querySelector('.sb-v2-header')");
+    await navigate('/play','/play/'+GAMES[0].gameId,
+      "!!document.querySelector('.v2-led.on')");
+    // Verify the official library also works independently after returning from legacy.
+    await navigate('/library','/library',
+      "!!document.querySelector('.sb-v2-header')&&document.querySelectorAll('.v2-library-game').length===3");
+    console.log('Canonical route smoke passed: UUID root/library/play, old /v2 aliases, legacy V1 pages/creator, mobile/settings and save migration');
   }finally{
     browser?.close();
     await new Promise<void>(resolve=>server.close(()=>resolve()));
