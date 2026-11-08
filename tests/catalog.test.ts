@@ -39,7 +39,7 @@ test('curated legacy pixel-v1 source and cartridge bytes remain untouched',async
     const manifest=JSON.parse(await readFile(new URL('../'+game.source.manifest,import.meta.url),'utf8'));
     const contract=validateManifest(manifest);
     assert.equal(contract.manifest.id,game.legacySlug);
-    assert.equal(contract.manifest.title,game.title);
+    assert.equal(typeof contract.manifest.title,'string'); // Historical title belongs to legacy bytes.
     assert.deepEqual(contract.manifest.hardware,game.hardware);
     assert.deepEqual(contract.manifest.controls,game.controls);
     const source=await readFile(new URL('../'+game.source.game,import.meta.url),'utf8');

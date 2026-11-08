@@ -30,7 +30,8 @@ async function release(action:'build'|'verify'):Promise<void>{
     known.add(basename(output));
     const declared=JSON.parse(await readSource(entry.source.manifest));
     const {manifest}=validateManifest(declared);
-    if(manifest.id!==entry.legacySlug||manifest.title!==entry.title||
+    // UI titles may be renamed without rebuilding immutable pixel-v1 cartridges.
+    if(manifest.id!==entry.legacySlug||
       manifest.hardware.id!==entry.hardware.id||manifest.hardware.version!==entry.hardware.version||
       JSON.stringify(manifest.controls)!==JSON.stringify(entry.controls))throw Error('Catalog manifest mismatch: '+entry.legacySlug);
     const code=compileGameSource(await readSource(entry.source.game));
