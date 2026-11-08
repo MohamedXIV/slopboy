@@ -9,8 +9,23 @@ export interface BrowserCartridge {
 /** Downloads only a known first-party public cartridge path; limits gzip inflation. */
 export async function loadBundledCartridge(path: string, hardware: HardwareProfile): Promise<BrowserCartridge> {
   if (!/^\/cartridges\/[a-z0-9-]+\.slop$/.test(path)) throw Error('Invalid cartridge path');
-  const response = await fetch(path, {credentials:'omit', redirect:'error', cache:'no-store'});
-  if (!response.ok || !response.body) throw Error('Cartridge unavailable');
+  // Explicitly installed reviewed bundles remain readable when the browser is
+  // offline, including browsers that stall network Fetch under CDP/offline mode.
+  // This is *not* arbitrary offline JS: the exact path, hardware, gzip and
+  // isolated pixel-v1 manifest still pass the normal validation below.
+  const offline=async():Promise<Response|undefined>=>{
+    try{
+      if(typeof caches==='undefined'||!(await caches.has('slopboy-games-v3')))return undefined;
+      return await (await caches.open('slopboy-games-v3')).match(path);
+    }catch{return undefined;}
+  };
+  let response:Response|undefined;
+  if(typeof navigator!=='undefined'&&!navigator.onLine)response=await offline();
+  if(!response){
+    try{response=await fetch(path,{credentials:'omit',redirect:'error',cache:'no-store'});}
+    catch{response=await offline();}
+  }
+  if(!response?.ok || !response.body) throw Error('Cartridge unavailable');
   const compressed = new Uint8Array(await response.arrayBuffer());
   if (compressed.byteLength < 2 || compressed.byteLength > hardware.budgets.compressedBytes) throw Error('Cartridge too large');
   if (typeof DecompressionStream === 'undefined') throw Error('This browser does not support cartridge decompression');
