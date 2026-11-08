@@ -8,7 +8,8 @@ const readSource=()=>readFile(new URL('../tools/offline-worker-source.js',import
 test('runtime offline worker is generated from reviewed source and seeded immutable UUIDs',async()=>{
   const source=await readSource();
   const script=renderServiceWorker(source,'deadbeef12345678');
-  assert.match(script,/slopboy-shell-v3-deadbeef12345678/);
+  assert.match(script,/const RELEASE='deadbeef12345678'/);
+  assert.match(script,/const SHELL='slopboy-shell-v3-'\+RELEASE/);
   assert.match(script,/slopboy-games-v3/);
   assert.match(script,/slopboy-installed-index-v3/);
   assert.ok(!script.includes('__RELEASE__')&&!script.includes('__CURATED__'));
