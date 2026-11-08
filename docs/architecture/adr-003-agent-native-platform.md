@@ -61,8 +61,8 @@ Entities from ADR-002 still apply, plus:
 - Render supports full Next.js Node web services and persistent HTTP endpoints. Its **free** web service spins down after 15 min without inbound messages and can take around 1 minute to wake. Free Render Postgres expires after 30 days. These are unacceptable as reliable production MCP/auth endpoints.
 - Render's paid entry-level web service is currently **$7/month, 0.5 CPU / 512 MiB RAM**, plus bandwidth/other services. Render Hobby workspace itself can remain $0; compute is extra. Avoid relying on 512 MiB for heavy AI-generated game builds.
 - Vercel's Hobby tier is limited to **personal or noncommercial use**. It is suitable for prototype preview, not an unrestricted SaaS with creator revenue, ads or subscriptions.
-- Both can serve Next.js HTTP APIs. Render is attractive for a stable long-running MCP server and jobs; Vercel excels at the current preview/static frontend. Whether to combine them on one Render service or separate frontend/API is a trade-off, not a necessity.
-- **Decision gate:** test full Next.js deployment + OAuth connector from ChatGPT and Claude, 95th percentile response latency after idle, real browser gameplay, build queue/resource isolation, mobile performance, egress/store quotas, deployment rollbacks and minimum sustainable operating cost. Keep the current Vercel preview until a candidate proves better.
+- **Clarified hosting intent:** Render is considered **only as a future replacement for Vercel's hosting of the Next.js frontend/app**. Neon database, Auth, Object Storage and candidate MCP Functions remain the separate backend. Moving hosts still requires DNS, OAuth callback, cookies, PWA origin/cache, deployment and secrets testing.
+- **Frontend-hosting migration gate:** test full Next.js build/start, real browser gameplay, OAuth redirect/domain/cookie changes, PWA behavior, rollbacks and sustainable operating cost on Render. Test ChatGPT/Claude MCP separately against the Neon-backed service. Keep Vercel until switching is justified and verified.
 - Avoid an unaffordable 24/7 service while the requirement remains truly $0. Do not silently deploy a paid instance. If testing Render Free, label it **experimental only**.
 
 ## New zero-budget-first hosting opportunity — Neon Functions (2026-11-08)
@@ -72,11 +72,15 @@ Neon's November 2 release confirms Managed Better Auth as an OAuth 2.1 Provider 
 **Preferred first measured experiment (no Render migration yet):**
 - Retain the working **Vercel preview** for the Next.js web frontend (non-commercial development/beta only).
 - Build a **Slopboy-specific Neon dev project + Function** exposing one HTTPS MCP endpoint, using Managed Better Auth OAuth Provider and Postgres/Storage; test OAuth linking from **both** ChatGPT and Claude with the same Slopboy account.
-- Once the MCP vertical slice works, decide whether the web frontend should keep Vercel with full-stack APIs, use Neon Functions for all JSON data operations, or migrate full Next.js hosting to Render **paid** if commercial deployment or persistent Node server needs justify it.
+- Once the MCP vertical slice works, decide only whether **Next.js frontend hosting** stays Vercel or moves to Render; **do not relocate Neon** as part of that decision. Backend data handlers and MCP tools invoke shared typed domain services.
 - Render Free should not host production OAuth/MCP due to its 15-minute scale-down and potentially ~1-minute wake; Render Starter (~$7/mo) is a later, explicitly approved paid option.
 - Avoid duplicating backend business logic. MCP tool handlers and web dashboard handlers call the **same typed domain services**, regardless of deployment topology.
 
 Sources: https://neon.com/blog/managed-better-auth-oauth-provider-mcp ; https://neon.com/blog/neon-free-plan-1-gb-per-project ; https://neon.com/blog/is-mcp-good-yet
+
+## Delivery tracking
+
+[ROADMAP.md](../../ROADMAP.md) and [GitHub Project #7](https://github.com/users/MohamedXIV/projects/7) track seven Epics #15–#21, with 21 linked execution Issues #22–#42. First coding issue: #23 (UUID and non-destructive guest-save contract).
 
 ## Priority order (replaces ADR-002 Studio-first batch)
 

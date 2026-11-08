@@ -1,0 +1,55 @@
+# Slopboy — Agent-Native Platform Roadmap
+
+**Updated:** 2026-11-08 · **Status:** Proposed; [Draft PR #14](https://github.com/MohamedXIV/slopboy/pull/14) contains the working V2 UI/runtime baseline. No production cutover has been merged.
+
+**GitHub Project:** [Slopboy — Agent-Native Platform Roadmap](https://github.com/users/MohamedXIV/projects/7)  
+**Architecture:** [ADR-002](docs/architecture/adr-002-production-cutover.md) (UUIDs/Legacy) · [ADR-003](docs/architecture/adr-003-agent-native-platform.md) (ChatGPT/Claude MCP, SaaS roles, hosting)
+
+## Locked product direction
+
+- **AI-assisted creation is the core product**, not a future optional feature. A creator connects their own Slopboy account to ChatGPT or Claude using an authenticated Remote MCP connector and creates a game inside those clients. Slopboy receives the game source and assets; no paid generation API subscription is required from Slopboy.
+- A new game is a **private, account-owned draft by default**. Friends see it only through explicit grants. Only reviewed approved immutable revisions become publicly discoverable.
+- A Slopboy user may be guest/player/creator in one identity; the protected `/dashboard` manages My Games, revisions, permissions, stats, integrations and saves. `/admin` manages moderation, approval and platform operations. A web game-code Studio is not in launch scope.
+- **Canonical URLs:** `/` devices/home, `/library` full catalog and personal collection, `/play/[gameId]` UUID route, `/games/[gameId]` detail, `/dashboard` user/creator, `/admin` operator, and `/legacy` for old prototype. UUID game/revision IDs are immutable; titles are mutable display data.
+- **Display-only virtual hardware:** logical resolution, aspect ratio and indexed-color count; no invented CPU/RAM/ROM, save-size, audio or FPS hardware caps. Storage/upload abuse quotas are independent platform policies.
+- **Hosting:** **Vercel** hosts Next.js for now; **Neon** provides data/Auth/Object Storage and candidate Remote MCP Functions. **Render is only a future alternative to Vercel for hosting the Next.js frontend/app**, not a replacement for Neon. Keep portable Next.js runtime/config and document OAuth redirect, domain, cookie and PWA changes before any switch.
+- **Safety:** guest IndexedDB saves remain offline-first; untrusted games never run in privileged app or MCP contexts. Existing [#4](https://github.com/MohamedXIV/slopboy/issues/4) is the untrusted-code sandbox gate; the KAPLAY experiment alone doesn't satisfy it.
+
+## Milestones and epics
+
+| Milestone | Epic and implementation issues | Exit criterion |
+|---|---|---|
+| **M0 · Canonical app** | [#15](https://github.com/MohamedXIV/slopboy/issues/15): [#23 UUID/save aliases](https://github.com/MohamedXIV/slopboy/issues/23) → [#22 routes/legacy](https://github.com/MohamedXIV/slopboy/issues/22) → [#24 Next.js dynamic/PWA](https://github.com/MohamedXIV/slopboy/issues/24) | No `/v2` for users; canonical UUID play pages; old saves/bookmarks preserved; real dynamic Next deploy passes |
+| **M1 · User/data** | [#16](https://github.com/MohamedXIV/slopboy/issues/16): [#25 Neon dev/schema](https://github.com/MohamedXIV/slopboy/issues/25), [#26 Auth/roles](https://github.com/MohamedXIV/slopboy/issues/26), [#27 DB catalog/ownership](https://github.com/MohamedXIV/slopboy/issues/27) | Two real accounts; private user drafts and public catalog with UUIDs; guest play intact |
+| **M2 · Agent-native private game (core product)** | [#17](https://github.com/MohamedXIV/slopboy/issues/17): [#28 OAuth](https://github.com/MohamedXIV/slopboy/issues/28), [#29 MCP tools](https://github.com/MohamedXIV/slopboy/issues/29), [#30 ChatGPT+Claude E2E](https://github.com/MohamedXIV/slopboy/issues/30). [#18](https://github.com/MohamedXIV/slopboy/issues/18): [#31 uploads](https://github.com/MohamedXIV/slopboy/issues/31), [#32 builds](https://github.com/MohamedXIV/slopboy/issues/32), [#33 sandbox](https://github.com/MohamedXIV/slopboy/issues/33) + existing [#4](https://github.com/MohamedXIV/slopboy/issues/4) | Game genuinely created in ChatGPT and Claude, private in owner dashboard, safely built and playable to authorized owner only |
+| **M3 · Player/creator experience** | [#19](https://github.com/MohamedXIV/slopboy/issues/19): [#34 My Games](https://github.com/MohamedXIV/slopboy/issues/34), [#35 friend sharing](https://github.com/MohamedXIV/slopboy/issues/35), [#36 cloud saves](https://github.com/MohamedXIV/slopboy/issues/36), [#37 analytics/ratings](https://github.com/MohamedXIV/slopboy/issues/37) | Owner manages games, stats, private grants and opt-in quota-protected synced saves |
+| **M4 · Admin moderation** | [#20](https://github.com/MohamedXIV/slopboy/issues/20): [#38 review](https://github.com/MohamedXIV/slopboy/issues/38), [#39 reports](https://github.com/MohamedXIV/slopboy/issues/39) | Server-only admin roles, audited approvals; unapproved content stays non-public |
+| **M5 · Reliability/launch** | [#21](https://github.com/MohamedXIV/slopboy/issues/21): [#40 offline](https://github.com/MohamedXIV/slopboy/issues/40), [#41 hosting portability](https://github.com/MohamedXIV/slopboy/issues/41), [#42 release QA](https://github.com/MohamedXIV/slopboy/issues/42) | Dynamic PWA, mobile/WebKit, security/permissions/quotas, Vercel↔Render Next.js guide and rollback evidence |
+
+M0/M1/M2 are partially parallelizable: the OAuth contract and remote MCP tool schemas can start while canonical routes are being migrated, but *success* depends on real data ownership and a safe game bundle.
+
+## Sprint 1 — Start here
+
+**Primary order:** [#23](https://github.com/MohamedXIV/slopboy/issues/23) **UUID contract and non-destructive legacy save mapping** → [#22](https://github.com/MohamedXIV/slopboy/issues/22) **promote the Slopboy UI and keep the old prototype as `/legacy`** → [#24](https://github.com/MohamedXIV/slopboy/issues/24) **dynamic Next.js deploy without breaking PWA/guest games**.
+
+**Parallel research/implementation:** [#25](https://github.com/MohamedXIV/slopboy/issues/25) Neon isolated development schema and [#28](https://github.com/MohamedXIV/slopboy/issues/28) OAuth provider / ChatGPT + Claude MCP compatibility, before real [#26](https://github.com/MohamedXIV/slopboy/issues/26) authentication and [#29](https://github.com/MohamedXIV/slopboy/issues/29) MCP tools.
+
+**Sprint exit:** UUID routes, guest saves preserved, root new UI + legacy route, running dynamic Vercel Preview and real Chromium/mobile controls. No fake cloud or OAuth connected indicators.
+
+## First real game acceptance journey
+
+1. Creator signs in, linking their Slopboy account to **both ChatGPT and Claude** through OAuth.
+2. ChatGPT or Claude calls `create_game_draft` with an authenticated tool, creating an immutable UUID-owned private draft. User identity always comes from verified server auth, **never** model-supplied account IDs.
+3. Assistant transfers source/assets through bounded, verified uploads; isolated build and preview return honest state.
+4. Owner sees game immediately in My Games and can play only when the safe preview passes. A second unrelated account cannot access it.
+5. Optional private friend sharing uses grants; public discoverability requires admin review.
+6. The same process is repeated against the other AI client to prove interoperability.
+
+## Existing work and release constraints
+
+- [PR #14](https://github.com/MohamedXIV/slopboy/pull/14) is Draft and carries real V2 UI, HeroUI drawers, screen FX, offline guest saves and curated runtime. Do **not** merge unchanged; canonical-route/UUID/backend/offline migration is still missing.
+- Existing issues [#2](https://github.com/MohamedXIV/slopboy/issues/2), [#3](https://github.com/MohamedXIV/slopboy/issues/3) and legacy PRs are completed history. [#4](https://github.com/MohamedXIV/slopboy/issues/4) remains a security blocker. Legacy [#5](https://github.com/MohamedXIV/slopboy/issues/5) and [#6](https://github.com/MohamedXIV/slopboy/issues/6) need separate reconciliation rather than duplicate tickets.
+- Every issue closes with tested code, typecheck/lint/build and relevant browser/security evidence, migration and rollback notes, and a small PR. Avoid unnecessary ongoing CI minutes and unapproved paid infrastructure.
+- **GitHub Project #7 exists; its items have not yet been added into the Project board.** The linked Epics and their Issue checklists are the authoritative work hierarchy until a GitHub Project add-item operation is available. Don't claim the board is populated.
+
+No calendar dates or production-ready status are implied by this roadmap.

@@ -6,7 +6,7 @@
 
 ## Decisions to review
 
-1. **V2 is the new app; V1 becomes Legacy.** The canonical routes become `/` (devices/landing), `/library` (full catalog and personal library), `/play/[gameId]` (running a cartridge), `/games/[gameId]` (metadata/detail), and `/studio` (drafts/publishing later). `/legacy` and `/legacy/play/[legacySlug]` preserve V1 for reference and smoke tests. Keep temporary redirects from known `/v2` routes and the old root routes; redirects must be tested on Vercel.
+1. **V2 is the new app; V1 becomes Legacy.** The canonical routes become `/` (devices/landing), `/library` (full catalog and personal library), `/play/[gameId]` (running a cartridge), `/games/[gameId]` (metadata/detail), and `/dashboard` (player/creator game management) plus role-protected `/admin` (moderation); a browser game-code Studio is deferred. `/legacy` and `/legacy/play/[legacySlug]` preserve V1 for reference and smoke tests. Keep temporary redirects from known `/v2` routes and the old root routes; redirects must be tested on Vercel.
 2. **Opaque immutable game IDs.** `gameId` is a server-issued UUID (UUID v4 works everywhere; no need to infer title or slug). URLs use IDs only, never display names. Titles and search labels are editable metadata. Revisions have their **own UUIDs** and immutable build identifiers. `/play/[gameId]` resolves an authorized published revision or an authorized personal draft; explicit version selection may use a separate query/route without mutating the game's identity.
 3. **Keep v1 save compatibility during promotion.** The three curated demos currently use slug IDs such as `tiny-catcher` in cartridge paths and IndexedDB keys. Introduce an explicit, finite `legacySlug -> UUID` mapping for these fixtures; migrate/alias local save namespaces transactionally without data loss. Do not silently replace IDs in existing save keys. Existing V1 URLs get explicit legacy or UUID redirects.
 4. **Switch to runtime Next.js deployment when dynamic publishing is introduced.** Current `output: 'export'` requires known build-time game routes and cannot serve newly published UUID pages without redeployment. Remove the static export restriction **together with** the backend/route integration, not in a separate broken deployment. Keep public pages cached, runtime game metadata queried by ID, and games rendered in browser isolation. Update Vercel output and CI artifact assumptions.
@@ -71,9 +71,13 @@
 - **Gameplay:** isolated client-side runtime; KAPLAY as engine candidate after security/performance gate; small pixel runtime for legacy-curated games.
 - **API:** Next.js server handlers (minimize backend duplication).
 - **Data/Auth/Files:** Neon Postgres + Managed Better Auth + Object Storage **candidate pending a live Slopboy project acceptance test**.
-- **Hosting:** Vercel. Hobby is for personal/non-commercial use only; reassess hosting before monetization.
+- **Hosting:** Vercel for Next.js/frontend now. **Render may later replace only Vercel as the Next.js host**. Neon backend/Auth/Object Storage and provider-neutral MCP services remain separate; document DNS and OAuth callback migration. Hobby is for personal/non-commercial use; reassess before monetization.
 - **Offline:** PWA with guest IndexedDB saves and explicit immutable cartridge caching.
 - **Testing:** unit, typecheck, ESLint, Chromium + mobile WebKit, permissions/RLS, multi-device saves, offline recovery. Avoid unnecessary recurring CI minutes.
+
+## Delivery tracking
+
+[ROADMAP.md](../../ROADMAP.md) and [GitHub Project #7](https://github.com/users/MohamedXIV/projects/7) track Epics #15–#21 and their issues #22–#42. **First implementation: #23**, then #22 and #24. This ADR is not a claim that routing/backend migration is complete.
 
 ## Merge policy
 

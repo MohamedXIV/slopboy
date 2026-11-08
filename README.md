@@ -6,6 +6,8 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 
 > **Project status:** constitution and prototype planning. Slopboy is a codename, not a cleared brand. A first curated play prototype is in development; no public submissions or production service exists yet.
 
+> **November 2026 direction:** Slopboy is an **agent-native game platform**: creators use ChatGPT/Claude connected to their Slopboy account through OAuth Remote MCP; their game drafts appear privately and become public only after review. The new visual/runtime platform remains on Draft PR #14, not yet merged into production. Read the [**Agent-Native Roadmap**](ROADMAP.md) before implementing features. There is no functioning public AI game uploader or cloud save service yet.
+
 ## Product pillars
 
 - **Invented hardware, real constraints.** Consoles are not clones of Game Boy, PSP, or any commercial device.
@@ -20,7 +22,10 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [Platform Constitution v0.1](docs/platform-constitution.md)
 - [Architecture & security](docs/architecture-and-security.md)
 - [Slopboy 1000 draft hardware contract](docs/hardware/slopboy-1000.md)
-- [Roadmap and acceptance gates](docs/roadmap.md)
+- [**Agent-native Roadmap — Epics, Issues, Sprint 1**](ROADMAP.md)
+- [Legacy prototype roadmap](docs/roadmap.md)
+- [ADR-002: Canonical routes and UUIDs](docs/architecture/adr-002-production-cutover.md)
+- [ADR-003: ChatGPT/Claude MCP, roles, hosting](docs/architecture/adr-003-agent-native-platform.md)
 - [Development setup and P0 validation](docs/development.md)
 
 ## Proposed implementation
