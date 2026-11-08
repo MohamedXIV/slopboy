@@ -57,8 +57,10 @@ export async function saveSnapshot(driver:SaveDriver,gameId:string,now=Date.now(
   const game=identity(gameId);
   const value=await createGameSaveService(driver,SLOPBOY_1000,game).read();
   if(value===null)throw Error('No saved game data yet. Play and save first.');
-  await listSnapshots(driver,gameId);
+  const occupied=new Set((await listSnapshots(driver,gameId)).map(snapshot=>snapshot.slot));
   for(let slot=1;slot<=LOCAL_SNAPSHOT_SLOTS;slot++){
+    // A valid legacy snapshot still occupies its slot if a previous copy aborted.
+    if(occupied.has(slot))continue;
     const key=localSnapshotKey(gameId,slot);
     const raw=await driver.get(key);
     if(raw!==undefined&&raw!==DELETED)continue;

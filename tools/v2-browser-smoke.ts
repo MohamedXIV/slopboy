@@ -204,11 +204,96 @@ async function main(){
     const libraryHeroControl=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).color"));
     if(libraryHeroControl!=='rgb(48, 71, 68)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
 
-    const libraryStats=await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:history:v1:tiny-catcher')||'{}').launches>=1");
+    const libraryStats=await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:history:v2:"+GAMES[0].gameId+"')||'{}').launches>=1");
     if(libraryStats!==true)throw Error('Real game launch was not recorded locally');
     const cloudStatus=String(await evalJs("document.querySelector('.v2-cloud-state')?.textContent||''"));
     if(!cloudStatus.includes('Not connected'))throw Error('Cloud saves must not claim unsupported sync');
-    console.log('V2 Chrome smoke passed: shared V2 chrome / unified theme / branded HeroUI / in-player cartridge swap / GPU optics / mobile drawer / full library');
+    // A real IndexedDB / localStorage upgrade with historical names, not a mock driver.
+    const circuit=GAMES[2];
+    const legacySave='save-v1:slopboy-1000@0.1.0:'+circuit.legacySlug;
+    const uuidSave='save-v2:slopboy-1000@0.1.0:'+circuit.gameId;
+    const oldBackup='slopboy:local-backup:v1:slopboy-1000:'+circuit.legacySlug+':2';
+    const uuidBackup='slopboy:local-backup:v2:slopboy-1000:'+circuit.gameId+':2';
+    const gameProgress=JSON.stringify({version:1,tiles:[1,2,3,4,5,6,7,0,8],seed:4242});
+    const backupValue=JSON.stringify({createdAt:2468,save:gameProgress});
+    const oldHistory='slopboy:v2:history:v1:'+circuit.legacySlug;
+    const newHistory='slopboy:v2:history:v2:'+circuit.gameId;
+    await evalJs(`localStorage.setItem(${JSON.stringify(oldHistory)},${JSON.stringify(JSON.stringify({gameId:circuit.legacySlug,launches:7,activeMs:1234,lastPlayedAt:2468}))});true`);
+    await evalJs(`(function(){
+      window.__seedStatus='pending';
+      const req=indexedDB.open('slopboy-local-saves',1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('cartridges'))req.result.createObjectStore('cartridges');};
+      req.onerror=()=>window.__seedStatus='error';
+      req.onsuccess=()=>{
+        const db=req.result,tx=db.transaction('cartridges','readwrite'),store=tx.objectStore('cartridges');
+        store.put(${JSON.stringify(gameProgress)},${JSON.stringify(legacySave)});
+        store.put(${JSON.stringify(backupValue)},${JSON.stringify(oldBackup)});
+        tx.oncomplete=()=>{db.close();window.__seedStatus='done';};
+        tx.onerror=()=>window.__seedStatus='error';
+      };
+    })();true`);
+    let seeded=false;
+    for(let i=0;i<80;i++){
+      if(await evalJs("window.__seedStatus")==='done'){seeded=true;break;}
+      await sleep(60);
+    }
+    if(!seeded)throw Error('Could not seed legacy IndexedDB autosave and backup for real Chrome test');
+    await evalJs('window.location.reload();true');
+    let migratedHistory=false;
+    for(let i=0;i<120;i++){
+      try{
+        migratedHistory=await evalJs(`JSON.parse(localStorage.getItem(${JSON.stringify(newHistory)})||'{}').launches===7
+          && document.querySelectorAll('.v2-library-game').length===3`)===true;
+        if(migratedHistory)break;
+      }catch{}
+      await sleep(80);
+    }
+    if(!migratedHistory)throw Error('Guest play history did not recover from legacy slug after reload');
+    await evalJs("document.querySelectorAll('.v2-library-actions button')[2].click();true");
+    let foundBackup=false;
+    for(let i=0;i<80;i++){
+      foundBackup=await evalJs("document.querySelectorAll('.v2-local-slot').length===1")===true;
+      if(foundBackup)break;
+      await sleep(60);
+    }
+    if(!foundBackup)throw Error('Legacy local backup not visible in UUID library after migration');
+    await evalJs(`window.location.assign('/v2/play/${circuit.gameId}');true`);
+    let circuitBoot=false;
+    for(let i=0;i<180;i++){
+      try{
+        circuitBoot=await evalJs(`location.pathname==='/v2/play/${circuit.gameId}'&&!!document.querySelector('.v2-led.on')`)===true;
+        if(circuitBoot)break;
+      }catch{}
+      await sleep(80);
+    }
+    if(!circuitBoot)throw Error('Circuit Slide did not boot via UUID route');
+    await evalJs(`(function(){
+      window.__migrationStatus='pending';
+      const req=indexedDB.open('slopboy-local-saves',1);
+      req.onerror=()=>window.__migrationStatus='error';
+      req.onsuccess=()=>{
+        const db=req.result,tx=db.transaction('cartridges','readonly'),store=tx.objectStore('cartridges');
+        const keys=${JSON.stringify([legacySave,uuidSave,oldBackup,uuidBackup])};
+        const values={};
+        for(const key of keys)store.get(key).onsuccess=e=>values[key]=e.target.result;
+        tx.oncomplete=()=>{db.close();window.__migrationData=JSON.stringify(values);window.__migrationStatus='done';};
+        tx.onerror=()=>window.__migrationStatus='error';
+      };
+    })();true`);
+    let snapshot:null|string=null;
+    for(let i=0;i<80;i++){
+      if(await evalJs("window.__migrationStatus")==='done'){
+        snapshot=String(await evalJs("window.__migrationData"));break;
+      }
+      await sleep(60);
+    }
+    if(!snapshot)throw Error('Could not read migrated IndexedDB keys');
+    const values=JSON.parse(snapshot) as Record<string,string>;
+    const migratedSave=JSON.parse(values[uuidSave]||'null') as {format?:string;gameId?:string;data?:string}|null;
+    if(values[legacySave]!==gameProgress||values[oldBackup]!==backupValue||values[uuidBackup]!==backupValue
+      ||migratedSave?.format!=='slopboy-save-v2'||migratedSave.gameId!==circuit.gameId||migratedSave.data!==gameProgress)
+      throw Error('Guest autosave or backup was not copied exactly and non-destructively to UUID identity');
+    console.log('V2 Chrome smoke passed: shared V2 chrome / unified theme / branded HeroUI / in-player cartridge swap / GPU optics / mobile drawer / full library / real UUID save migration');
   }finally{
     browser?.close();
     await new Promise<void>(resolve=>server.close(()=>resolve()));
