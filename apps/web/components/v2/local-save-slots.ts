@@ -1,54 +1,82 @@
 import {SLOPBOY_1000} from '@slopboy/hardware';
-import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
+import {getCatalogGame} from '@slopboy/catalog';
+import {browserSaveDriver,copyIfAbsent,createGameSaveService,validSave,type SaveDriver}
+  from '@slopboy/runtime/save-store';
 
-/** User-facing offline backups. Limits protect local storage, not fantasy hardware. */
+/** Guest IndexedDB backups; the five slots are a UI policy, not a virtual device limit. */
 export const LOCAL_SNAPSHOT_SLOTS=5;
-export interface LocalSnapshot {readonly slot:number;readonly createdAt:number;readonly bytes:number;}
-const identity=/^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const prefix=(gameId:string)=> {
-  if(!identity.test(gameId))throw Error('Invalid game ID');
-  return 'slopboy:local-backup:v1:'+SLOPBOY_1000.id+':'+gameId+':';
-};
-function slotKey(gameId:string,slot:number):string{
-  if(!Number.isInteger(slot)||slot<1||slot>LOCAL_SNAPSHOT_SLOTS)throw Error('Invalid local backup slot');
-  return prefix(gameId)+slot;
+export interface LocalSnapshot{readonly slot:number;readonly createdAt:number;readonly bytes:number;}
+const NEW_PREFIX='slopboy:local-backup:v2:';
+const OLD_PREFIX='slopboy:local-backup:v1:';
+const DELETED='slopboy-local-backup-deleted-v2';
+type Snapshot={createdAt:number;save:string};
+function identity(gameId:string){
+  const game=getCatalogGame(gameId);
+  if(!game)throw Error('Unknown curated game UUID');
+  return game;
 }
-function decode(value:unknown):{createdAt:number;save:string}|null{
-  if(typeof value!=='string')return null;
+export function localSnapshotKey(gameId:string,slot:number,legacy=false):string{
+  if(!Number.isInteger(slot)||slot<1||slot>LOCAL_SNAPSHOT_SLOTS)throw Error('Invalid local backup slot');
+  const game=identity(gameId);
+  return (legacy?OLD_PREFIX:NEW_PREFIX)+SLOPBOY_1000.id+':'+(legacy?game.legacySlug:game.gameId)+':'+slot;
+}
+function decode(raw:unknown):Snapshot|null{
+  if(typeof raw!=='string')return null;
   try{
-    const entry:unknown=JSON.parse(value);
-    if(!entry||typeof entry!=='object')return null;
-    const object=entry as Record<string,unknown>;
-    if(!Number.isSafeInteger(object.createdAt)||Number(object.createdAt)<=0||!validSave(object.save,SLOPBOY_1000)||object.save===null)return null;
-    return {createdAt:Number(object.createdAt),save:object.save as string};
+    const parsed:unknown=JSON.parse(raw);
+    if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return null;
+    const o=parsed as Record<string,unknown>;
+    if(!Number.isSafeInteger(o.createdAt)||Number(o.createdAt)<=0||typeof o.save!=='string'||!validSave(o.save,SLOPBOY_1000))return null;
+    return {createdAt:Number(o.createdAt),save:o.save};
   }catch{return null;}
 }
-export async function listLocalSnapshots(gameId:string):Promise<LocalSnapshot[]>{
+/** Also exported for deterministic in-memory migration regression tests. */
+export async function readLocalSnapshot(driver:SaveDriver,gameId:string,slot:number):Promise<Snapshot|null>{
+  const next=localSnapshotKey(gameId,slot);
+  const raw=await driver.get(next);
+  if(raw===DELETED)return null;
+  const existing=decode(raw);
+  if(existing)return existing;
+  const previous=localSnapshotKey(gameId,slot,true);
+  try{await copyIfAbsent(driver,previous,next,old=>decode(old)?old as string:undefined);}
+  catch{/* Never prevent recovery from the untouched legacy snapshot. */}
+  const copied=await driver.get(next);
+  if(copied===DELETED)return null;
+  return decode(copied)??decode(await driver.get(previous));
+}
+export async function listSnapshots(driver:SaveDriver,gameId:string):Promise<LocalSnapshot[]>{
   const snapshots:LocalSnapshot[]=[];
   for(let slot=1;slot<=LOCAL_SNAPSHOT_SLOTS;slot++){
-    const data=decode(await browserSaveDriver.get(slotKey(gameId,slot)));
-    if(data)snapshots.push({slot,createdAt:data.createdAt,bytes:new TextEncoder().encode(data.save).length});
+    const record=await readLocalSnapshot(driver,gameId,slot);
+    if(record)snapshots.push({slot,createdAt:record.createdAt,bytes:new TextEncoder().encode(record.save).length});
   }
   return snapshots.sort((a,b)=>b.createdAt-a.createdAt);
 }
-export async function saveLocalSnapshot(gameId:string):Promise<LocalSnapshot>{
-  const store=createSaveService(browserSaveDriver,SLOPBOY_1000,gameId);
-  const value=await store.read();
+export function listLocalSnapshots(gameId:string){return listSnapshots(browserSaveDriver,gameId);}
+export async function saveSnapshot(driver:SaveDriver,gameId:string,now=Date.now()):Promise<LocalSnapshot>{
+  const game=identity(gameId);
+  const value=await createGameSaveService(driver,SLOPBOY_1000,game).read();
   if(value===null)throw Error('No saved game data yet. Play and save first.');
+  await listSnapshots(driver,gameId);
   for(let slot=1;slot<=LOCAL_SNAPSHOT_SLOTS;slot++){
-    const key=slotKey(gameId,slot);
-    if((await browserSaveDriver.get(key))!==undefined)continue;
-    const createdAt=Date.now();
-    await browserSaveDriver.put(key,JSON.stringify({createdAt,save:value}));
-    return {slot,createdAt,bytes:new TextEncoder().encode(value).length};
+    const key=localSnapshotKey(gameId,slot);
+    const raw=await driver.get(key);
+    if(raw!==undefined&&raw!==DELETED)continue;
+    if(!Number.isSafeInteger(now)||now<=0)throw Error('Invalid snapshot timestamp');
+    await driver.put(key,JSON.stringify({createdAt:now,save:value}));
+    return {slot,createdAt:now,bytes:new TextEncoder().encode(value).length};
   }
   throw Error('All local backup slots are filled. Delete an old snapshot first.');
 }
-export async function restoreLocalSnapshot(gameId:string,slot:number):Promise<void>{
-  const data=decode(await browserSaveDriver.get(slotKey(gameId,slot)));
+export function saveLocalSnapshot(gameId:string){return saveSnapshot(browserSaveDriver,gameId);}
+export async function restoreSnapshot(driver:SaveDriver,gameId:string,slot:number):Promise<void>{
+  const data=await readLocalSnapshot(driver,gameId,slot);
   if(!data)throw Error('This local snapshot is missing or invalid.');
-  await createSaveService(browserSaveDriver,SLOPBOY_1000,gameId).write(data.save);
+  await createGameSaveService(driver,SLOPBOY_1000,identity(gameId)).write(data.save);
 }
-export async function deleteLocalSnapshot(gameId:string,slot:number):Promise<void>{
-  await browserSaveDriver.delete(slotKey(gameId,slot));
+export function restoreLocalSnapshot(gameId:string,slot:number){return restoreSnapshot(browserSaveDriver,gameId,slot);}
+export async function deleteSnapshot(driver:SaveDriver,gameId:string,slot:number):Promise<void>{
+  // Preserve the historic key as rollback evidence, but explicitly hide it after deletion.
+  await driver.put(localSnapshotKey(gameId,slot),DELETED);
 }
+export function deleteLocalSnapshot(gameId:string,slot:number){return deleteSnapshot(browserSaveDriver,gameId,slot);}
