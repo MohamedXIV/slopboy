@@ -64,9 +64,18 @@ async function main(){
     try{
       await wait('installed game boots offline',"location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')",26000);
     }catch(error){
+      await evalJs(`(async()=>{window.__offlineProbe='pending';
+        try{const r=await fetch('${game.cartridge}',{credentials:'omit',cache:'no-store'});
+          const bytes=await r.arrayBuffer();
+          window.__offlineProbe=JSON.stringify({status:r.status,bytes:bytes.byteLength,type:r.type});
+        }catch(e){window.__offlineProbe=String(e);}
+      })();true`);
+      await sleep(1600);
       let info:unknown='unavailable';
       try{info=await evalJs(`JSON.stringify({path:location.pathname,online:navigator.onLine,
-        controller:!!navigator.serviceWorker?.controller,body:document.body?.innerText?.slice(0,900),
+        controller:!!navigator.serviceWorker?.controller,status:document.querySelector('.v2-status')?.textContent,
+        probe:window.__offlineProbe,frame:!!document.querySelector('.v2-isolated-frame'),
+        body:document.body?.innerText?.slice(0,1300),
         scriptCount:document.querySelectorAll('script[src]').length,app:!!document.querySelector('.v2-player')})`);}catch{}
       throw Error(String(error)+'; browser diagnostics='+String(info));
     }
