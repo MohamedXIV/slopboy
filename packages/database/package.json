@@ -1,0 +1,14 @@
+{
+  "name": "@slopboy/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@slopboy/catalog": "workspace:*"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./migrator": "./src/migrator.ts"
+  }
+}

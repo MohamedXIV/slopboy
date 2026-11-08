@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "packageManager": "pnpm@10.20.0",
   "engines": {
-    "node": "22.x"
+    "node": ">=22.0.0"
   },
   "scripts": {
     "dev": "pnpm icons:build && pnpm cartridge:build && pnpm --filter @slopboy/web dev",
