@@ -28,7 +28,8 @@
     "security:runtime-routes": "node --experimental-strip-types tools/runtime-route-smoke.ts",
     "security:v2-browser": "node --experimental-strip-types tools/v2-browser-smoke.ts",
     "kaplay:spike-build": "node --experimental-strip-types tools/build-kaplay-spike.ts",
-    "security:kaplay-spike": "node --experimental-strip-types tools/kaplay-browser-smoke.ts"
+    "security:kaplay-spike": "node --experimental-strip-types tools/kaplay-browser-smoke.ts",
+    "template:cli": "node --experimental-strip-types tools/template-cli.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
