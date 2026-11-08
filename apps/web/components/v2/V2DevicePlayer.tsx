@@ -7,7 +7,7 @@ import {trackBrowserLaunch,trackBrowserPlaytime} from './library-history';
 import {makeCartridgeAppearance} from './cartridge-cover';
 import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
-import {GAMES,getCatalogGame} from '@slopboy/catalog';
+import {GAMES,type PlayableGame} from '@slopboy/catalog';
 import {SLOPBOY_1000,type InputName} from '@slopboy/hardware';
 import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId} from '@slopboy/hardware/v2';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
@@ -59,9 +59,7 @@ const CYCLE_BUTTONS:ReadonlyArray<{name:InputName;label:string;className:string}
 
 const PRESET_ORDER=['clean','lcd','phosphor'] as const;
 
-export default function V2DevicePlayer({gameId}:{gameId:string}){
-  const game=getCatalogGame(gameId);
-  if(!game)throw Error('Unknown curated game '+gameId);
+export default function V2DevicePlayer({game}:{game:PlayableGame}){
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [saved,setSaved]=useState<{epoch:number;value:string|null}|null>(null);
   const [epoch,setEpoch]=useState(0);

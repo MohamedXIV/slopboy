@@ -1,12 +1,12 @@
 import {notFound} from 'next/navigation';
-import {GAMES,resolveCatalogGame} from '@slopboy/catalog';
+import {getLegacyCatalogGame} from '@slopboy/catalog';
+import {resolvePublishedGame} from '../../../server/published-games';
 import CompatibilityRedirect from '../../../../components/CompatibilityRedirect';
-export function generateStaticParams(){
-  return GAMES.flatMap(game=>[{game:game.gameId},{game:game.legacySlug}]);
-}
+
+export const dynamic='force-dynamic';
 export default async function PreviousV2Game({params}:{params:Promise<{game:string}>}){
   const {game:oldId}=await params;
-  const game=resolveCatalogGame(oldId);
+  const game=resolvePublishedGame(oldId)??getLegacyCatalogGame(oldId);
   if(!game)notFound();
   return <CompatibilityRedirect to={`/play/${game.gameId}`}/>;
 }

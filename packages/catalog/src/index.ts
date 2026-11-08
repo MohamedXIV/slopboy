@@ -19,6 +19,10 @@ export interface CatalogGame {
   readonly source:{readonly manifest:string;readonly game:string};
   readonly status:'curated';
 }
+/** Browser-safe reviewed game metadata; runtime fixtures never bring arbitrary code URLs. */
+export type PlayableGame=Omit<CatalogGame,'source'|'status'> & {
+  readonly status:'curated'|'runtime-fixture';
+};
 export const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function isGameUuid(value:string):boolean{return UUID_PATTERN.test(value);}
 export const GAMES:readonly CatalogGame[]=[
