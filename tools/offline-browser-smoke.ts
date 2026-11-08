@@ -33,12 +33,21 @@ async function main(){
     if(!initial.includes('Install offline'))throw Error('Guest install must be opt-in: '+initial);
     await evalJs("document.querySelector('"+btn+"').click();true");
     await wait('offline install completed',"document.querySelector('"+btn+"').textContent.includes('Remove offline')",25000);
-    const installed=await evalJs(`(async()=>{const c=await caches.open('slopboy-games-v3');
-      return !!(await c.match('/play/${game.gameId}'))&&!!(await c.match('${game.cartridge}'));})()`);
-    // evaluate is not awaitPromise; asynchronous checks are signaled explicitly.
+    // The CDP runner doesn't await Promise-returning expressions.
+    // Publish async CacheStorage diagnostics on window before offline navigation.
     await evalJs(`(async()=>{const c=await caches.open('slopboy-games-v3');
       window.__offlineCached=!!(await c.match('/play/${game.gameId}'))&&!!(await c.match('${game.cartridge}'));})();true`);
     await wait('installed page and bundle in CacheStorage',"window.__offlineCached===true");
+    await evalJs(`(async()=>{const c=await caches.open('slopboy-games-v3');
+      const assets=await caches.open('slopboy-installed-assets-v3');
+      const html=await (await c.match('/play/${game.gameId}')).text();
+      const requested=[...new Set(html.match(/\\/_next\\/static\\/[a-zA-Z0-9_/.%-]+\\.(?:js|css|woff2?)/g)||[])];
+      const present=await Promise.all(requested.map(async p=>!!(await assets.match(p))));
+      window.__assetReport=JSON.stringify({required:requested.length,cached:present.filter(Boolean).length,
+        missing:requested.filter((_,i)=>!present[i]),cachedAssets:(await assets.keys()).length});
+    })();true`);
+    await wait('installed asset report',"!!window.__assetReport");
+    console.log('Offline prefetch evidence',String(await evalJs('window.__assetReport')));
     await evalJs(`(function(){
       window.__saved='pending';const req=indexedDB.open('slopboy-local-saves',1);
       req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('cartridges'))req.result.createObjectStore('cartridges');};
@@ -52,7 +61,15 @@ async function main(){
     await wait('guest save persisted',"window.__saved==='done'");
     await browser.setOffline(true);
     await evalJs(`window.location.assign('/play/${game.gameId}');true`);
-    await wait('installed game boots offline',"location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')",26000);
+    try{
+      await wait('installed game boots offline',"location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')",26000);
+    }catch(error){
+      let info:unknown='unavailable';
+      try{info=await evalJs(`JSON.stringify({path:location.pathname,online:navigator.onLine,
+        controller:!!navigator.serviceWorker?.controller,body:document.body?.innerText?.slice(0,900),
+        scriptCount:document.querySelectorAll('script[src]').length,app:!!document.querySelector('.v2-player')})`);}catch{}
+      throw Error(String(error)+'; browser diagnostics='+String(info));
+    }
     await evalJs(`window.__guestCheck='pending';
       (function(){const req=indexedDB.open('slopboy-local-saves',1);
         req.onsuccess=()=>{const db=req.result,tx=db.transaction('cartridges','readonly');
