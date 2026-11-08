@@ -72,6 +72,24 @@ async function main(){
 
     const animation=await evalJs("!!document.querySelector('.v2-cartridge-entrant')&&!!document.querySelector('.v2-boot-screen')");
     if(animation!==true)throw Error('Cartridge insertion or real boot overlay is missing');
+    // Verify gamepad analog input reaches the real pixel-v1 game, not merely the UI.
+    // Chromium CI has no physical controller, so inject only the navigator Gamepad API.
+    const locatePlayer=async()=>{
+      const result=await evalJs(`(()=>{const canvas=document.querySelector('.v2-display canvas');
+        if(!canvas)return -1;
+        const pixels=canvas.getContext('2d').getImageData(0,131,160,1).data;
+        for(let x=0;x<160;x++){const i=x*4;if(pixels[i]===32&&pixels[i+1]===59&&pixels[i+2]===51)return x;}
+        return -1;})()`);
+      return Number(result);
+    };
+    let beforePad=-1;
+    for(let i=0;i<16;i++){beforePad=await locatePlayer();if(beforePad>=0)break;await sleep(60);}
+    if(beforePad<0)throw Error('Cannot locate live Tiny Catcher sprite before analog input');
+    await evalJs("Object.defineProperty(navigator,'getGamepads',{configurable:true,value:()=>[{buttons:Array.from({length:16},()=>({pressed:false})),axes:[1,0]}]});true");
+    await sleep(750);
+    const afterPad=await locatePlayer();
+    await evalJs("delete navigator.getGamepads;true");
+    if(afterPad<beforePad+18)throw Error('Gamepad analog input did not move the actual sprite: '+beforePad+' -> '+afterPad);
     const initial=String(await evalJs("document.querySelector('.v2-display canvas').toDataURL()"));
     await evalJs("window.__frame=document.querySelector('.v2-isolated-frame');window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));true");
     await sleep(900);
