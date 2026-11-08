@@ -1,35 +1,16 @@
-import {createServer} from 'node:http';
-import {readFile,mkdtemp,rm} from 'node:fs/promises';
-import {join,resolve,extname,sep} from 'node:path';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openChromePage} from './chrome-cdp.ts';
+import {startNextTestServer,BROWSER_RUNTIME_FIXTURE} from './next-test-server.ts';
 import {GAMES} from '../packages/catalog/src/index.ts';
 const STAR_GAME_ID=GAMES[1].gameId;
 
 const sleep=(ms:number)=>new Promise<void>(r=>setTimeout(r,ms));
-const root=resolve('apps/web/out');
-const mime:Record<string,string>={
-  '.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
-  '.css':'text/css; charset=utf-8','.slop':'application/octet-stream',
-  '.png':'image/png','.json':'application/json','.webmanifest':'application/manifest+json',
-  '.woff2':'font/woff2','.svg':'image/svg+xml'
-};
 async function main(){
   const profile=await mkdtemp(join(tmpdir(),'slopboy-v2-browser-'));
-  const server=createServer(async(req,res)=>{
-    try{
-      const pathname=decodeURIComponent(new URL(req.url||'/', 'http://localhost').pathname);
-      const candidate=pathname.endsWith('/')?pathname+'index.html':pathname;
-      const safe=resolve(root,'.'+candidate);
-      if(!safe.startsWith(root+sep)){res.writeHead(403).end();return;}
-      const finalPath=extname(safe)?safe:safe+'.html';
-      const payload=await readFile(finalPath);
-      res.writeHead(200,{'content-type':mime[extname(finalPath)]||'application/octet-stream','cache-control':'no-store'});
-      res.end(payload);
-    }catch{res.writeHead(404).end('Not Found');}
-  });
-  await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
-  const port=(server.address() as {port:number}).port;
+  const server=await startNextTestServer();
+  const port=server.port;
   let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
   try{
     browser=await openChromePage('http://127.0.0.1:'+port+'/play/tiny-catcher',join(profile,'chrome'));
@@ -357,7 +338,7 @@ async function main(){
     console.log('Canonical route smoke passed: UUID root/library/play, old /v2 aliases, legacy V1 pages/creator, mobile/settings and save migration');
   }finally{
     browser?.close();
-    await new Promise<void>(resolve=>server.close(()=>resolve()));
+    await server.stop();
     await sleep(450);
     await rm(profile,{force:true,recursive:true,maxRetries:20,retryDelay:150}).catch(err=>console.warn('Chrome temp cleanup:',err));
   }

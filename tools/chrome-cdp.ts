@@ -78,7 +78,12 @@ export async function openChromePage(url:string,profile:string){
       await send('Emulation.setDeviceMetricsOverride',
         {width,height,deviceScaleFactor:1,mobile:width<=760},validatedSessionId);
     }
-    return {evaluate,setViewport,close:()=>{
+    async function setOffline(value:boolean){
+      await send('Network.enable',{},validatedSessionId);
+      await send('Network.emulateNetworkConditions',{offline:value,latency:0,
+        downloadThroughput:0,uploadThroughput:0},validatedSessionId);
+    }
+    return {evaluate,setViewport,setOffline,close:()=>{
       socket?.close();
       process.kill('SIGTERM');
     }};

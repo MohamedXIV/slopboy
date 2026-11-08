@@ -1,6 +1,6 @@
 import {notFound} from 'next/navigation';
 import {getLegacyCatalogGame} from '@slopboy/catalog';
-import {resolvePublishedGame} from '../../../server/published-games';
+import {resolvePublishedGame} from '../../../../server/published-games';
 import CompatibilityRedirect from '../../../../components/CompatibilityRedirect';
 
 export const dynamic='force-dynamic';
