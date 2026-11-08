@@ -41,7 +41,7 @@ One Slopboy account can be **player and creator simultaneously**; reviewer/opera
   - (`share_game_with_friend`), (`submit_for_public_review`) (explicit, audited owner intent)
 - Every mutation checks actor scope and server-derived ownership, validates file/path/extension/type/count/total-byte ceilings and request idempotency. Don't expose raw object-store credentials or privileged database secrets.
 - **Content ingestion is distinct from runtime:** AI agents generate code and assets, Slopboy *hosts* and builds only after safe validation. Build workers need OS/process isolation and resource limits. A KAPLAY iframe spike is not evidence of safe public arbitrary-code hosting.
-- OAuth acceptance gate: actual OpenAI plugin and Claude connector compatibility, protected resource metadata, authorization server discovery, PKCE S256, token audience/resource and refresh/revoke, client registration (CIMD/DCR where supported), user consent, failure tests, no token exposure in client logs. **Neon Managed Better Auth may supply user login, but MCP-compliant OAuth authorization-server behavior is NOT assumed without testing it.**
+- OAuth acceptance gate: actual OpenAI plugin and Claude connector compatibility, protected resource metadata, authorization server discovery, PKCE S256, token audience/resource and refresh/revoke, client registration (CIMD/DCR where supported), user consent, failure tests, no token exposure in client logs. **Verified Nov 2026 capability:** Neon Managed Better Auth officially ships an OAuth 2.1 Provider with MCP support, CIMD and discovery, and its `@neon/oauth` SDK can protect remote MCP resources. These capabilities need **end-to-end ChatGPT and Claude acceptance testing** on our own project, especially redirects, PKCE, resource audience, scopes, refresh and revoked access.
 - Start with custom/private MCP connections for hands-on testing; publishing in the ChatGPT plugin directory has an additional organization verification, review and approval process. Never promise automatic public distribution.
 
 ## Database / permissions shape
@@ -64,6 +64,19 @@ Entities from ADR-002 still apply, plus:
 - Both can serve Next.js HTTP APIs. Render is attractive for a stable long-running MCP server and jobs; Vercel excels at the current preview/static frontend. Whether to combine them on one Render service or separate frontend/API is a trade-off, not a necessity.
 - **Decision gate:** test full Next.js deployment + OAuth connector from ChatGPT and Claude, 95th percentile response latency after idle, real browser gameplay, build queue/resource isolation, mobile performance, egress/store quotas, deployment rollbacks and minimum sustainable operating cost. Keep the current Vercel preview until a candidate proves better.
 - Avoid an unaffordable 24/7 service while the requirement remains truly $0. Do not silently deploy a paid instance. If testing Render Free, label it **experimental only**.
+
+## New zero-budget-first hosting opportunity — Neon Functions (2026-11-08)
+
+Neon's November 2 release confirms Managed Better Auth as an OAuth 2.1 Provider with MCP support. Neon also provides public HTTPS Functions that can host a stateless Hono/TypeScript MCP server near its Postgres database and object storage. Its October 2026 Free allowances include **1M function invocations, 10 active capacity-hours and 400 waiting capacity-hours per project per month** (plus other service limits). Verify cold-start latency and quotas, and do not treat free beta capacity as a contractual production SLA.
+
+**Preferred first measured experiment (no Render migration yet):**
+- Retain the working **Vercel preview** for the Next.js web frontend (non-commercial development/beta only).
+- Build a **Slopboy-specific Neon dev project + Function** exposing one HTTPS MCP endpoint, using Managed Better Auth OAuth Provider and Postgres/Storage; test OAuth linking from **both** ChatGPT and Claude with the same Slopboy account.
+- Once the MCP vertical slice works, decide whether the web frontend should keep Vercel with full-stack APIs, use Neon Functions for all JSON data operations, or migrate full Next.js hosting to Render **paid** if commercial deployment or persistent Node server needs justify it.
+- Render Free should not host production OAuth/MCP due to its 15-minute scale-down and potentially ~1-minute wake; Render Starter (~$7/mo) is a later, explicitly approved paid option.
+- Avoid duplicating backend business logic. MCP tool handlers and web dashboard handlers call the **same typed domain services**, regardless of deployment topology.
+
+Sources: https://neon.com/blog/managed-better-auth-oauth-provider-mcp ; https://neon.com/blog/neon-free-plan-1-gb-per-project ; https://neon.com/blog/is-mcp-good-yet
 
 ## Priority order (replaces ADR-002 Studio-first batch)
 
