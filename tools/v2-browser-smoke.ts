@@ -3,6 +3,8 @@ import {readFile,mkdtemp,rm} from 'node:fs/promises';
 import {join,resolve,extname,sep} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openChromePage} from './chrome-cdp.ts';
+import {GAMES} from '../packages/catalog/src/index.ts';
+const STAR_GAME_ID=GAMES[1].gameId;
 
 const sleep=(ms:number)=>new Promise<void>(r=>setTimeout(r,ms));
 const root=resolve('apps/web/out');
@@ -145,12 +147,12 @@ async function main(){
     if(simultaneous!==true)throw Error('Opening quick cartridge Drawer restarted or paused the active runtime');
     const quickCount=Number(await evalJs("document.querySelectorAll('.v2-quick-cartridge-list .v2-quick-cartridge').length"));
     if(quickCount!==3)throw Error('Quick cartridge shelf must show every curated title');
-    await evalJs("document.querySelector('.v2-quick-cartridge[href=\"/v2/play/star-patrol\"]').click();true");
+    await evalJs(`document.querySelector('.v2-quick-cartridge[href="/v2/play/${STAR_GAME_ID}"]').click();true`);
     const swappedDeadline=Date.now()+15000;
     let swapped=false;
     while(Date.now()<swappedDeadline){
       try{
-        swapped=await evalJs("location.pathname==='/v2/play/star-patrol' && !!document.querySelector('.v2-led.on') && document.querySelector('.v2-session-id strong')?.textContent==='Star Patrol' && window.__frame!==document.querySelector('.v2-isolated-frame')")===true;
+        swapped=await evalJs(`location.pathname==='/v2/play/${STAR_GAME_ID}' && !!document.querySelector('.v2-led.on') && document.querySelector('.v2-session-id strong')?.textContent==='Star Patrol' && window.__frame!==document.querySelector('.v2-isolated-frame')`)===true;
         if(swapped)break;
       }catch{/* Client navigation may briefly replace the execution context. */}
       await sleep(180);
