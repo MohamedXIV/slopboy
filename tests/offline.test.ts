@@ -37,6 +37,9 @@ test('public shell and explicit installs only; private API and RSC requests bypa
   assert.match(code,/fetch\(noCredentials\('\/api\/public-games\/'/);
   assert.match(code,/MAX_CARTRIDGE_BYTES/);
   assert.match(code,/slopboy-static-/); // old implicit installs preserved on activation
+  assert.match(code,/REMOVED\+game.gameId/); // deleted games do not resurrect after a new SW activates
+  assert.match(code,/REMOVED\+id/);
+  assert.match(code,/X-Slopboy-Offline-Public/);
   assert.ok(!code.includes("caches.delete('slopboy-local-saves')"));
   assert.ok(!code.includes("indexedDB.deleteDatabase"));
 });

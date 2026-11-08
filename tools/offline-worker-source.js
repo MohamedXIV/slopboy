@@ -14,6 +14,7 @@ const CARTRIDGE=/^\/cartridges\/[a-z0-9]+(?:-[a-z0-9]+)*\.slop$/;
 const STATIC=/^\/_next\/static\/[a-zA-Z0-9_/.%-]+\.(?:js|css|woff2?)$/;
 const MAX_CARTRIDGE_BYTES=1024*1024; // network/cache safety guard; NOT simulated ROM capacity
 const PUBLIC_META='/__offline_game_index__/';
+const REMOVED='/__offline_game_removed__/'; // version-stable uninstall tombstones
 const noCredentials=path=>new Request(path,{credentials:'omit',redirect:'error',cache:'no-store'});
 function validMetadata(data,id){
   return data&&typeof data==='object'&&data.format==='slopboy-public-game-v1'&&
@@ -39,7 +40,7 @@ async function cacheDependencies(html,cache){
 async function publicPage(path){
   const response=await fetch(noCredentials(path));
   if(!response.ok||!response.headers.get('content-type')?.includes('text/html')||
-    response.type==='opaque')throw Error('Public page unavailable');
+    response.headers.get('X-Slopboy-Offline-Public')!=='1'||response.type==='opaque')throw Error('Public page unavailable');
   return response;
 }
 self.addEventListener('install',event=>{
@@ -48,6 +49,8 @@ self.addEventListener('install',event=>{
     for(const path of SHELL_URLS){
       const response=await fetch(noCredentials(path));
       if(!response.ok||response.type==='opaque')throw Error('Offline app shell missing: '+path);
+      if((path==='/'||path==='/library')&&response.headers.get('X-Slopboy-Offline-Public')!=='1')
+        throw Error('Refusing to cache a non-public app shell');
       await cache.put(path,response.clone());
       if(path==='/'||path==='/library')await cacheDependencies(await response.text(),cache);
     }
@@ -63,7 +66,7 @@ async function migratePreviousStaticInstall(){
   for(const key of old){
     const previous=await caches.open(key);
     for(const game of CURATED){
-      if(await index.match(PUBLIC_META+game.gameId))continue;
+      if(await index.match(PUBLIC_META+game.gameId)||await index.match(REMOVED+game.gameId))continue;
       const cartridge=await previous.match(game.cartridge);
       const page=(await previous.match('/play/'+game.gameId+'.html'))||
         (await previous.match('/v2/play/'+game.gameId+'.html'));
@@ -107,7 +110,9 @@ async function listInstalled(){
   const keys=await cache.keys();
   const games=[];
   for(const key of keys){
-    const id=new URL(key.url).pathname.slice(PUBLIC_META.length);
+    const path=new URL(key.url).pathname;
+    if(!path.startsWith(PUBLIC_META))continue;
+    const id=path.slice(PUBLIC_META.length);
     if(UUID.test(id)){
       const game=await gameMetadata(id);
       if(game)games.push({gameId:id,revisionId:game.revisionId,title:game.title});
@@ -136,29 +141,32 @@ async function installGame(id){
   // Do not mutate a previous installation unless every download succeeded.
   await games.put(meta.cartridge,cartridge.clone());
   await games.put('/play/'+id,page.clone());
-  await (await caches.open(INDEX)).put(PUBLIC_META+id,
+  const registry=await caches.open(INDEX);
+  await registry.put(PUBLIC_META+id,
     new Response(JSON.stringify(meta),{headers:{'Content-Type':'application/json'}}));
+  await registry.delete(REMOVED+id);
   return {gameId:id,revisionId:meta.revisionId,title:meta.title};
 }
 async function deleteGame(id){
   if(!UUID.test(id))throw Error('Invalid game ID');
   const meta=await gameMetadata(id);
   if(!meta)return {gameId:id,removed:false};
-  await (await caches.open(INDEX)).delete(PUBLIC_META+id);
+  const index=await caches.open(INDEX);
+  // Keep the old static-release cache for rollback, but never resurrect an
+  // explicitly deleted installation on the next worker activation.
+  await index.put(REMOVED+id,new Response('removed'));
+  await index.delete(PUBLIC_META+id);
   const games=await caches.open(INSTALLED);
   await games.delete('/play/'+id);
-  // Reviewed cartridge assets may be shared by multiple UUID fixture identities.
-  const stillUsed=(await listInstalled()).some(other=>CURATED.some(g=>g.gameId===other.gameId&&g.cartridge===meta.cartridge));
-  if(!stillUsed){
-    // Also account for runtime-approved aliases, not only curated fixtures.
-    const entries=await (await caches.open(INDEX)).keys();
-    let referenced=false;
-    for(const key of entries){
-      const response=await (await caches.open(INDEX)).match(key);
-      if(response&&(await response.json()).cartridge===meta.cartridge){referenced=true;break;}
-    }
-    if(!referenced)await games.delete(meta.cartridge);
+  // Multiple reviewed UUIDs may legitimately share the same immutable fixture.
+  let referenced=false;
+  for(const key of await index.keys()){
+    if(!new URL(key.url).pathname.startsWith(PUBLIC_META))continue;
+    const response=await index.match(key);
+    if(!response)continue;
+    try{if((await response.json()).cartridge===meta.cartridge){referenced=true;break;}}catch{}
   }
+  if(!referenced)await games.delete(meta.cartridge);
   if(!(await listInstalled()).length)await caches.delete(GAME_ASSETS);
   return {gameId:id,removed:true};
 }
