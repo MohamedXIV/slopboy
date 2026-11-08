@@ -67,13 +67,19 @@ async function main(){
       await evalJs(`(async()=>{window.__offlineProbe='pending';
         try{const r=await fetch('${game.cartridge}',{credentials:'omit',cache:'no-store'});
           const bytes=await r.arrayBuffer();
-          window.__offlineProbe=JSON.stringify({status:r.status,bytes:bytes.byteLength,type:r.type});
+          const source=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+          const reader=source.getReader();const result=await reader.read();
+          window.__offlineProbe=JSON.stringify({status:r.status,bytes:bytes.byteLength,type:r.type,
+            decoded:result.value?.byteLength,streamDone:result.done});
+          reader.releaseLock();
         }catch(e){window.__offlineProbe=String(e);}
       })();true`);
       await sleep(1600);
       let info:unknown='unavailable';
       try{info=await evalJs(`JSON.stringify({path:location.pathname,online:navigator.onLine,
         controller:!!navigator.serviceWorker?.controller,status:document.querySelector('.v2-status')?.textContent,
+        pill:document.querySelector('.v2-runtime-pill')?.textContent,
+        iframe:document.querySelector('.v2-isolated-frame')?.getAttribute('srcdoc')?.length,
         probe:window.__offlineProbe,frame:!!document.querySelector('.v2-isolated-frame'),
         body:document.body?.innerText?.slice(0,1300),
         scriptCount:document.querySelectorAll('script[src]').length,app:!!document.querySelector('.v2-player')})`);}catch{}
