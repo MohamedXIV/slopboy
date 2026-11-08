@@ -28,12 +28,12 @@ export default function V2LabHome(){
     <section className="v2-hub-library">
       <p className="v2-hub-kicker">CURRENTLY PLAYABLE / PIXEL V1 COMPATIBILITY</p>
       <h2>Three small worlds. One fresh shell.</h2>
-      <div className="v2-hub-games">{GAMES.map((game,index)=><article key={game.id} className="v2-hub-card">
+      <div className="v2-hub-games">{GAMES.map((game,index)=><article key={game.gameId} className="v2-hub-card">
         <div className="v2-hub-art" style={{background:game.artwork.background,color:game.artwork.foreground}}>
           <span className="v2-hub-card-id">0{index+1} / GAME CARD</span><strong aria-hidden="true">{game.artwork.emblem}</strong><span>{game.genre.toUpperCase()}</span>
         </div>
         <div className="v2-hub-card-body"><h3>{game.title}</h3><p>{game.description}</p>
-          <Link href={'/v2/play/'+game.id}>Insert &amp; play <span aria-hidden="true">↗</span></Link></div>
+          <Link href={'/v2/play/'+game.gameId}>Insert &amp; play <span aria-hidden="true">↗</span></Link></div>
       </article>)}</div>
     </section>
     <section className="v2-hub-concepts"><div><p className="v2-hub-kicker">ENGINE FEASIBILITY / REAL WEBGL</p><h2>Try a KAPLAY cartridge</h2><p>A separate test game with four-color WebGL capture, an opaque sandbox and instrumentation. Not a public cartridge uploader.</p><Link href="/v2/spikes/kaplay">Open KAPLAY spike ↗</Link></div></section>

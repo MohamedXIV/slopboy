@@ -21,7 +21,7 @@ export default function V2GameLibrary(){
   useEffect(()=>{
     const handle=requestAnimationFrame(()=>{
       const records:Record<string,GameHistory>={};
-      for(const game of GAMES)records[game.id]=getBrowserHistory(game.id);
+      for(const game of GAMES)records[game.gameId]=getBrowserHistory(game.gameId);
       setHistory(records);
     });
     return()=>cancelAnimationFrame(handle);
@@ -58,10 +58,10 @@ export default function V2GameLibrary(){
       <section aria-labelledby="shelf-heading" className="v2-shelf">
         <div className="v2-shelf-heading"><h2 id="shelf-heading">Available cartridges <span>{GAMES.length} games</span></h2><span>Click any cartridge to insert &amp; play</span></div>
         <div className="v2-cart-grid">{GAMES.map((game,index)=>{
-          const record=history[game.id];const active=record&&record.launches>0;
-          return <article key={game.id} className="v2-library-game">
-            <Link className="v2-cartridge-link" href={'/v2/play/'+game.id} aria-label={'Insert '+game.title+' cartridge'}>
-              <V2CartridgeArt id={game.id} title={game.title} emblem={game.artwork.emblem} index={index}/>
+          const record=history[game.gameId];const active=record&&record.launches>0;
+          return <article key={game.gameId} className="v2-library-game">
+            <Link className="v2-cartridge-link" href={'/v2/play/'+game.gameId} aria-label={'Insert '+game.title+' cartridge'}>
+              <V2CartridgeArt id={game.legacySlug} title={game.title} emblem={game.artwork.emblem} index={index}/>
             </Link>
             <div className="v2-library-card-details"><div className="v2-library-title"><h3>{game.title}</h3><span>{game.genre}</span></div>
               <p>{game.description}</p>
@@ -72,27 +72,27 @@ export default function V2GameLibrary(){
                     ?`${record.story.completed} / ${record.story.total} milestones`:'Not tracked'}</strong></div>
               </div>
               <div className="v2-library-actions">
-                <Link className="v2-library-play" href={'/v2/play/'+game.id}>↧ Insert &amp; play</Link>
-                <Button className="sb-control" size="sm" variant="secondary" onPress={()=>void expandSaves(game.id)}
-                  aria-expanded={openSaves===game.id} aria-controls={'v2-save-'+game.id}>Local saves</Button>
+                <Link className="v2-library-play" href={'/v2/play/'+game.gameId}>↧ Insert &amp; play</Link>
+                <Button className="sb-control" size="sm" variant="secondary" onPress={()=>void expandSaves(game.gameId)}
+                  aria-expanded={openSaves===game.gameId} aria-controls={'v2-save-'+game.gameId}>Local saves</Button>
               </div>
-              {openSaves===game.id&&<div id={'v2-save-'+game.id} className="v2-local-saves">
-                <div className="v2-local-save-head"><strong>Offline backup slots</strong><span>{snapshots[game.id]?.length??0} / {LOCAL_SNAPSHOT_SLOTS}</span></div>
+              {openSaves===game.gameId&&<div id={'v2-save-'+game.gameId} className="v2-local-saves">
+                <div className="v2-local-save-head"><strong>Offline backup slots</strong><span>{snapshots[game.gameId]?.length??0} / {LOCAL_SNAPSHOT_SLOTS}</span></div>
                 <p>These are local IndexedDB snapshots, not cloud saves. Clearing browser storage may erase them.</p>
-                <Button className="sb-control sb-control-primary" size="sm" variant="primary" isDisabled={pending===game.id}
-                  onPress={()=>void withSlots(game.id,()=>saveLocalSnapshot(game.id),'Local snapshot saved.')}>
+                <Button className="sb-control sb-control-primary" size="sm" variant="primary" isDisabled={pending===game.gameId}
+                  onPress={()=>void withSlots(game.gameId,()=>saveLocalSnapshot(game.gameId),'Local snapshot saved.')}>
                   Back up current save
                 </Button>
-                {(snapshots[game.id]??[]).map(slot=><div className="v2-local-slot" key={slot.slot}>
+                {(snapshots[game.gameId]??[]).map(slot=><div className="v2-local-slot" key={slot.slot}>
                   <div><strong>Slot {slot.slot}</strong><small>{new Date(slot.createdAt).toLocaleString()} · {slot.bytes} bytes</small></div>
-                  <Button size="sm" variant="secondary" isDisabled={pending===game.id}
+                  <Button size="sm" variant="secondary" isDisabled={pending===game.gameId}
                     onPress={()=>{if(window.confirm('Replace the current autosave with this local snapshot?'))
-                      void withSlots(game.id,()=>restoreLocalSnapshot(game.id,slot.slot),'Autosave restored. Launch the game to load it.');}}>
+                      void withSlots(game.gameId,()=>restoreLocalSnapshot(game.gameId,slot.slot),'Autosave restored. Launch the game to load it.');}}>
                     Restore
                   </Button>
-                  <Button className="sb-control" size="sm" variant="tertiary" isDisabled={pending===game.id}
+                  <Button className="sb-control" size="sm" variant="tertiary" isDisabled={pending===game.gameId}
                     onPress={()=>{if(window.confirm('Delete this local backup?'))
-                      void withSlots(game.id,()=>deleteLocalSnapshot(game.id,slot.slot),'Local backup deleted.');}}>
+                      void withSlots(game.gameId,()=>deleteLocalSnapshot(game.gameId,slot.slot),'Local backup deleted.');}}>
                     Delete
                   </Button>
                 </div>)}

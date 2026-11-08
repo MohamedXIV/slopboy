@@ -13,7 +13,7 @@ import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
 import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
-import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
+import {browserSaveDriver,createGameSaveService,validSave} from '@slopboy/runtime/save-store';
 import {RetroScreenRenderer} from './RetroScreenRenderer';
 import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_PRESET_META,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
   sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
@@ -164,13 +164,13 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     const flush=()=>{
       const now=performance.now(),elapsed=now-last;last=now;
       if(ready.current&&statusRef.current==='running'&&document.visibilityState==='visible')
-        trackBrowserPlaytime(game.id,elapsed);
+        trackBrowserPlaytime(game.gameId,elapsed);
     };
     const visibility=()=>{last=performance.now();};
     const interval=window.setInterval(flush,5000);
     document.addEventListener('visibilitychange',visibility);
     return()=>{flush();clearInterval(interval);document.removeEventListener('visibilitychange',visibility);};
-  },[game.id]);
+  },[game.gameId]);
   const draw=useCallback((pixels:Uint8Array,paletteColors:readonly string[])=>{
     const ctx=canvasRef.current?.getContext('2d',{alpha:false});
     if(!ctx)return;
@@ -185,7 +185,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
   useEffect(()=>{
     let active=true;
     loadBundledCartridge(game.cartridge,DEVICE).then(loaded=>{
-      if(loaded.manifest.id!==game.id)throw Error('Cartridge ID mismatch');
+      if(loaded.manifest.id!==game.legacySlug)throw Error('Cartridge ID mismatch');
       if(active){setCartridge(loaded);updateStatus('booting');}
     }).catch(err=>{if(active)updateStatus('error',String(err));});
     return()=>{active=false;};
@@ -194,12 +194,12 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     if(!cartridge)return;
     let active=true;
     setSaved(null);
-    const store=createSaveService(browserSaveDriver,DEVICE,game.id);
+    const store=createGameSaveService(browserSaveDriver,DEVICE,game);
     writeChain.current.then(()=>store.read()).catch(()=>null).then(value=>{
       if(active)setSaved({epoch,value});
     });
     return()=>{active=false;};
-  },[cartridge,epoch,game.id]);
+  },[cartridge,epoch,game.gameId]);
 
   useEffect(()=>{
     if(!cartridge||!saved||saved.epoch!==epoch)return;
@@ -217,7 +217,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
       }
       if(msg.key!==sessionKey.current)return;
       if(msg.type==='ready'){
-        ready.current=true;trackBrowserLaunch(game.id);updateStatus('running');
+        ready.current=true;trackBrowserLaunch(game.gameId);updateStatus('running');
         if(bootTimer.current)clearTimeout(bootTimer.current);
         bootTimer.current=window.setTimeout(()=>setBootComplete(true),1100);
         return;
@@ -237,7 +237,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
         if(now-lastSave.current<250)return;
         lastSave.current=now;
         const value=msg.value as string|null;
-        const store=createSaveService(browserSaveDriver,DEVICE,game.id);
+        const store=createGameSaveService(browserSaveDriver,DEVICE,game);
         writeChain.current=writeChain.current.catch(()=>{}).then(()=>store.write(value)).catch(err=>console.warn('V2 local save error',err));
       }
     };
@@ -263,7 +263,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
       ready.current=false;
       post('stop');
     };
-  },[cartridge,saved,epoch,post,draw,updateStatus,game.id]);
+  },[cartridge,saved,epoch,post,draw,updateStatus,game.gameId]);
 
   const syncKeys=useCallback(()=>{
     setKeyHeld([...physical.current]);
@@ -347,7 +347,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
     ? 'GPU ACTIVE'
     : 'FALLBACK';
 
-  const cartridgeAppearance=makeCartridgeAppearance(game.id);
+  const cartridgeAppearance=makeCartridgeAppearance(game.legacySlug);
   const settingsPanel=(
         <aside className="v2-side">
           <div className="v2-side-intro">
@@ -661,7 +661,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
               </div>
               <div className="v2-cartridge-slot" aria-hidden="true">
                 <span className="v2-slot-grip" />
-                <span className="v2-slot-label">CART · {game.id.toUpperCase()}</span>
+                <span className="v2-slot-label">CART · {game.legacySlug.toUpperCase()}</span>
                 <span className="v2-slot-grip" />
               </div>
 
@@ -859,19 +859,19 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
               <Drawer.Body>
                 <p className="v2-quick-library-description">Select a cartridge to insert into this Slopboy. Your current game remains running until you choose another.</p>
                 <div className="v2-quick-cartridge-list" role="list">
-                  {GAMES.map((item,index)=><div role="listitem" key={item.id}>
-                    <Link href={'/v2/play/'+item.id} scroll={false}
-                      className={'v2-quick-cartridge'+(item.id===game.id?' is-current':'')}
-                      aria-current={item.id===game.id?'page':undefined}
+                  {GAMES.map((item,index)=><div role="listitem" key={item.gameId}>
+                    <Link href={'/v2/play/'+item.gameId} scroll={false}
+                      className={'v2-quick-cartridge'+(item.gameId===game.gameId?' is-current':'')}
+                      aria-current={item.gameId===game.gameId?'page':undefined}
                       onClick={event=>{
-                        if(item.id===game.id)event.preventDefault();
+                        if(item.gameId===game.gameId)event.preventDefault();
                         setLibraryOpen(false);
                       }}>
-                      <V2CartridgeArt id={item.id} title={item.title} emblem={item.artwork.emblem} index={index} compact/>
+                      <V2CartridgeArt id={item.legacySlug} title={item.title} emblem={item.artwork.emblem} index={index} compact/>
                       <span className="v2-quick-cartridge-copy">
                         <strong>{item.title}</strong>
                         <small>{item.genre} · Slopboy 1000</small>
-                        <span>{item.id===game.id?'● Currently inserted':'↧ Insert cartridge'}</span>
+                        <span>{item.gameId===game.gameId?'● Currently inserted':'↧ Insert cartridge'}</span>
                       </span>
                     </Link>
                   </div>)}
@@ -904,7 +904,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
       </Drawer>}
       {cartridge && saved?.epoch === epoch && (
         <iframe
-          key={epoch + ':' + game.id}
+          key={epoch + ':' + game.gameId}
           ref={iframeRef}
           sandbox="allow-scripts"
           referrerPolicy="no-referrer"
