@@ -6,7 +6,8 @@ import {GAMES} from '../packages/catalog/src/index.ts';
 
 const readSource=()=>readFile(new URL('../tools/offline-worker-source.js',import.meta.url),'utf8');
 test('runtime offline worker is generated from reviewed source and seeded immutable UUIDs',async()=>{
-  const script=renderServiceWorker(await readSource(),'deadbeef12345678');
+  const source=await readSource();
+  const script=renderServiceWorker(source,'deadbeef12345678');
   assert.match(script,/slopboy-shell-v3-deadbeef12345678/);
   assert.match(script,/slopboy-games-v3/);
   assert.match(script,/slopboy-installed-index-v3/);
@@ -19,7 +20,7 @@ test('runtime offline worker is generated from reviewed source and seeded immuta
   assert.deepEqual(OFFLINE_SHELL_PATHS,['/','/library','/manifest.webmanifest',
     '/icons/slopboy-192.png','/icons/slopboy-512.png']);
   assert.throws(()=>renderServiceWorker('wrong','deadbeef12345678'),/Incomplete/);
-  assert.throws(()=>renderServiceWorker(await readSource(),'invalid'),/Invalid/);
+  assert.throws(()=>renderServiceWorker(source,'invalid'),/Invalid/);
 });
 test('public shell and explicit installs only; private API and RSC requests bypass persistent cache',async()=>{
   const code=await readSource();
