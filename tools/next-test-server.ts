@@ -22,8 +22,8 @@ async function freePort():Promise<number>{
     });
   });
 }
-export async function startNextTestServer(){
-  const port=await freePort();
+export async function startNextTestServer(requestedPort?:number){
+  const port=requestedPort??await freePort();
   const executable=resolve('apps/web/node_modules/next/dist/bin/next');
   const child=spawn(process.execPath,[executable,'start','--hostname','127.0.0.1','--port',String(port)],
     {cwd:resolve('apps/web'),env:{...process.env,

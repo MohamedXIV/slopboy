@@ -11,6 +11,7 @@ async function main(){
   const server=await startNextTestServer();
   const profile=await mkdtemp(join(tmpdir(),'slopboy-offline-next-'));
   let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
+  let resumed:Awaited<ReturnType<typeof startNextTestServer>>|undefined;
   const game=GAMES[0];
   const btn='[data-testid="offline-game-'+game.gameId+'"]';
   const key='save-v2:slopboy-1000@0.1.0:'+game.gameId;
@@ -59,6 +60,13 @@ async function main(){
       };
     })();true`);
     await wait('guest save persisted',"window.__saved==='done'");
+    // A Service Worker is a distinct Chrome target: CDP's page-only offline flag
+    // must NOT be mistaken for a complete network outage. Kill real Next, too.
+    await server.stop();
+    let actuallyDown=false;
+    try{await fetch(server.url+'/',{signal:AbortSignal.timeout(1500)});}
+    catch{actuallyDown=true;}
+    if(!actuallyDown)throw Error('Offline test cannot proceed: Next server still accepts network requests');
     await browser.setOffline(true);
     await evalJs(`window.location.assign('/play/${game.gameId}');true`);
     try{
@@ -117,6 +125,8 @@ async function main(){
     await wait('uninstalled game intentionally unavailable offline',
       `location.pathname==='/play/${game.gameId}'&&document.body?.textContent?.includes('not installed for offline play')`,15000);
     await browser.setOffline(false);
+    resumed=await startNextTestServer(server.port);
+    if(resumed.port!==server.port)throw Error('Reconnect moved to a different origin');
     await evalJs(`window.location.assign('/play/${BROWSER_RUNTIME_FIXTURE.gameId}');true`);
     await wait('new UUID unknown during build boots runtime',
       `location.pathname==='/play/${BROWSER_RUNTIME_FIXTURE.gameId}'&&!!document.querySelector('.v2-led.on')`,24000);
@@ -125,6 +135,7 @@ async function main(){
     console.log('Next PWA Chromium smoke PASS: opt-in installed cartridge offline boot, shell reload, guest IDB persistence, uninstall, fresh runtime UUID play');
   }finally{
     if(browser){try{await browser.setOffline(false);}catch{}browser.close();}
+    await resumed?.stop();
     await server.stop();
     await sleep(300);
     await rm(profile,{recursive:true,force:true,maxRetries:10,retryDelay:140}).catch(()=>{});
