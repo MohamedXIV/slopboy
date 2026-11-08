@@ -17,7 +17,7 @@ export function useV2Theme():V2ThemeState {
   return value;
 }
 
-/** The single header/footer/theme owner for every V2 route. V1 remains separate. */
+/** One header/footer/theme owner for canonical routes; legacy pages are separate. */
 export default function V2AppShell({children}:{children:ReactNode}){
   const pathname=usePathname();
   const [theme,setTheme]=useState<V2Theme>('dark');
@@ -39,13 +39,13 @@ export default function V2AppShell({children}:{children:ReactNode}){
     <div className="sb-v2-shell" data-v2-theme={theme} data-theme={theme}>
       <header className="sb-v2-header">
         <div className="sb-v2-header-inner">
-          <Link className="sb-v2-brand" href="/v2" aria-label="Slopboy 2.0 home">
+          <Link className="sb-v2-brand" href="/" aria-label="Slopboy 2.0 home">
             SLOPBOY <span>2.0</span>
           </Link>
           <span className="sb-v2-header-descriptor">IMAGINARY HANDHELDS · REAL TINY GAMES</span>
           <nav className="sb-v2-nav" aria-label="Slopboy 2.0 navigation">
-            <Link href="/v2" aria-current={pathname==='/v2'?'page':undefined}>Devices</Link>
-            <Link href="/v2/library" aria-current={pathname==='/v2/library'?'page':undefined}>My library</Link>
+            <Link href="/" aria-current={pathname==='/'?'page':undefined}>Devices</Link>
+            <Link href="/library" aria-current={pathname==='/library'?'page':undefined}>My library</Link>
             <Button size="sm" variant="secondary" className="sb-control sb-v2-theme-toggle"
               onPress={toggleTheme} aria-label={theme==='dark'?'Switch to light theme':'Switch to dark theme'}
 >
@@ -58,12 +58,12 @@ export default function V2AppShell({children}:{children:ReactNode}){
       <div className="sb-v2-main">{children}</div>
       <footer className="sb-v2-footer">
         <div className="sb-v2-footer-inner">
-          <Link href="/v2" className="sb-v2-footer-brand">SLOPBOY <span>2.0</span></Link>
+          <Link href="/" className="sb-v2-footer-brand">SLOPBOY <span>2.0</span></Link>
           <span>Imaginary handhelds, real tiny games. · Independent preview</span>
           <nav aria-label="Footer navigation">
-            <Link href="/v2/library">Library</Link>
-            <Link href="/v2/spikes/kaplay">Engine lab</Link>
-            <Link href="/">V1 reference</Link>
+            <Link href="/library">Library</Link>
+            <Link href="/labs/kaplay">Engine lab</Link>
+            <Link href="/legacy">Legacy prototype</Link>
           </nav>
         </div>
       </footer>

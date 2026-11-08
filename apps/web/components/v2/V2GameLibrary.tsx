@@ -60,7 +60,7 @@ export default function V2GameLibrary(){
         <div className="v2-cart-grid">{GAMES.map((game,index)=>{
           const record=history[game.gameId];const active=record&&record.launches>0;
           return <article key={game.gameId} className="v2-library-game">
-            <Link className="v2-cartridge-link" href={'/v2/play/'+game.gameId} aria-label={'Insert '+game.title+' cartridge'}>
+            <Link className="v2-cartridge-link" href={'/play/'+game.gameId} aria-label={'Insert '+game.title+' cartridge'}>
               <V2CartridgeArt id={game.legacySlug} title={game.title} emblem={game.artwork.emblem} index={index}/>
             </Link>
             <div className="v2-library-card-details"><div className="v2-library-title"><h3>{game.title}</h3><span>{game.genre}</span></div>
@@ -72,7 +72,7 @@ export default function V2GameLibrary(){
                     ?`${record.story.completed} / ${record.story.total} milestones`:'Not tracked'}</strong></div>
               </div>
               <div className="v2-library-actions">
-                <Link className="v2-library-play" href={'/v2/play/'+game.gameId}>↧ Insert &amp; play</Link>
+                <Link className="v2-library-play" href={'/play/'+game.gameId}>↧ Insert &amp; play</Link>
                 <Button className="sb-control" size="sm" variant="secondary" onPress={()=>void expandSaves(game.gameId)}
                   aria-expanded={openSaves===game.gameId} aria-controls={'v2-save-'+game.gameId}>Local saves</Button>
               </div>

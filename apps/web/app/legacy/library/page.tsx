@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import {GAMES} from '@slopboy/catalog';
-import './library.css';
+import '../../library/library.css';
 export default function LibraryPage(){
   return <main className="library-page">
     <header className="topbar">
-      <Link className="brand" href="/" aria-label="Slopboy home"><span className="brand-icon">S</span>SLOPBOY<span className="accent">.</span></Link>
+      <Link className="brand" href="/legacy" aria-label="Slopboy home"><span className="brand-icon">S</span>SLOPBOY<span className="accent">.</span></Link>
       <span className="pill">CURATED PROTOTYPE LIBRARY</span>
     </header>
     <section className="library-content">
@@ -22,11 +22,11 @@ export default function LibraryPage(){
             <h2>{game.title}</h2>
             <p className="game-card-tagline">{game.tagline}</p>
             <p className="game-card-copy">{game.description}</p>
-            <Link className="game-card-play" href={`/play/${game.gameId}`}>Insert &amp; play <span aria-hidden="true">↗</span></Link>
+            <Link className="game-card-play" href={`/legacy/play/${game.legacySlug}`}>Insert &amp; play <span aria-hidden="true">↗</span></Link>
           </div>
         </article>)}
       </div>
-      <p className="library-notice">Curated demonstration games only. <Link href="/create">Build a local cartridge with the Creator Kit</Link>. Public uploads, accounts and cloud achievements are not enabled.</p>
+      <p className="library-notice">Curated demonstration games only. <Link href="/legacy/create">Build a local cartridge with the Creator Kit</Link>. Public uploads, accounts and cloud achievements are not enabled.</p>
     </section>
   </main>;
 }

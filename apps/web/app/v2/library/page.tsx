@@ -1,2 +1,2 @@
-import V2GameLibrary from '../../../components/v2/V2GameLibrary';
-export default function V2LibraryPage(){return <V2GameLibrary/>;}
+import CompatibilityRedirect from '../../../components/CompatibilityRedirect';
+export default function PreviousV2Library(){return <CompatibilityRedirect to="/library"/>;}

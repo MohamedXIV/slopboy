@@ -604,7 +604,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
             }}>
             ↧ Change cartridge
           </Button>
-          <Link href="/v2/library" className="v2-full-library-link">Full library</Link>
+          <Link href="/library" className="v2-full-library-link">Full library</Link>
           <Button size="sm" variant="secondary" className="sb-control v2-mobile-settings"
             onPress={()=>{
               physical.current.clear();pressed.current.clear();syncKeys();
@@ -860,7 +860,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
                 <p className="v2-quick-library-description">Select a cartridge to insert into this Slopboy. Your current game remains running until you choose another.</p>
                 <div className="v2-quick-cartridge-list" role="list">
                   {GAMES.map((item,index)=><div role="listitem" key={item.gameId}>
-                    <Link href={'/v2/play/'+item.gameId} scroll={false}
+                    <Link href={'/play/'+item.gameId} scroll={false}
                       className={'v2-quick-cartridge'+(item.gameId===game.gameId?' is-current':'')}
                       aria-current={item.gameId===game.gameId?'page':undefined}
                       onClick={event=>{
@@ -876,7 +876,7 @@ export default function V2DevicePlayer({gameId}:{gameId:string}){
                     </Link>
                   </div>)}
                 </div>
-                <Link className="v2-quick-library-all" href="/v2/library">Browse your full library ↗</Link>
+                <Link className="v2-quick-library-all" href="/library">Browse your full library ↗</Link>
               </Drawer.Body>
               <Drawer.Footer>
                 <Button className="sb-control" variant="secondary" onPress={()=>setLibraryOpen(false)}>Continue playing</Button>
