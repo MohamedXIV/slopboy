@@ -8,7 +8,7 @@ export default function SignInPage(){
     <p className="sb-account-label">SLOPBOY · ACCOUNT</p>
     <h1>Welcome back.</h1>
     <p>All guest games work without an account. Sign-in is for private creator features.</p>
-    {authReady(process.env)?<SignInForm/>:<p role="status">Account sign-in is not configured in this deployment.</p>}
+    {authReady({NEON_AUTH_BASE_URL:process.env.NEON_AUTH_BASE_URL,NEON_AUTH_COOKIE_SECRET:process.env.NEON_AUTH_COOKIE_SECRET})?<SignInForm/>:<p role="status">Account sign-in is not configured in this deployment.</p>}
     <p className="sb-account-small">New account registration is closed during the private development rollout.</p>
     <Link href="/library">Continue as guest</Link>
   </section></main>;
