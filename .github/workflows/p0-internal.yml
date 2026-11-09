@@ -66,6 +66,8 @@ jobs:
         run: pnpm build
       - name: Dynamic runtime UUID and reviewed metadata smoke
         run: pnpm security:runtime-routes
+      - name: Auth route anonymous/CSRF/guest regression (real Next server)
+        run: pnpm security:auth-routes
       - name: V2 real-browser playable device regression
         run: pnpm security:v2-browser
       - name: Real Chromium KAPLAY isolated rendering spike
