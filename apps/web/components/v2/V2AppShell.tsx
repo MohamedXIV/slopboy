@@ -36,7 +36,7 @@ export default function V2AppShell({children}:{children:ReactNode}){
   },[theme]);
   const state=useMemo(()=>({theme,toggleTheme}),[theme,toggleTheme]);
   return <ThemeContext.Provider value={state}>
-    <div className="sb-v2-shell" data-v2-theme={theme} data-theme={theme}>
+    <div className={`sb-v2-shell ${theme}`} data-v2-theme={theme} data-theme={theme}>
       <header className="sb-v2-header">
         <div className="sb-v2-header-inner">
           <Link className="sb-v2-brand" href="/" aria-label="Slopboy 2.0 home">
