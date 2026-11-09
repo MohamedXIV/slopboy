@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import {
   loadMigrationFiles,
@@ -58,8 +58,14 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
   };
 
   try {
+    // Prefer configured binary path, otherwise discover the installed
+    // PostgreSQL version rather than hardcoding v15 on CI/Neon dev hosts.
+    const pgRoot = process.env.SLOPBOY_PG_BIN_DIR || '/usr/lib/postgresql';
+    const versions = process.env.SLOPBOY_PG_BIN_DIR ? [] : await readdir(pgRoot);
+    const binDir = process.env.SLOPBOY_PG_BIN_DIR ||
+      resolve(pgRoot, versions.filter(v => /^\\d+$/.test(v)).sort((a, b) => Number(b) - Number(a))[0], 'bin');
     // 1. Initialize cluster
-    await runProc('/usr/lib/postgresql/15/bin/initdb', [
+    await runProc(resolve(binDir, 'initdb'), [
       '-D', dataDir,
       '-A', 'trust',
       '-U', 'antigravity',
@@ -68,7 +74,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     ]);
 
     // 2. Start PostgreSQL server on unix socket
-    await runProc('/usr/lib/postgresql/15/bin/pg_ctl', [
+    await runProc(resolve(binDir, 'pg_ctl'), [
       '-D', dataDir,
       '-o', `-k ${tempDir} -p ${port}`,
       '-l', resolve(tempDir, 'pg.log'),
