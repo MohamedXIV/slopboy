@@ -78,6 +78,12 @@ importers:
 
   packages/catalog: {}
 
+  packages/database:
+    dependencies:
+      '@slopboy/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+
   packages/hardware: {}
 
   packages/runtime:
