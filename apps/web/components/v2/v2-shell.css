@@ -27,6 +27,9 @@
 .sb-v2-footer nav{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:16px}
 .sb-v2-footer nav a{font-weight:700;color:var(--sb-subtle)}
 .sb-v2-footer nav a:hover{color:var(--sb-accent)}
+/* Semantic keyboard focus for navigational links outside HeroUI controls. */
+.sb-v2-shell a:focus-visible,
+.sb-v2-dialog a:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
 /* Portaled Drawer.Dialog receives its own data-theme and the same tokens. */
 .sb-v2-dialog{
   background:var(--overlay);
