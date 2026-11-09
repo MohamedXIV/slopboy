@@ -1,6 +1,6 @@
 # Slopboy — Agent-Native Platform Roadmap
 
-**Updated:** 2026-11-08 · **Status:** Proposed; [Draft PR #14](https://github.com/MohamedXIV/slopboy/pull/14) contains the working V2 UI/runtime baseline. No production cutover has been merged.
+**Updated:** 2026-11-09 · **Status:** Sprint 2 integration ([Issue #77](https://github.com/MohamedXIV/slopboy/issues/77)) underway; V2 and backend PRs remain unmerged. No production cutover has been merged.
 
 **GitHub Project:** [Slopboy — Agent-Native Platform Roadmap](https://github.com/users/MohamedXIV/projects/7)  
 **Long-term product register:** [Long-Term Vision](docs/product/long-term-vision.md) · [Agents' entrypoint](AGENTS.md)
@@ -47,7 +47,20 @@ The MVP roadmap above is **not** the full planned platform. The persistent futur
 
 **The current implementation order does not change:** #23 → #22 → #24, with #44 SDK and #25/#28 readiness in parallel. Future tracks are preserved as architecture and documentation requirements, not as a reason to block or inflate the first launch.
 
-## Sprint 1 — Start here
+## Active Sprint 2 — Integration and account-backed platform
+
+**Coordination/claim source:** [Issue #77](https://github.com/MohamedXIV/slopboy/issues/77). The agent owning integration works on `integrate/sprint-2-baseline`; other agents must not commit there or work concurrently on its CI/workspace scope.
+
+1. **Integration gate #77:** start from the verified PR #76 KAPLAY HostSession head and integrate the independent PR #73 PostgreSQL schema as an explicit second merge parent. Run frozen-install, live PostgreSQL migrations, typecheck, Chromium, sandbox and offline PWA tests **on the combined SHA**. Verify real Vercel Preview READY. Do not merge to `main` until the owner approves.
+2. **Real dev/backend #25 → #26:** Neon provisioning is still a separate operation. Verify isolated, Slopboy-only $0 resources and actual auth/OAuth provider capability; only then implement genuine sessions, server-derived roles and two-account access denial. Never treat the MCP JWT test spike as production authentication.
+3. **Catalog #27 → My Games #34 → Paste Code #49:** real UUID ownership, reviewed public revisions and private drafts from verified identities. Storage of private source must not execute it; game preview awaits #31/#32/#33/#4.
+4. **Parallel agent lanes:** #29 provider-neutral MCP schemas/validation *only*, and #33/#4 hostile iframe browser fixtures *only*, with separate branch/file claims. Both are allowed to progress before Neon, but neither may enable unauthorized writes, weaken sandbox security or edit the integration branch.
+
+**Single-writer rule:** claim the Issue and base SHA/files in a GitHub Issue comment before coding. One agent per Issue/branch; submit focused PRs. Every agent must reread #77 and the relevant Issue before touching shared files. Passing an isolated PR's CI does **not** prove combined integration or live account authorization.
+
+**Exit criterion:** integrated branch and PR, real PostgreSQL + browser/security/offline checks passing on the same exact commit, READY Vercel Preview, and no cutover to production. All subsequent database/auth writes must target this integrated baseline rather than diverging PR #73/#76.
+
+## Sprint 1 — historical starting plan (completed on review branches)
 
 **Primary order:** [#23](https://github.com/MohamedXIV/slopboy/issues/23) **UUID contract and non-destructive legacy save mapping** → [#22](https://github.com/MohamedXIV/slopboy/issues/22) **promote the Slopboy UI and keep the old prototype as `/legacy`** → [#24](https://github.com/MohamedXIV/slopboy/issues/24) **dynamic Next.js deploy without breaking PWA/guest games**.
 

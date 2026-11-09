@@ -3,7 +3,7 @@
 **Read this before making architectural changes or generating new Slopboy game code.** This is the repository's lightweight onboarding index for Codex, Claude Code, Gemini, GitHub Copilot and future agents. The authoritative requirements are in linked documents and GitHub Issues; this file is *not* permission to implement future features unasked.
 
 ## Essential reading, in order
-1. [ROADMAP.md](ROADMAP.md) — current active Sprint, milestone gates, issue dependencies. **Begin with #23, then #22, then #24** unless the task explicitly targets another issue.
+1. [ROADMAP.md](ROADMAP.md) — current active Sprint, milestone gates, issue dependencies. **Sprint 2 begins at #77 integration**; the #23 → #22 → #24 sequence is historical work in unmerged PRs. Check Issue #77 claim, PR base and blockers before accepting a task.
 2. [docs/product/long-term-vision.md](docs/product/long-term-vision.md) — future progression/economy, rich assets, multiplayer, social discovery, governance, device power/UX. **Preserve extension seams, but do not implement deferred Epics.**
 3. [ADR-002](docs/architecture/adr-002-production-cutover.md) — canonical paths, UUIDs, /legacy and guest-save migration.
 4. [ADR-003](docs/architecture/adr-003-agent-native-platform.md) — OAuth-linked ChatGPT/Claude MCP, player/creator dashboard, admin, Neon backend, Vercel frontend.
@@ -19,6 +19,14 @@
 - Keep offline guest gameplay/saves. Cloud sync is opt-in and cannot silently overwrite local saves or claim success without backend confirmation.
 - **Vercel** hosts Next.js now; **Render** is only a possible alternative for frontend hosting later. **Neon** is the separate candidate for database/auth/storage/MCP functions.
 - No paid infrastructure or model API assumed. Do not add permanent multiplayer servers or expensive dependencies because a distant feature is on the roadmap.
+
+## Concurrent AI agents (Sprint 2)
+- **One writer per Issue and branch.** Check [#77](https://github.com/MohamedXIV/slopboy/issues/77) and the target Issue for existing claims before starting; comment `CLAIM: agent / Issue # / branch / file scope / exact base SHA`.
+- Never commit to another agent's branch or force-push integration branches. Avoid shared API/CI/schema files concurrently; split tasks and use PRs with explicit dependencies.
+- Integration branch `integrate/sprint-2-baseline` is reserved for #77. Backend/auth #25–#27 depends on its combined passing integration gate and verification of isolated zero-cost Neon development resources.
+- Gemini can independently handle #29 MCP **schemas/tests only** or #33 browser **hostile security fixtures only**, after separate Issue claims. No unapproved real write tools or relaxation of sandbox security.
+- `main` and Vercel Production are **never** targets for unattended agents without explicit owner approval.
+- Separate experimental work (KAPLAY adapter, OAuth mock verification, migration schema) from verified real external services and account access.
 
 ## Workflow
 - Read the task's GitHub Issue/parent Epic and existing code before changing files; avoid unrelated refactors.
