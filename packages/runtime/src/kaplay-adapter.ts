@@ -7,8 +7,8 @@
  * - Host-mediated input forwarding (UP, DOWN, LEFT, RIGHT, A, B, START, SELECT).
  * - Host-mediated save/load persistence connected to guest UUID envelopes.
  * - Output frame quantization: 160x144 logical resolution and 4 indexed colors.
- * - Chromium occlusion mitigation: retains non-zero geometry and active compositor
- *   scheduling while presenting through the trusted handheld screen canvas.
+ * - Separate visible source viewport to avoid double-compositing over the
+ *   indexed-color host canvas while keeping compositor scheduling active.
  * - Explicit experimental status per ADR-004 until renderer isolation is fully proven.
  */
 
@@ -89,15 +89,16 @@ export class KaplayEngineAdapter implements EngineAdapter {
     iframe.setAttribute('referrerpolicy', 'no-referrer');
     iframe.setAttribute('title', 'Slopboy KAPLAY Sandbox');
 
-    // Mitigate Chromium hidden/occluded iframe throttling:
-    // Retain 160x144 logical dimensions and place within layout with pointer-events: none.
+    // Keep the vetted WebGL source genuinely visible for compositor scheduling.
+    // The host places it in a separate diagnostic viewport, never over the
+    // indexed-color canvas (which caused a double-image/ghosting artifact).
     iframe.style.width = '160px';
     iframe.style.height = '144px';
     iframe.style.border = 'none';
     iframe.style.display = 'block';
     iframe.style.pointerEvents = 'none';
     iframe.style.position = 'absolute';
-    iframe.style.opacity = '0.05';
+    iframe.style.opacity = '1';
     iframe.style.zIndex = '0';
 
     let documentSource = this._options.sandboxHtml;
