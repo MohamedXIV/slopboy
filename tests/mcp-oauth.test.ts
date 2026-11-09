@@ -251,7 +251,7 @@ test('handleMcpHttpRequest lists tools without authentication', async () => {
   assert.equal(res.status, 200);
   const json = JSON.parse(res.body);
   assert.ok(Array.isArray(json.result.tools));
-  assert.equal(json.result.tools.length, 6);
+  assert.equal(json.result.tools.length, 5);
 
   const toolNames = json.result.tools.map((t: any) => t.name);
   assert.ok(toolNames.includes('list_supported_engines'));
@@ -259,7 +259,7 @@ test('handleMcpHttpRequest lists tools without authentication', async () => {
   assert.ok(toolNames.includes('recommend_engine'));
   assert.ok(toolNames.includes('get_game_template'));
   assert.ok(toolNames.includes('validate_game_source'));
-  assert.ok(toolNames.includes('create_game_draft'));
+  assert.ok(!toolNames.includes('create_game_draft'), 'Do not advertise non-persistent writes');
 });
 
 test('handleMcpHttpRequest executes public discovery tools without authentication', async () => {
@@ -430,4 +430,39 @@ export default function setupGame(kInit, canvas) {}
   assert.ok(savedDraft);
   assert.equal(savedDraft.ownerId, 'usr_legitimate_creator_uuid_123');
   assert.equal(savedDraft.title, 'Laser Asteroid');
+});
+
+test('draft creation is unavailable without a durable persistence handler even with valid token', async () => {
+  const token = createTestAccessToken({
+    sub: 'usr_test', iss: EXPECTED_ISSUER, aud: EXPECTED_AUDIENCE,
+    scope: 'mcp:write',
+  }, TEST_SECRET);
+  const result = await handleMcpHttpRequest({
+    method: 'POST', headers: { authorization: `Bearer ${token}` },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 42, method: 'tools/call',
+      params: { name: 'create_game_draft', arguments: {
+        title: 'Fake Success', engineId: 'kaplay', sourceCode: 'export default function game() {}',
+      } } }),
+  }, { authConfig: DEFAULT_AUTH_CONFIG });
+  assert.equal(result.status, 503);
+  assert.equal(JSON.parse(result.body).error.code, -32003);
+});
+
+test('draft creation is only advertised when auth and persistent storage are both configured', async () => {
+  const result = await handleMcpHttpRequest({
+    method: 'POST', headers: {},
+    body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/list' }),
+  }, { authConfig: DEFAULT_AUTH_CONFIG, onSaveDraft: async () => {} });
+  assert.ok(JSON.parse(result.body).result.tools.some((t: {name:string}) => t.name === 'create_game_draft'));
+});
+
+test('JWT verifier rejects unsupported algorithm headers before signature validation', () => {
+  const token = createTestAccessToken({
+    sub: 'usr_test', iss: EXPECTED_ISSUER, aud: EXPECTED_AUDIENCE, scope: 'mcp:write',
+  }, TEST_SECRET);
+  const segments = token.split('.');
+  const fakeHeader = Buffer.from(JSON.stringify({ alg: 'none', typ: 'at+jwt' })).toString('base64url');
+  const result = verifyAccessToken(`Bearer ${fakeHeader}.${segments[1]}.${segments[2]}`, DEFAULT_AUTH_CONFIG);
+  assert.equal(result.ok, false);
+  assert.ok(result.error?.errorDescription.includes('Unsupported JWT algorithm'));
 });
