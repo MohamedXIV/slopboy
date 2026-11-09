@@ -55,6 +55,7 @@ export class KaplayEngineAdapter implements EngineAdapter {
   private _lastCaptureMs = 0;
   private _isOpaque = false;
   private _isWebgl = false;
+  private _booted = false;
 
   constructor(options: KaplayAdapterOptions = {}) {
     this._options = options;
@@ -73,7 +74,8 @@ export class KaplayEngineAdapter implements EngineAdapter {
 
   async init(bridge: HostBridge): Promise<void> {
     this._host = bridge;
-    this._sessionKey = `${bridge.diagnostics.gameId}-${Date.now()}`;
+    this._sessionKey = crypto.randomUUID();
+    this._booted = false;
 
     // If running in browser environment with DOM
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
@@ -98,27 +100,34 @@ export class KaplayEngineAdapter implements EngineAdapter {
     iframe.style.opacity = '0.05';
     iframe.style.zIndex = '0';
 
-    if (this._options.sandboxHtml) {
-      iframe.srcdoc = this._options.sandboxHtml;
-    } else if (this._options.sandboxUrl) {
-      const resp = await fetch(this._options.sandboxUrl, {
-        credentials: 'omit',
-        cache: 'no-store',
-      });
-      if (!resp.ok) throw new Error(`Failed to load KAPLAY sandbox document: ${resp.status}`);
-      iframe.srcdoc = await resp.text();
+    let documentSource = this._options.sandboxHtml;
+    if (!documentSource && this._options.sandboxUrl) {
+      const url = new URL(this._options.sandboxUrl, window.location.href);
+      if (url.origin !== window.location.origin || !url.pathname.startsWith('/v2/')) {
+        throw new Error('KAPLAY sandbox document must be a vetted, same-origin /v2/ resource');
+      }
+      const resp = await fetch(url.href, { credentials: 'omit', cache: 'no-store', redirect: 'error' });
+      if (!resp.ok || Number(resp.headers.get('content-length') || 0) > 8 * 1024 * 1024) {
+        throw new Error(`KAPLAY sandbox fetch rejected (${resp.status})`);
+      }
+      documentSource = await resp.text();
     }
-
+    if (!documentSource || new TextEncoder().encode(documentSource).byteLength > 8 * 1024 * 1024 ||
+        !documentSource.includes('Content-Security-Policy') ||
+        !documentSource.includes("connect-src 'none'")) {
+      throw new Error('Missing or unsafe KAPLAY sandbox document');
+    }
+    iframe.srcdoc = documentSource;
     const container = this._options.container || document.body;
-    container.appendChild(iframe);
     this._iframe = iframe;
-
+    // Install listener first: srcdoc can post "boot" immediately on attachment.
     this.setupMessageListener();
+    container.appendChild(iframe);
   }
 
   private setupMessageListener(): void {
     this._messageListener = (event: MessageEvent) => {
-      if (this._iframe && event.source !== this._iframe.contentWindow) return;
+      if (!this._iframe || event.source !== this._iframe.contentWindow || event.origin !== 'null') return;
       const msg = event.data;
       if (!msg || msg.scope !== KAPLAY_SANDBOX_SCOPE) return;
 
@@ -130,8 +139,16 @@ export class KaplayEngineAdapter implements EngineAdapter {
       if (msg.key !== this._sessionKey) return;
 
       if (msg.type === 'ready') {
-        this._isOpaque = msg.opaque === true;
-        this._isWebgl = msg.webgl === true;
+        const { width, height } = this._host?.display ?? { width: 0, height: 0 };
+        if (msg.opaque !== true || msg.webgl !== true ||
+            !Array.isArray(msg.dimensions) || msg.dimensions[0] !== width || msg.dimensions[1] !== height) {
+          this._running = false;
+          this.postToIframe('stop');
+          this._host?.diagnostics.reportError('KAPLAY sandbox did not verify opaque origin, WebGL and display dimensions');
+          return;
+        }
+        this._isOpaque = true;
+        this._isWebgl = true;
         return;
       }
 
@@ -154,7 +171,8 @@ export class KaplayEngineAdapter implements EngineAdapter {
   }
 
   private handleBoot(): void {
-    if (!this._host) return;
+    if (!this._host || this._booted) return;
+    this._booted = true;
     // Load initial save from host bridge and pass to start message
     this._host.save.load().then(initialSave => {
       this.postToIframe('start', {
@@ -191,11 +209,14 @@ export class KaplayEngineAdapter implements EngineAdapter {
 
   private handleSaveMessage(value: unknown): void {
     if (!this._host) return;
-    if (value === null || typeof value === 'string') {
-      this._host.save.save(value).catch(err => {
-        this._host?.diagnostics.reportError(err);
-      });
+    if (value !== null && typeof value !== 'string') return;
+    if (typeof value === 'string' && new TextEncoder().encode(value).byteLength > 8192) {
+      this._host.diagnostics.reportError('KAPLAY save exceeded platform safety budget');
+      return;
     }
+    this._host.save.save(value).catch(err => {
+      this._host?.diagnostics.reportError(err);
+    });
   }
 
   private postToIframe(type: string, extra: Record<string, unknown> = {}): void {
@@ -253,5 +274,6 @@ export class KaplayEngineAdapter implements EngineAdapter {
     }
 
     this._host = null;
+    this._booted = false;
   }
 }
