@@ -1,0 +1,132 @@
+/**
+ * Slopboy 2.0 — HeroUI v3 semantic theme.
+ *
+ * One source of truth for every modern route and portaled HeroUI drawer.
+ * Keep device shells, game pixel palettes and GPU effects independent.
+ * Palette preserves the existing Slopboy petrol / LCD-lime / sage / cream look.
+ *
+ * HeroUI v3 derives hover/soft/focus variants from these semantic colors.
+ * Do not recreate Buttons, Inputs, Cards or Alerts with hardcoded CSS.
+ */
+
+/* Dark: midnight petrol, warm LCD lime, readable subdued sage text. */
+.sb-v2-shell[data-theme='dark'],
+.sb-v2-dialog[data-theme='dark'] {
+  color-scheme: dark;
+
+  --background: #0d1719;
+  --background-secondary: #132225;
+  --background-tertiary: #1a2e30;
+  --foreground: #edf4e5;
+  --muted: #adbfba;
+
+  --surface: #172a2d;
+  --surface-foreground: #edf4e5;
+  --surface-secondary: #20363a;
+  --surface-secondary-foreground: #edf4e5;
+  --surface-tertiary: #294447;
+  --surface-tertiary-foreground: #edf4e5;
+  --overlay: #1b3032;
+  --overlay-foreground: #edf4e5;
+
+  --default: #2a4242;
+  --default-foreground: #edf4e5;
+  --accent: #d1e99d;
+  --accent-foreground: #263d34;
+  --success: #82d99f;
+  --success-foreground: #183a2c;
+  --warning: #f0bd70;
+  --warning-foreground: #452b18;
+  --danger: #f28c8e;
+  --danger-foreground: #481f24;
+
+  --field-background: #203537;
+  --field-foreground: #edf4e5;
+  --field-placeholder: #adbfba;
+  --field-border: #59736b;
+  --border: #405b56;
+  --separator: #334c49;
+  --focus: #d1e99d;
+  --link: #d1e99d;
+  --segment: #25403f;
+  --segment-foreground: #edf4e5;
+
+  --radius: 0.875rem;
+  --field-radius: 0.75rem;
+  --border-width: 1px;
+  --field-border-width: 1px;
+  --disabled-opacity: 0.5;
+  --surface-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
+  --overlay-shadow: 0 16px 38px rgb(0 0 0 / 0.24);
+  --field-shadow: none;
+
+  --sb-bg: var(--background);
+  --sb-top: #111f22;
+  --sb-panel: var(--surface);
+  --sb-line: var(--border);
+  --sb-text: var(--foreground);
+  --sb-subtle: var(--muted);
+  --sb-accent: var(--accent);
+  --sb-accent-ink: var(--accent-foreground);
+}
+
+/* Light: warm cream canvas, porcelain surfaces and deep sage accents. */
+.sb-v2-shell[data-theme='light'],
+.sb-v2-dialog[data-theme='light'] {
+  color-scheme: light;
+
+  --background: #f4f0e5;
+  --background-secondary: #edeee4;
+  --background-tertiary: #e5e9df;
+  --foreground: #304744;
+  --muted: #526d64;
+
+  --surface: #fffdf7;
+  --surface-foreground: #304744;
+  --surface-secondary: #f1f3eb;
+  --surface-secondary-foreground: #304744;
+  --surface-tertiary: #e5ece1;
+  --surface-tertiary-foreground: #304744;
+  --overlay: #fffdf7;
+  --overlay-foreground: #304744;
+
+  --default: #e5eee4;
+  --default-foreground: #304744;
+  --accent: #496f45;
+  --accent-foreground: #fffdf5;
+  --success: #31714d;
+  --success-foreground: #fffdf5;
+  --warning: #925711;
+  --warning-foreground: #fffdf5;
+  --danger: #ac424c;
+  --danger-foreground: #fffdf5;
+
+  --field-background: #f6f8f1;
+  --field-foreground: #304744;
+  --field-placeholder: #637a6f;
+  --field-border: #b4c5b7;
+  --border: #c6d0c3;
+  --separator: #d3ddcf;
+  --focus: #496f45;
+  --link: #396b48;
+  --segment: #e1e9de;
+  --segment-foreground: #304744;
+
+  --radius: 0.875rem;
+  --field-radius: 0.75rem;
+  --border-width: 1px;
+  --field-border-width: 1px;
+  --disabled-opacity: 0.5;
+  --surface-shadow: 0 9px 24px rgb(48 71 68 / 0.08);
+  --overlay-shadow: 0 16px 38px rgb(48 71 68 / 0.15);
+  --field-shadow: none;
+
+  --sb-bg: var(--background);
+  --sb-top: #fffdf7;
+  --sb-panel: var(--surface);
+  --sb-line: var(--border);
+  --sb-text: var(--foreground);
+  --sb-subtle: var(--muted);
+  --sb-accent: var(--accent);
+  --sb-accent-ink: var(--accent-foreground);
+}
