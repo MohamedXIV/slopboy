@@ -248,7 +248,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     await executePsql(config,{sql:`
       CREATE ROLE slopboy_test_web;
       GRANT USAGE ON SCHEMA public TO slopboy_test_web;
-      GRANT SELECT(id,email,display_name,role), INSERT(id,email,display_name,role),
+      GRANT SELECT(id,email,display_name,role), INSERT(id,email,display_name),
         UPDATE(email,display_name) ON public.users TO slopboy_test_web;
       GRANT SELECT(id,owner_id,title,status,visibility,created_at)
         ON public.games TO slopboy_test_web;
@@ -256,9 +256,10 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const grants=await executePsql(config,{sql:`
       SELECT has_column_privilege('slopboy_test_web','public.users','role','UPDATE'),
         has_table_privilege('slopboy_test_web','public.games','DELETE'),
-        has_column_privilege('slopboy_test_web','public.users','display_name','UPDATE');
+        has_column_privilege('slopboy_test_web','public.users','display_name','UPDATE'),
+        has_column_privilege('slopboy_test_web','public.users','role','INSERT');
     `});
-    assert.equal(grants.stdout.trim(),'f|f|t');
+    assert.equal(grants.stdout.trim(),'f|f|t|f');
 
   } finally {
     // Stop server and clean up temporary cluster
