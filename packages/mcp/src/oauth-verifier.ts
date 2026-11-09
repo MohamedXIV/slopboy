@@ -140,6 +140,16 @@ export function verifyAccessToken(
   }
 
   const token = parts[1];
+  if (token.length > 16384 || Buffer.byteLength(options.secretKey, 'utf8') < 32) {
+    return {
+      ok: false,
+      error: {
+        status: 401, error: 'invalid_token',
+        errorDescription: 'Token cannot be verified with this configuration',
+        wwwAuthenticate: 'Bearer error="invalid_token"',
+      },
+    };
+  }
   const segments = token.split('.');
   if (segments.length !== 3) {
     return {
@@ -154,6 +164,24 @@ export function verifyAccessToken(
   }
 
   const [headerB64, payloadB64, signatureB64] = segments;
+
+  // JWT signature bytes alone are insufficient: enforce the expected algorithm
+  // and access-token profile, otherwise algorithm confusion is possible.
+  try {
+    const header = JSON.parse(base64UrlDecode(headerB64));
+    if (header?.alg !== 'HS256' || header?.typ !== 'at+jwt') {
+      throw new Error('Unsupported token header');
+    }
+  } catch {
+    return {
+      ok: false,
+      error: {
+        status: 401, error: 'invalid_token',
+        errorDescription: 'Unsupported JWT algorithm or token type',
+        wwwAuthenticate: 'Bearer error="invalid_token"',
+      },
+    };
+  }
 
   // Verify HMAC signature
   const signingInput = `${headerB64}.${payloadB64}`;
@@ -192,7 +220,7 @@ export function verifyAccessToken(
   const tolerance = options.clockToleranceSeconds ?? 5;
 
   // 1. Verify expiration
-  if (typeof payload.exp !== 'number' || payload.exp + tolerance < now) {
+  if (!Number.isFinite(payload.exp) || payload.exp + tolerance < now) {
     return {
       ok: false,
       error: {
@@ -205,7 +233,7 @@ export function verifyAccessToken(
   }
 
   // 2. Verify Not Before (nbf) if present
-  if (typeof payload.nbf === 'number' && payload.nbf - tolerance > now) {
+  if (payload.nbf !== undefined && (!Number.isFinite(payload.nbf) || payload.nbf - tolerance > now)) {
     return {
       ok: false,
       error: {
@@ -258,6 +286,13 @@ export function verifyAccessToken(
   }
 
   // 6. Extract scopes and verify required scope
+  if (payload.scope !== undefined && typeof payload.scope !== 'string') {
+    return { ok: false, error: {
+      status: 401, error: 'invalid_token',
+      errorDescription: 'Malformed scope claim',
+      wwwAuthenticate: 'Bearer error="invalid_token"',
+    } };
+  }
   const scopes = (payload.scope || '').split(/\s+/).filter(Boolean);
   if (options.requiredScope && !scopes.includes(options.requiredScope)) {
     return {
