@@ -37,10 +37,33 @@ async function main(){
     if(quickTrigger!==true)throw Error('Player must provide in-place cartridge selection and full library');
     if(Number(await evalJs("document.querySelectorAll('.v2-cartridge-strip, .v2-header').length"))!==0)
       throw Error('Duplicated legacy V2 game header still visible');
+    const darkTheme=JSON.parse(String(await evalJs(`(()=>{const el=document.querySelector('.sb-v2-shell');
+      const css=getComputedStyle(el);return JSON.stringify({
+        mode:el.dataset.theme,accent:css.getPropertyValue('--accent').trim(),
+        surface:css.getPropertyValue('--surface').trim(),
+        field:css.getPropertyValue('--field-background').trim(),
+        radius:css.getPropertyValue('--radius').trim(),
+      });})()`)));
+    if(darkTheme.mode!=='dark'||darkTheme.accent!=='#d1e99d'||
+      darkTheme.surface!=='#172a2d'||darkTheme.field!=='#203537'||
+      darkTheme.radius!=='0.875rem')
+      throw Error('Dark HeroUI semantic tokens differ from the Slopboy identity: '+JSON.stringify(darkTheme));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(350);
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
     if(sharedLight!==true)throw Error('Shared theme did not propagate into player without duplicate controls');
+    const lightTheme=JSON.parse(String(await evalJs(`(()=>{const el=document.querySelector('.sb-v2-shell');
+      const css=getComputedStyle(el);return JSON.stringify({
+        mode:el.dataset.theme,accent:css.getPropertyValue('--accent').trim(),
+        surface:css.getPropertyValue('--surface').trim(),
+        field:css.getPropertyValue('--field-background').trim(),
+        radius:css.getPropertyValue('--radius').trim(),
+      });})()`)));
+    if(lightTheme.mode!=='light'||lightTheme.accent!=='#496f45'||
+      lightTheme.surface!=='#fffdf7'||lightTheme.field!=='#f6f8f1'||
+      lightTheme.radius!==darkTheme.radius)
+      throw Error('Light HeroUI semantic tokens differ from Slopboy identity: '+JSON.stringify(lightTheme));
+
     const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
     const brandRgb=brandedButton.match(/[0-9]+/g)?.map(Number);
     if(!brandRgb||brandRgb.length!==3||Number(brandRgb[0])<100||Number(brandRgb[1])<Number(brandRgb[0])+5
@@ -176,6 +199,16 @@ async function main(){
       await sleep(150);
     }
     if(!drawerOpen)throw Error('HeroUI mobile device settings drawer failed to open');
+    const drawerTheme=JSON.parse(String(await evalJs(`(()=>{const el=document.querySelector('.v2-mobile-drawer');
+      const css=getComputedStyle(el);return JSON.stringify({
+        mode:el.dataset.theme,lightClass:el.classList.contains('light'),
+        accent:css.getPropertyValue('--accent').trim(),
+        surface:css.getPropertyValue('--overlay').trim(),
+      });})()`)));
+    if(drawerTheme.mode!=='light'||!drawerTheme.lightClass||
+      drawerTheme.accent!=='#496f45'||drawerTheme.surface!=='#fffdf7')
+      throw Error('HeroUI portal lost the persisted Slopboy theme: '+JSON.stringify(drawerTheme));
+
     const liveDuringSettings=await evalJs("!!document.querySelector('.v2-led.on')&&!!document.querySelector('.v2-isolated-frame')");
     if(liveDuringSettings!==true)throw Error('Opening mobile drawer interrupted live cartridge');
     // Back to game library: real curated cartridges, not a header game strip.
@@ -202,6 +235,10 @@ async function main(){
       await sleep(120);
     }
     if(!lightPersisted)throw Error('One shared theme did not persist after rehydration on library navigation');
+    const cardBackground=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-game')).backgroundColor"));
+    if(cardBackground!=='rgb(255, 253, 247)')
+      throw Error('Library card did not inherit the HeroUI light surface: '+cardBackground);
+
     const libraryHeroControl=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).color"));
     if(libraryHeroControl!=='rgb(48, 71, 68)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
 
