@@ -588,7 +588,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         </aside>
   );
   return (
-    <main className="v2-player" data-v2-theme={theme}>
+    <main className="v2-player" data-v2-theme={theme} data-theme={theme}>
       <section className="v2-player-toolbar" aria-label="Current game controls">
         <div className="v2-session-id">
           <span className="v2-player-toolbar-kicker">CARTRIDGE INSERTED / SLOPBOY 1000</span>
@@ -850,8 +850,8 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       <Drawer>
         <Drawer.Backdrop isOpen={libraryOpen} onOpenChange={setLibraryOpen} variant="blur">
           <Drawer.Content placement="left">
-            <Drawer.Dialog className="v2-quick-library-drawer sb-v2-dialog"
-              data-v2-theme={theme} aria-label="Change game from your library">
+            <Drawer.Dialog className={`v2-quick-library-drawer sb-v2-dialog ${theme}`}
+              data-v2-theme={theme} data-theme={theme} aria-label="Change game from your library">
               <Drawer.Header>
                 <Drawer.Heading>Change cartridge</Drawer.Heading>
                 <Drawer.CloseTrigger aria-label="Close quick game library">✕</Drawer.CloseTrigger>
@@ -888,7 +888,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       {compact && <Drawer>
         <Drawer.Backdrop isOpen={mobileSettingsOpen} onOpenChange={setMobileSettingsOpen} variant="blur">
           <Drawer.Content placement="right">
-            <Drawer.Dialog className="v2-mobile-drawer sb-v2-dialog" aria-label="Slopboy display and shell settings"
+            <Drawer.Dialog className={`v2-mobile-drawer sb-v2-dialog ${theme}`} aria-label="Slopboy display and shell settings"
               data-v2-theme={theme}>
               <Drawer.Header>
                 <Drawer.Heading>Device settings</Drawer.Heading>
