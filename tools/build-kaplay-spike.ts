@@ -64,7 +64,7 @@ async function buildGemMiner(): Promise<void> {
     fileName: "game.ts",
     compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022, verbatimModuleSyntax: false }
   }).outputText;
-  if (/\\bfrom\\s*["']|\\bimport\\s*\\(/.test(output)) throw Error("Gem Miner output contains unresolved imports");
+  if (/\bfrom\s*["']|\bimport\s*\(/.test(output)) throw Error("Gem Miner output contains unresolved imports");
   const html = shell.replace("__KAPLAY_ENGINE_SOURCE__", literal(engine))
     .replace("__SLOPBOY_CARTRIDGE_SOURCE__", literal(output));
   if (Buffer.byteLength(html) > 8 * 1024 * 1024) throw Error("Gem Miner sandbox exceeds size limit");
