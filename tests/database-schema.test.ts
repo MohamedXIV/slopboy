@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, readdir } from 'node:fs/promises';
+import { mkdtemp, rm, readdir, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import {
   loadMigrationFiles,
@@ -45,7 +45,7 @@ test('migration files load cleanly with matching checksums', async () => {
   assert.equal(down[1].version, 1);
 });
 
-test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async () => {
+test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
   const tempDir = await mkdtemp(resolve(tmpdir(), 'slopboy-pg-'));
   const dataDir = resolve(tempDir, 'data');
   const port = 5434;
@@ -61,9 +61,13 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // Prefer configured binary path, otherwise discover the installed
     // PostgreSQL version rather than hardcoding v15 on CI/Neon dev hosts.
     const pgRoot = process.env.SLOPBOY_PG_BIN_DIR || '/usr/lib/postgresql';
-    const versions = process.env.SLOPBOY_PG_BIN_DIR ? [] : await readdir(pgRoot);
-    const binDir = process.env.SLOPBOY_PG_BIN_DIR ||
-      resolve(pgRoot, versions.filter(v => /^\\d+$/.test(v)).sort((a, b) => Number(b) - Number(a))[0], 'bin');
+    const versions = process.env.SLOPBOY_PG_BIN_DIR ? [] : await readdir(pgRoot).catch(() => []);
+    const newest = versions.filter(v => /^\\d+$/.test(v)).sort((a, b) => Number(b) - Number(a))[0];
+    const binDir = process.env.SLOPBOY_PG_BIN_DIR || (newest ? resolve(pgRoot, newest, 'bin') : undefined);
+    if (!binDir || await access(resolve(binDir, 'initdb')).then(() => false, () => true)) {
+      t.skip('PostgreSQL server binaries unavailable; run with SLOPBOY_PG_BIN_DIR for real DB integration');
+      return;
+    }
     // 1. Initialize cluster
     await runProc(resolve(binDir, 'initdb'), [
       '-D', dataDir,
@@ -206,5 +210,27 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       // Ignore if already stopped
     }
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test('migration CLI wraps SQL and version bookkeeping in one psql transaction', async () => {
+  const tempDir = await mkdtemp(resolve(tmpdir(), 'slopboy-psql-argv-'));
+  const psql = resolve(tempDir, 'psql');
+  const oldPath = process.env.PATH;
+  try {
+    await writeFile(psql, "#!/bin/sh\nprintf '%s\\n' \"$@\"\n", { mode: 0o755 });
+    process.env.PATH = `${tempDir}:${oldPath || ''}`;
+    const out = await executePsql({}, {
+      file: '/example/test-migration.sql',
+      sqlAfterFile: 'INSERT INTO schema_migrations VALUES (99);',
+    });
+    assert.ok(out.stdout.includes('--single-transaction'));
+    assert.ok(out.stdout.includes('/example/test-migration.sql'));
+    assert.ok(out.stdout.includes('INSERT INTO schema_migrations VALUES (99);'));
+    assert.ok(out.stdout.includes('-A'));
+    assert.ok(out.stdout.includes('-t'));
+  } finally {
+    process.env.PATH = oldPath;
+    await rm(tempDir, { recursive: true, force: true });
   }
 });
