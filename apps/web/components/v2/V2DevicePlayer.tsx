@@ -595,7 +595,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
           <strong>{game.title}</strong>
         </div>
         <div className="v2-player-toolbar-actions">
-          <Button size="sm" variant="secondary" className="sb-control sb-control-primary v2-change-game"
+          <Button size="sm" variant="primary" className="sb-control v2-change-game"
             aria-label="Open quick game library"
             onPress={()=>{
               physical.current.clear();pressed.current.clear();syncKeys();
