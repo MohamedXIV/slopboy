@@ -30,7 +30,7 @@ async function main(){
       'Same-origin mutation should pass CSRF guard then reject missing session: '+await sameOrigin.text());
     const login=await get('/auth/sign-in');
     assert.equal(login.status,200);
-    assert.match(await login.text(),/Account sign-in is not configured/);
+    assert.match(await login.text(),/Authentication is not configured in this deployment/);
     assert.equal((await get('/dashboard')).status,200,'Static dashboard shell contains no private identity');
     assert.equal((await get('/library')).status,200,'Guest cartridge library remains public');
     console.log('Anonymous auth HTTP regression PASS: fail-closed proxy/session, CSRF, owner ID, admin, guest library');
