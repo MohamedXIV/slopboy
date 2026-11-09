@@ -48,6 +48,7 @@ async function main(){
       darkTheme.surface!=='#172a2d'||darkTheme.field!=='#203537'||
       Number.parseFloat(darkTheme.radius)!==0.875)
       throw Error('Dark HeroUI semantic tokens differ from the Slopboy identity: '+JSON.stringify(darkTheme));
+    const darkButtonBg=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(350);
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
@@ -64,13 +65,19 @@ async function main(){
       lightTheme.radius!==darkTheme.radius)
       throw Error('Light HeroUI semantic tokens differ from Slopboy identity: '+JSON.stringify(lightTheme));
 
+    // HeroUI v3 may serialize calculated colors as lab()/oklch() rather than rgb().
+    // Verify native buttons inherit our semantic tokens and actually change mode,
+    // without forcing a custom CSS skin on the Button.
     const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
-    const brandRgb=brandedButton.match(/[0-9]+/g)?.map(Number);
-    if(!brandRgb||brandRgb.length!==3||Number(brandRgb[0])<100||Number(brandRgb[1])<Number(brandRgb[0])+5
-      ||Number(brandRgb[1])<Number(brandRgb[2])+5)
-      throw Error('HeroUI toggle uses blue/gray defaults rather than a light Slopboy sage tone: '+brandedButton);
-    const brandedText=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).color"));
-    if(brandedText!=='rgb(48, 71, 68)')throw Error('HeroUI theme toggle text must use Slopboy ink: '+brandedText);
+    const buttonTheme=JSON.parse(String(await evalJs(`(()=>{const css=getComputedStyle(document.querySelector('.sb-v2-theme-toggle'));return JSON.stringify({
+      accent:css.getPropertyValue('--accent').trim(),
+      neutral:css.getPropertyValue('--default').trim(),
+      ink:css.getPropertyValue('--default-foreground').trim(),
+    });})()`)));
+    if(!brandedButton||brandedButton===darkButtonBg||
+      buttonTheme.accent!=='#496f45'||buttonTheme.neutral!=='#e5eee4'||
+      buttonTheme.ink!=='#304744')
+      throw Error('HeroUI Button did not inherit the Slopboy light semantic palette: '+JSON.stringify({brandedButton,darkButtonBg,buttonTheme}));
     const duplicateTheme=await evalJs("!!document.querySelector('.v2-appearance-mode, .v2-theme-button')");
     if(duplicateTheme===true)throw Error('Redundant theme switches were not removed');
 
@@ -239,8 +246,8 @@ async function main(){
     if(cardBackground!=='rgb(255, 253, 247)')
       throw Error('Library card did not inherit the HeroUI light surface: '+cardBackground);
 
-    const libraryHeroControl=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).color"));
-    if(libraryHeroControl!=='rgb(48, 71, 68)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
+    const libraryAccent=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).getPropertyValue('--accent').trim()"));
+    if(libraryAccent!=='#496f45')throw Error('Native HeroUI library button lost the Slopboy accent token: '+libraryAccent);
 
     const libraryStats=await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:history:v2:"+GAMES[0].gameId+"')||'{}').launches>=1");
     if(libraryStats!==true)throw Error('Real game launch was not recorded locally');
