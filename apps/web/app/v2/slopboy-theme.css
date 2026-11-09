@@ -9,7 +9,12 @@
  * Do not recreate Buttons, Inputs, Cards or Alerts with hardcoded CSS.
  */
 
-/* Dark: midnight petrol, warm LCD lime, readable subdued sage text. */
+/* HeroUI compiles --color-* aliases on :root. The theme MUST set colors
+ * on that same element, otherwise its Button/Input colors keep default blue/white.
+ * :has() makes SSR and client theme switching apply without JS or a flash.
+ * Scoped shell/portals keep legacy games and device palettes independent. */
+ /* Dark: midnight petrol, warm LCD lime, readable subdued sage text. */
+html:has(.sb-v2-shell[data-theme='dark']),
 .sb-v2-shell[data-theme='dark'],
 .sb-v2-dialog.dark,
 .sb-v2-dialog[data-theme='dark'] {
@@ -75,6 +80,7 @@
 }
 
 /* Light: warm cream canvas, porcelain surfaces and deep sage accents. */
+html:has(.sb-v2-shell[data-theme='light']),
 .sb-v2-shell[data-theme='light'],
 .sb-v2-dialog.light,
 .sb-v2-dialog[data-theme='light'] {
