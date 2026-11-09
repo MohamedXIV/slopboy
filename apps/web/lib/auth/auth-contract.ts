@@ -20,3 +20,10 @@ export function authReady(env:{NEON_AUTH_BASE_URL?:string;NEON_AUTH_COOKIE_SECRE
   try{const url=new URL(env.NEON_AUTH_BASE_URL);return url.protocol==='https:'&&!url.username&&!url.password&&
     !url.search&&!url.hash&&url.pathname.endsWith('/auth');}catch{return false;}
 }
+
+/** Reject cross-origin mutation requests even when a browser sends cookies. */
+export function sameOriginMutation(origin:string|null,url:string,fetchSite:string|null):boolean{
+  if(!origin||origin==='null'||fetchSite==='cross-site')return false;
+  try{return new URL(origin).origin===new URL(url).origin&&origin===new URL(origin).origin;}
+  catch{return false;}
+}
