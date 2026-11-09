@@ -49,6 +49,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
   const tempDir = await mkdtemp(resolve(tmpdir(), 'slopboy-pg-'));
   const dataDir = resolve(tempDir, 'data');
   const port = 5434;
+  let pgBinDir: string | undefined;
 
   const config: DatabaseConnectionConfig = {
     host: tempDir,
@@ -68,6 +69,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       t.skip('PostgreSQL server binaries unavailable; run with SLOPBOY_PG_BIN_DIR for real DB integration');
       return;
     }
+    pgBinDir = binDir;
     // 1. Initialize cluster
     await runProc(resolve(binDir, 'initdb'), [
       '-D', dataDir,
@@ -108,15 +110,14 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       });
       assert.ok(gameRes.stdout.includes(fixture.title));
       assert.ok(gameRes.stdout.includes(fixture.legacySlug));
-      assert.ok(gameRes.stdout.includes('curated'));
-      assert.ok(gameRes.stdout.includes('public'));
-      assert.ok(gameRes.stdout.includes(fixture.revisionId));
+      assert.ok(gameRes.stdout.includes('draft'));
+      assert.ok(gameRes.stdout.includes('private'));
+      assert.ok(!gameRes.stdout.includes(fixture.revisionId), 'Do not publish an unverified revision');
 
       const revRes = await executePsql(config, {
-        sql: `SELECT id, game_id, engine_id, revision_number FROM game_revisions WHERE id = '${fixture.revisionId}';`,
+        sql: `SELECT id FROM game_revisions WHERE id = '${fixture.revisionId}';`,
       });
-      assert.ok(revRes.stdout.includes('pixel-v1'));
-      assert.ok(revRes.stdout.includes(fixture.gameId));
+      assert.equal(revRes.stdout.trim(), '', 'No fabricated content digest or artifact record');
     }
 
     // 7. Verify Schema Constraints:
@@ -148,6 +149,16 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 7d. Check unique revision constraint (game_id, revision_number)
     const existingGameId = CURATED_GAME_FIXTURES[0].gameId;
+    // Create a real constraint-test fixture after seeding; published release
+    // records are deliberately absent until verified bundle import.
+    await executePsql(config, {
+      sql: `INSERT INTO game_revisions (id, game_id, revision_number, engine_id,
+        engine_version, manifest, content_digest, storage_key, byte_size, created_by)
+        VALUES ('${CURATED_GAME_FIXTURES[0].revisionId}', '${existingGameId}',
+          1, 'pixel-v1', '0.1.0', '{}'::jsonb,
+          encode(digest('constraint-test-source', 'sha256'), 'hex'),
+          '/fixtures/constraint-test.slop', 22, '${SYSTEM_CURATOR_USER_ID}');`,
+    });
     await assert.rejects(
       () => executePsql(config, {
         sql: `
@@ -172,7 +183,10 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     });
     assert.ok(updatedGame.stdout.includes('Tiny Catcher Deluxe'));
     assert.ok(updatedGame.stdout.includes(existingGameId));
-    assert.ok(updatedGame.stdout.includes(CURATED_GAME_FIXTURES[0].revisionId));
+    const unchangedRevision = await executePsql(config, {
+      sql: `SELECT id FROM game_revisions WHERE game_id = '${existingGameId}';`,
+    });
+    assert.ok(unchangedRevision.stdout.includes(CURATED_GAME_FIXTURES[0].revisionId));
 
     // 8. Test Rollback DOWN:
 
@@ -205,7 +219,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
   } finally {
     // Stop server and clean up temporary cluster
     try {
-      await runProc('/usr/lib/postgresql/15/bin/pg_ctl', ['-D', dataDir, 'stop', '-m', 'immediate']);
+      if (pgBinDir) await runProc(resolve(pgBinDir, 'pg_ctl'), ['-D', dataDir, 'stop', '-m', 'immediate']);
     } catch {
       // Ignore if already stopped
     }
