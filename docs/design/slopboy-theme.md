@@ -6,7 +6,7 @@
 
 Slopboy should feel like a little world of imaginary retro handhelds, not a generic developer dashboard. Reuse the product's existing midnight-petrol, LCD-lime and sage palette. Keep the UI calm, readable, compact and tactile without turning every surface into a pixel-art texture.
 
-**Single source of truth:** [`apps/web/app/v2/slopboy-theme.css`](../../apps/web/app/v2/slopboy-theme.css), imported after `@heroui/styles` in `apps/web/app/v2/heroui.css`. All colors are **HeroUI v3 semantic CSS variables**. HeroUI's calculated variants and Tailwind `bg-surface`, `text-muted`, `bg-accent`, `border-border` utilities derive from these variables; do not paste these values into individual components.
+**Single source of truth:** [`apps/web/app/v2/slopboy-theme.css`](../../apps/web/app/v2/slopboy-theme.css), imported after `@heroui/styles` in `apps/web/app/v2/heroui.css`. All colors are **HeroUI v3 semantic CSS variables**. HeroUI's calculated variants and Tailwind `bg-surface`, `text-muted`, `bg-accent`, `border-border` utilities derive from these variables; do not paste these values into individual components. **Important:** HeroUI computes `--color-*` aliases on `:root`, so the active palette is also applied to `html:has(.sb-v2-shell[data-theme=...])`. If the theme is only applied inside the shell, real HeroUI buttons stay default blue and fields stay white even though `--accent` seems correct on the shell.
 
 ## Palette
 
@@ -27,7 +27,7 @@ Supporting semantic roles include `--default`, `--overlay`, `--success`, `--warn
 
 - Base corner radius: `--radius: 0.875rem`; field radius: `--field-radius: 0.75rem`. Card, Button and Input components use native HeroUI rounding; no per-component forced `border-radius: ... !important`.
 - Subtle surface and overlay shadows are shared through `--surface-shadow` and `--overlay-shadow`; neither the dark theme nor the light theme should fake a raised glass panel by default.
-- Modern typography: system UI sans for legible controls, restrained monospaced labels for hardware serial numbers and tiny informational badges. Avoid importing fonts just for a theme.
+- **Slopboy display font: Silkscreen** (400/700, original pixel-brand font), self-hosted via `next/font/google` in the shared root layout. Use for the wordmark, cartridge names/serials, compact category labels and native HeroUI button text. **Readable system UI sans** remains the text-entry and long-description font; never switch all paragraphs to pixel letters. Keep both styles behind `--sb-font-pixel` and `--sb-font-ui` in the canonical CSS, not scattered per-component declarations. Offline PWA font loading must work without external Google Fonts runtime requests.
 - Both modes are available via the **existing** `slopboy:v2:theme` setting. The single `V2AppShell` applies `light`/`dark` plus `data-theme` on the modern-route wrapper. Avoid introducing another theme provider or duplicate light/dark toggle.
 - Portaled HeroUI drawers receive their own `light`/`dark` class; some compound components do not forward custom `data-theme` props, so the class is the verified CSS selector. Portals do not inherit the V2 wrapper tokens when attached to `document.body`.
 - Use semantic hover/focus states from HeroUI. Preserve sufficient contrast in light/dark. Keep keyboard focus clearly visible.
@@ -40,6 +40,6 @@ Shared header/footer are custom *structure* but their colors are token-based. Ha
 
 ## Verification
 
-`pnpm security:v2-browser` checks computed semantic colors and radius in dark/light, portal drawer inheritance, existing keyboard/gameplay behavior, and persistent palette across library navigation. `pnpm security:auth-routes`, `pnpm typecheck`, `pnpm lint`, `pnpm build` must pass too.
+`pnpm security:v2-browser` checks **computed root `--color-accent`/`--color-field-focus` and live HeroUI primary Button background tokens**, Silkscreen wordmark + readable body font, semantic radius in dark/light, portal drawer inheritance, existing keyboard/gameplay behavior, and persistent palette across library navigation. A check of shell `--accent` alone is insufficient. `pnpm security:auth-routes`, `pnpm typecheck`, `pnpm lint`, `pnpm build` must pass too.
 
 Official references: [HeroUI Colors](https://heroui.com/en/docs/react/getting-started/colors), [HeroUI Theming](https://heroui.com/en/docs/react/getting-started/theming). Future agents must update this contract and the central theme file together for deliberate design-system changes.
