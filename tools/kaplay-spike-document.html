@@ -47,12 +47,14 @@ function capture(now) {
     }
     post("frame", {
       pixels,
-      playerX: game.getPlayerX(),
-      gameTicks: game.getTicks(),
-      inputPackets: game.getInputPackets(),
-      activeInputTicks: game.getActiveInputTicks(),
-      inputCount: game.getInputCount(),
-      assetProgress: game.getAssetProgress(),
+      playerX: game.getPlayerX?.() ?? 0,
+      gameTicks: game.getTicks?.() ?? 0,
+      inputPackets: game.getInputPackets?.() ?? 0,
+      activeInputTicks: game.getActiveInputTicks?.() ?? 0,
+      inputCount: game.getInputCount?.() ?? 0,
+      assetProgress: game.getAssetProgress?.() ?? 0,
+      score: game.getScore?.() ?? 0,
+      highScore: game.getHighScore?.() ?? 0,
       captureMs: performance.now() - started,
       engineFrameTarget: 60,
       transferFrameTarget: 30
