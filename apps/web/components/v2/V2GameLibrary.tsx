@@ -81,7 +81,7 @@ export default function V2GameLibrary(){
               {openSaves===game.gameId&&<div id={'v2-save-'+game.gameId} className="v2-local-saves">
                 <div className="v2-local-save-head"><strong>Offline backup slots</strong><span>{snapshots[game.gameId]?.length??0} / {LOCAL_SNAPSHOT_SLOTS}</span></div>
                 <p>These are local IndexedDB snapshots, not cloud saves. Clearing browser storage may erase them.</p>
-                <Button className="sb-control sb-control-primary" size="sm" variant="primary" isDisabled={pending===game.gameId}
+                <Button className="sb-control" size="sm" variant="primary" isDisabled={pending===game.gameId}
                   onPress={()=>void withSlots(game.gameId,()=>saveLocalSnapshot(game.gameId),'Local snapshot saved.')}>
                   Back up current save
                 </Button>
