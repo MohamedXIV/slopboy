@@ -4,7 +4,7 @@ type NeonAuth=ReturnType<typeof createNeonAuth>;
 let cached:{base:string;key:string;value:NeonAuth}|null=null;
 /** Official managed SDK. Never synthesize an identity on a failed/missing session. */
 export function serverAuth():NeonAuth|null{
-  if(!authReady(process.env))return null;
+  if(!authReady({NEON_AUTH_BASE_URL:process.env.NEON_AUTH_BASE_URL,NEON_AUTH_COOKIE_SECRET:process.env.NEON_AUTH_COOKIE_SECRET}))return null;
   const base=process.env.NEON_AUTH_BASE_URL!,key=process.env.NEON_AUTH_COOKIE_SECRET!;
   if(!cached||cached.base!==base||cached.key!==key)
     cached={base,key,value:createNeonAuth({baseUrl:base,cookies:{secret:key,sessionDataTtl:60}})};
