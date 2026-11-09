@@ -43,7 +43,7 @@ jobs:
         if: ${{ hashFiles('packages/database/migrations/*.sql') != '' }}
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql
+          sudo apt-get install -y -qq postgresql-18
       - name: Unit tests
         run: pnpm test
       - name: Chromium sandbox isolation regression
