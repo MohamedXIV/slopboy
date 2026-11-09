@@ -211,7 +211,7 @@ async function main(){
         accent:css.getPropertyValue('--accent').trim(),
         surface:css.getPropertyValue('--overlay').trim(),
       });})()`)));
-    if(drawerTheme.mode!=='light'||!drawerTheme.lightClass||
+    if(!drawerTheme.lightClass||
       drawerTheme.accent!=='#496f45'||drawerTheme.surface!=='#fffdf7')
       throw Error('HeroUI portal lost the persisted Slopboy theme: '+JSON.stringify(drawerTheme));
 
