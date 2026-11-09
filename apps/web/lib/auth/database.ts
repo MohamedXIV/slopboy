@@ -25,8 +25,8 @@ export async function bootstrapProfile(subject:Subject):Promise<DatabaseProfile>
   if(!subject.emailVerified)throw Error('EMAIL_NOT_VERIFIED');
   const sql=sqlClient();if(!sql)throw Error('DATABASE_UNAVAILABLE');
   const rows=await sql`
-    INSERT INTO public.users(id,email,display_name,role)
-    VALUES (${subject.id}::uuid,${subject.email},${subject.displayName},'player')
+    INSERT INTO public.users(id,email,display_name)
+    VALUES (${subject.id}::uuid,${subject.email},${subject.displayName})
     ON CONFLICT(id) DO UPDATE SET email=EXCLUDED.email,display_name=EXCLUDED.display_name
     RETURNING id,display_name,role
   `;
