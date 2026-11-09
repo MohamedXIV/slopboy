@@ -210,7 +210,6 @@ export async function handleMcpHttpRequest(
 ): Promise<McpHttpResponse> {
   const jsonHeaders = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
@@ -301,7 +300,7 @@ export async function handleMcpHttpRequest(
         id: jsonRpc.id ?? null,
         error: {
           code: errorRecord.code || -32603,
-          message: errorRecord.message || 'Internal error',
+          message: status >= 500 && status !== 503 ? 'Internal error' : (errorRecord.message || 'Internal error'),
         },
       }),
     };
@@ -341,7 +340,7 @@ export async function processJsonRpc(
         jsonrpc: '2.0',
         id,
         result: {
-          tools: MCP_TOOLS.map(t => ({
+          tools: MCP_TOOLS.filter(t => !t.requiresScope || (options.authConfig && options.onSaveDraft)).map(t => ({
             name: t.name,
             description: t.description,
             inputSchema: t.inputSchema,
@@ -397,6 +396,12 @@ export async function processJsonRpc(
         subject = authResult.subject;
       }
 
+      if (toolName === 'create_game_draft' && (!options.onSaveDraft || !options.authConfig)) {
+        const error = new Error('Draft creation unavailable until authenticated persistence is configured') as Error & { status: number; code: number };
+        error.status = 503;
+        error.code = -32003;
+        throw error;
+      }
       const callResult = await executeTool(toolName, toolArgs, subject, options);
 
       return {
@@ -465,8 +470,16 @@ async function executeTool(
       }
 
       const engineId = String(args.engineId || '');
-      const title = String(args.title || '').trim();
-      const sourceCode = String(args.sourceCode || '');
+      const title = typeof args.title === 'string' ? args.title.trim() : '';
+      const sourceCode = typeof args.sourceCode === 'string' ? args.sourceCode : '';
+      if (!options.onSaveDraft) {
+        const error = new Error('Draft storage is not configured') as Error & { status: number };
+        error.status = 503;
+        throw error;
+      }
+      if (!title || title.length > 80 || Buffer.byteLength(sourceCode, 'utf8') > 65536) {
+        return { ok: false, error: 'INVALID_INPUT', message: 'Title (1–80 chars) and source (at most 64 KiB) are required' };
+      }
       const deviceProfile = typeof args.deviceProfile === 'string' ? args.deviceProfile : V2_DEVICE_1000.id;
 
       const desc = getEngineDescriptor(engineId);
@@ -502,9 +515,8 @@ async function executeTool(
         createdAt: new Date().toISOString(),
       };
 
-      if (options.onSaveDraft) {
-        await options.onSaveDraft(draftRecord);
-      }
+      // A successful response MUST reflect a completed, durable save.
+      await options.onSaveDraft(draftRecord);
 
       return {
         ok: true,
@@ -517,7 +529,7 @@ async function executeTool(
           version: desc.version,
         },
         status: 'private_draft',
-        message: 'Private draft created successfully. Stored in creator dashboard.',
+        message: 'Private draft persisted successfully.',
       };
     }
 
