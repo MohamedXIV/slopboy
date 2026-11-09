@@ -11,6 +11,7 @@
 
 /* Dark: midnight petrol, warm LCD lime, readable subdued sage text. */
 .sb-v2-shell[data-theme='dark'],
+.sb-v2-dialog.dark,
 .sb-v2-dialog[data-theme='dark'] {
   color-scheme: dark;
 
@@ -75,6 +76,7 @@
 
 /* Light: warm cream canvas, porcelain surfaces and deep sage accents. */
 .sb-v2-shell[data-theme='light'],
+.sb-v2-dialog.light,
 .sb-v2-dialog[data-theme='light'] {
   color-scheme: light;
 
