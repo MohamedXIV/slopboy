@@ -100,7 +100,7 @@ export default function AccountDashboard(){
             <Alert.Title>Verify your email</Alert.Title>
             <Alert.Description>Email verification is required before creator features.</Alert.Description>
           </Alert.Content>
-        )}
+        </Alert>}
         {user.emailVerified&&!profile&&<Card variant="secondary">
           <Card.Header>
             <Card.Title>Finish setting up your account</Card.Title>
