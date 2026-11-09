@@ -65,6 +65,9 @@ jobs:
         run: pnpm security:v2-browser
       - name: Real Chromium KAPLAY isolated rendering spike
         run: pnpm security:kaplay-spike
+      - name: KAPLAY vetted game through real HostSession browser integration
+        if: ${{ hashFiles('tools/kaplay-host-browser-smoke.ts') != '' }}
+        run: pnpm security:kaplay-host
       - name: Chromium offline PWA install / guest save / uninstall regression
         run: pnpm security:pwa-browser
       - name: Verify runtime Next deployment artifacts
