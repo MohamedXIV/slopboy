@@ -62,7 +62,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // PostgreSQL version rather than hardcoding v15 on CI/Neon dev hosts.
     const pgRoot = process.env.SLOPBOY_PG_BIN_DIR || '/usr/lib/postgresql';
     const versions = process.env.SLOPBOY_PG_BIN_DIR ? [] : await readdir(pgRoot).catch(() => []);
-    const newest = versions.filter(v => /^\\d+$/.test(v)).sort((a, b) => Number(b) - Number(a))[0];
+    const newest = versions.filter(v => /^\d+$/.test(v)).sort((a, b) => Number(b) - Number(a))[0];
     const binDir = process.env.SLOPBOY_PG_BIN_DIR || (newest ? resolve(pgRoot, newest, 'bin') : undefined);
     if (!binDir || await access(resolve(binDir, 'initdb')).then(() => false, () => true)) {
       t.skip('PostgreSQL server binaries unavailable; run with SLOPBOY_PG_BIN_DIR for real DB integration');
