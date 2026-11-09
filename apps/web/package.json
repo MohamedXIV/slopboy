@@ -19,6 +19,7 @@
     "@slopboy/catalog": "workspace:*",
     "@slopboy/cartridge": "workspace:*",
     "@slopboy/mcp": "workspace:*",
+    "@neondatabase/auth": "0.7.0-beta",
     "@heroui/react": "3.0.0",
     "@heroui/styles": "3.0.0"
   },
