@@ -46,8 +46,12 @@ export default function AccountDashboard(){
     }
   },[router]);
   useEffect(()=>{
-    void refresh();
-    return()=>{generation.current++;};
+    // Start the request after React has committed, not via a synchronous
+    // state update during the effect itself.
+    let active=true;
+    queueMicrotask(()=>{if(active)void refresh();});
+    const ref=generation;
+    return()=>{active=false;ref.current++;};
   },[refresh]);
 
   if(status==='loading')return <main className="sb-account-wrap"><section className="sb-account-panel">
