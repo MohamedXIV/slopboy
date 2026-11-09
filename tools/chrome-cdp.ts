@@ -21,12 +21,20 @@ export async function openChromePage(url:string,profile:string){
     '--disable-extensions','--disable-background-networking','--no-first-run',
     '--no-default-browser-check','--remote-debugging-port=0','--user-data-dir='+profile,
     'about:blank'
-  ],{stdio:'ignore'});
+  ],{stdio:['ignore','ignore','pipe']});
+  let stderr='';
+  let launchError='';
+  process.stderr?.on('data',data=>{stderr=(stderr+String(data)).slice(-2000);});
+  process.on('error',error=>{launchError=error.message;});
   let socket:WebSocket|undefined;
   try{
     let endpoint:string|undefined;
-    for(let i=0;i<180;i++){
-      if(process.exitCode!==null)throw Error('Chrome exited before DevTools opened');
+    // Chrome on shared CI hosts may need more than 9s to initialize its
+    // sandbox/profile. Bound the startup by wall time and preserve diagnostics.
+    const deadline=Date.now()+30000;
+    while(Date.now()<deadline){
+      if(launchError)throw Error('Chrome launch failed: '+launchError);
+      if(process.exitCode!==null)throw Error('Chrome exited before DevTools opened: '+stderr);
       try{
         const lines=(await readFile(join(profile,'DevToolsActivePort'),'utf8')).split(/\r?\n/);
         if(/^\d+$/.test(lines[0]) && lines[1]?.startsWith('/devtools/browser/')){
@@ -35,7 +43,7 @@ export async function openChromePage(url:string,profile:string){
       }catch{}
       await sleep(50);
     }
-    if(!endpoint)throw Error('Chrome DevTools socket did not become ready');
+    if(!endpoint)throw Error('Chrome DevTools socket did not become ready within 30s: '+(stderr||'no Chrome diagnostics'));
     socket=new WebSocket(endpoint);
     await new Promise<void>((resolve,reject)=>{
       socket!.addEventListener('open',()=>resolve(),{once:true});
