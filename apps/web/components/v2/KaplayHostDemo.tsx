@@ -6,6 +6,7 @@ import { rasterizeFrame } from '@slopboy/runtime/protocol';
 import { HostSession, type InputName } from '@slopboy/runtime/host-api';
 import { KaplayEngineAdapter, type KaplayDiagnostics } from '@slopboy/runtime/kaplay-adapter';
 import { browserSaveDriver } from '@slopboy/runtime/save-store';
+import './kaplay-host.css';
 
 // Exact immutable identifiers from the checked-in vetted example manifest.
 // These are not public catalog entries and no untrusted source is accepted.
@@ -29,6 +30,8 @@ export default function KaplayHostDemo() {
   const [state, setState] = useState('booting');
   const [error, setError] = useState('');
   const [frames, setFrames] = useState(0);
+  const [presentFps, setPresentFps] = useState(0);
+  const fpsWindow = useRef({ time: 0, frames: 0 });
   const [diagnostics, setDiagnostics] = useState<KaplayDiagnostics | null>(null);
 
   const paint = useCallback((pixels: Uint8Array) => {
@@ -56,6 +59,13 @@ export default function KaplayHostDemo() {
         if (metric.framesDelivered % 5 === 0) {
           setFrames(metric.framesDelivered);
           setDiagnostics(metric);
+          const now = performance.now();
+          const previous = fpsWindow.current;
+          if (previous.time === 0) fpsWindow.current = { time: now, frames: metric.framesDelivered };
+          else if (now - previous.time >= 1000) {
+            setPresentFps(Math.round((metric.framesDelivered - previous.frames) * 1000 / (now - previous.time)));
+            fpsWindow.current = { time: now, frames: metric.framesDelivered };
+          }
         }
       },
     });
@@ -144,36 +154,58 @@ export default function KaplayHostDemo() {
     else if (host?.state === 'paused') host.resume();
   };
 
-  return <main className="kaplay-host-lab" style={{ padding: 24, maxWidth: 860, margin: 'auto' }}>
-    <h1>Gem Miner — Engine Host Integration Lab</h1>
-    <p>Vetted local KAPLAY cartridge through HostSession, an isolated iframe, and UUID-based guest saves. Experimental; not public game publishing.</p>
-    <div className="kaplay-host-stage" style={{ position: 'relative', width: 320, height: 288, marginBottom: 12 }}>
-      <canvas ref={canvas} width={160} height={144} role="img" aria-label="Gem Miner indexed-color display"
-        style={{ width: 320, height: 288, imageRendering: 'pixelated', position: 'relative', zIndex: 1 }} />
-      <div ref={sandbox} style={{ position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'none' }} />
-    </div>
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxWidth: 340 }}>
-      {CONTROLS.map(key => <button key={key} type="button" aria-label={key + ' button'}
-        onPointerDown={downPointer(key)} onPointerUp={upPointer(key)}
-        onPointerCancel={upPointer(key)} onLostPointerCapture={upPointer(key)}
-        style={{ padding: 12, minWidth: 55 }}>{key}</button>)}
-    </div>
-    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16 }}>
-      <button type="button" onClick={togglePause}>Pause / Resume</button>
-      <button type="button" onClick={restart}>Restart</button>
-      <label>LCD palette:
-        <select value={palette} onChange={e => setPalette(e.target.value as V2PaletteId)}>
-          {Object.entries(V2_LCD_PALETTES).map(([key, value]) => <option key={key} value={key}>{value.name}</option>)}
-        </select>
-      </label>
-    </div>
-    <dl>
-      <dt>Host</dt><dd data-testid="kaplay-host-state">{state}</dd>
-      <dt>Frames</dt><dd data-testid="kaplay-host-frames">{frames}</dd>
-      <dt>Opaque origin</dt><dd>{String(diagnostics?.opaque ?? false)}</dd>
-      <dt>WebGL</dt><dd>{String(diagnostics?.webgl ?? false)}</dd>
-      <dt>Average capture</dt><dd>{diagnostics?.averageCaptureMs.toFixed(2) ?? '—'} ms</dd>
-    </dl>
-    {error && <p role="alert">{error}</p>}
+  return <main className="kaplay-host-lab">
+    <header className="kaplay-host-header">
+      <span className="kaplay-host-eyebrow">SLOPBOY ENGINE LAB · KAPLAY 3001.0.19</span>
+      <h1>Gem Miner</h1>
+      <p>HostSession + isolated KAPLAY renderer. This is a vetted local cartridge test, not public game publishing.</p>
+    </header>
+
+    <section className="kaplay-host-screens" aria-label="Presentation and renderer comparison">
+      <div className="kaplay-host-stage">
+        <span className="kaplay-host-screen-label">DEVICE DISPLAY <small>160 × 144 · 4 indexed shades</small></span>
+        <div className="kaplay-host-display">
+          <canvas ref={canvas} width={160} height={144} role="img" aria-label="Gem Miner indexed-color display" />
+        </div>
+        <p className="kaplay-host-help">This is the only player-facing image. Pixel-perfect output without a ghost overlay.</p>
+      </div>
+      <aside className="kaplay-host-raw">
+        <span className="kaplay-host-screen-label">RAW WEBGL <small>Live diagnostic · separate viewport</small></span>
+        <div ref={sandbox} className="kaplay-host-sandbox" aria-label="Live raw engine renderer, diagnostic only" />
+        <p className="kaplay-host-help">The source stays visibly composited to avoid Chromium throttling. It never overlays the LCD.</p>
+      </aside>
+    </section>
+
+    <section className="kaplay-host-panel" aria-label="Game controls">
+      <h2>Controls <small>Keyboard: WASD / arrows · A: Space/Z</small></h2>
+      <div className="kaplay-host-controls">
+        {CONTROLS.map(key => <button key={key} type="button" aria-label={key + ' button'}
+          onPointerDown={downPointer(key)} onPointerUp={upPointer(key)}
+          onPointerCancel={upPointer(key)} onLostPointerCapture={upPointer(key)}
+          className="kaplay-host-key">{key}</button>)}
+      </div>
+      <div className="kaplay-host-toolbar">
+        <button type="button" onClick={togglePause} className="kaplay-host-action">Pause / Resume</button>
+        <button type="button" onClick={restart} className="kaplay-host-action">Restart</button>
+        <label className="kaplay-host-palette">LCD palette
+          <select value={palette} onChange={e => setPalette(e.target.value as V2PaletteId)}>
+            {Object.entries(V2_LCD_PALETTES).map(([key, value]) => <option key={key} value={key}>{value.name}</option>)}
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section className="kaplay-host-panel" aria-label="Runtime metrics">
+      <h2>Runtime diagnostics</h2>
+      <dl className="kaplay-host-metrics">
+        <div><dt>Host</dt><dd data-testid="kaplay-host-state">{state}</dd></div>
+        <div><dt>Frames received</dt><dd data-testid="kaplay-host-frames">{frames}</dd></div>
+        <div><dt>Presentation FPS</dt><dd data-testid="kaplay-host-fps">{presentFps || '—'}</dd></div>
+        <div><dt>Opaque origin</dt><dd>{String(diagnostics?.opaque ?? false)}</dd></div>
+        <div><dt>WebGL</dt><dd>{String(diagnostics?.webgl ?? false)}</dd></div>
+        <div><dt>Average capture</dt><dd>{diagnostics?.averageCaptureMs.toFixed(2) ?? '—'} ms</dd></div>
+      </dl>
+      {error && <p role="alert" className="kaplay-host-error">{error}</p>}
+    </section>
   </main>;
 }
