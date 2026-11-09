@@ -173,10 +173,10 @@ test('KaplayEngineAdapter handles lifecycle, input, frame delivery and save pers
   adapter.dispose();
 });
 
-test('KAPLAY compositor is deliberately visible and no longer alpha-overlaid', async () => {
+test('KAPLAY compositor remains fully visible but does not overlay the presentation', async () => {
   const source = await readFile(resolve(root, 'packages/runtime/src/kaplay-adapter.ts'), 'utf8');
-  assert.match(source, /iframe\\.style\\.width = '160px'/);
-  assert.match(source, /iframe\\.style\\.height = '144px'/);
-  assert.match(source, /iframe\\.style\\.opacity = '1'/);
-  assert.doesNotMatch(source, /iframe\\.style\\.opacity = '0\\.05'/);
+  assert.ok(source.includes("iframe.style.width = '160px'"));
+  assert.ok(source.includes("iframe.style.height = '144px'"));
+  assert.ok(source.includes("iframe.style.opacity = '1'"));
+  assert.ok(!source.includes("iframe.style.opacity = '0.05'"));
 });
