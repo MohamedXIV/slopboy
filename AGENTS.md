@@ -20,6 +20,14 @@
 - **Vercel** hosts Next.js now; **Render** is only a possible alternative for frontend hosting later. **Neon** is the separate candidate for database/auth/storage/MCP functions.
 - No paid infrastructure or model API assumed. Do not add permanent multiplayer servers or expensive dependencies because a distant feature is on the roadmap.
 
+## UI component contract — HeroUI v3, not bespoke controls
+
+- **HeroUI v3 is the canonical Slopboy UI component system** (`@heroui/react` and `@heroui/styles` are already installed). Before implementing any new UI, inspect the existing HeroUI components and official **v3** API.
+- Compose interactive UI using **native HeroUI components first**: `Card`, `Button`, `TextField` + `Label` + `Input`, `Alert`, `Spinner`, etc. Prefer HeroUI's built-in behavior, focus/keyboard/accessibility, semantic variants, and theme tokens. HeroUI v3 uses compound components; do **not** use obsolete v2 prop patterns.
+- Customize via **component props, semantic theme tokens, and small Tailwind layout utilities** (spacing, grid/flex, width). Do not rewrite input, button, modal, form, card, focus or validation styling from scratch. New custom CSS is only justified for platform-specific visuals (virtual handheld shells, indexed LCD/pixel canvas, game rendering) that HeroUI does not provide.
+- Do not create visually separate bespoke auth/account styles; all new account, catalog, creator, admin and MCP-facing panels must share the existing HeroUI theme. Route-specific graphics do not override the common design system.
+- In code review, reject custom control markup/CSS when an installed HeroUI v3 primitive would meet the requirement; verify in browser and TypeScript/ESLint before merging.
+
 ## Concurrent AI agents (Sprint 2)
 - **One writer per Issue and branch.** Check [#77](https://github.com/MohamedXIV/slopboy/issues/77) and the target Issue for existing claims before starting; comment `CLAIM: agent / Issue # / branch / file scope / exact base SHA`.
 - Never commit to another agent's branch or force-push integration branches. Avoid shared API/CI/schema files concurrently; split tasks and use PRs with explicit dependencies.
