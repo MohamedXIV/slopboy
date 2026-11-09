@@ -96,10 +96,10 @@ export async function loadMigrationFiles(migrationsDir: string): Promise<{
  */
 export function executePsql(
   config: DatabaseConnectionConfig,
-  args: { sql?: string; file?: string }
+  args: { sql?: string; file?: string; sqlAfterFile?: string }
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolvePsql, rejectPsql) => {
-    const psqlArgs: string[] = ['-X', '-v', 'ON_ERROR_STOP=1'];
+    const psqlArgs: string[] = ['-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1'];
 
     if (config.connectionString) {
       psqlArgs.push('-d', config.connectionString);
@@ -111,7 +111,9 @@ export function executePsql(
     }
 
     if (args.file) {
-      psqlArgs.push('-f', args.file);
+      // Run the migration SQL and its bookkeeping in ONE transaction.
+      psqlArgs.push('--single-transaction', '-f', args.file);
+      if (args.sqlAfterFile) psqlArgs.push('-c', args.sqlAfterFile);
     } else if (args.sql) {
       psqlArgs.push('-c', args.sql);
     }
@@ -195,13 +197,11 @@ export async function migrateUp(
       continue;
     }
 
-    // Apply migration
-    await executePsql(config, { file: migration.filepath });
-
-    // Record migration
+    // Both SQL and version bookkeeping commit or roll back together.
     const escape = (s: string) => s.replace(/'/g, "''");
     await executePsql(config, {
-      sql: `INSERT INTO schema_migrations (version, name, checksum) VALUES (${migration.version}, '${escape(migration.name)}', '${migration.checksum}');`,
+      file: migration.filepath,
+      sqlAfterFile: `INSERT INTO schema_migrations (version, name, checksum) VALUES (${migration.version}, '${escape(migration.name)}', '${migration.checksum}');`,
     });
 
     appliedVersions.push(migration.version);
@@ -253,17 +253,14 @@ export async function migrateDown(
       throw new MigrationError('MISSING_DOWN_MIGRATION', `Missing rollback file for version ${version}`);
     }
 
-    // Execute down file
-    await executePsql(config, { file: migration.filepath });
-
-    // Check if schema_migrations still exists before deleting record
-    try {
-      await executePsql(config, {
-        sql: `DELETE FROM schema_migrations WHERE version = ${version};`,
-      });
-    } catch {
-      // If the migration dropped schema_migrations (e.g. migration 001 rollback), ignore
-    }
+    // Version 1 removes the tracking table itself. Other down migrations
+    // must remove their bookkeeping atomically with the schema/data rollback.
+    await executePsql(config, {
+      file: migration.filepath,
+      ...(version === 1 ? {} : {
+        sqlAfterFile: `DELETE FROM schema_migrations WHERE version = ${version};`,
+      }),
+    });
 
     rolledBack.push(version);
   }
