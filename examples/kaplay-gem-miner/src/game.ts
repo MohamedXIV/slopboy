@@ -46,6 +46,7 @@ export default function createGemMiner(kInit: typeof kaplay, canvas: HTMLCanvasE
   let highScore = 0;
   let updates = 0;
   let inputPackets = 0;
+  let paused = false;
 
   // Restore saved highscore if available
   if (host?.storage) {
@@ -65,6 +66,7 @@ export default function createGemMiner(kInit: typeof kaplay, canvas: HTMLCanvasE
   const clamp = (v: number, low: number, high: number) => Math.max(low, Math.min(high, v));
 
   k.onUpdate(() => {
+    if (paused) return;
     updates++;
     const dt = Math.min(k.dt(), 0.05);
     const speed = held.has('A') ? 120 : 75;
@@ -116,6 +118,19 @@ export default function createGemMiner(kInit: typeof kaplay, canvas: HTMLCanvasE
     },
     getAssetProgress() {
       return k.loadProgress();
+    },
+    pause() {
+      paused = true;
+    },
+    resume() {
+      paused = false;
+    },
+    restart() {
+      paused = false;
+      held.clear();
+      player.pos.x = 20;
+      player.pos.y = 116;
+      score = 0;
     },
     stop() {
       k.quit();
