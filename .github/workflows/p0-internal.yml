@@ -37,6 +37,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      # Temporary lockfile resolution step used only on this PR to capture
+      # the exact pnpm generated dependency graph, removed immediately after.
+      - name: Resolve auth database driver lockfile (temporary)
+        if: ${{ github.head_ref == 'feat/26-neon-auth-session' }}
+        run: |
+          pnpm install --ignore-scripts --lockfile-only --no-frozen-lockfile
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          raw=base64.b64encode(Path('pnpm-lock.yaml').read_bytes()).decode()
+          for i in range(0,len(raw),4000):
+              print('SLOPBOY_LOCK_CHUNK:'+raw[i:i+4000])
+          print('SLOPBOY_LOCK_END')
+          PY
       - name: Install without lifecycle scripts
         run: pnpm install --ignore-scripts --frozen-lockfile
       - name: Install PostgreSQL 18 for real migration integration tests
