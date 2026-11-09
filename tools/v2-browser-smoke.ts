@@ -48,6 +48,27 @@ async function main(){
       darkTheme.surface!=='#172a2d'||darkTheme.field!=='#203537'||
       Number.parseFloat(darkTheme.radius)!==0.875)
       throw Error('Dark HeroUI semantic tokens differ from the Slopboy identity: '+JSON.stringify(darkTheme));
+
+    // HeroUI's --color-* aliases are defined on the document root. Reading
+    // only --accent inside the shell would miss the regression that rendered
+    // a BLUE real button and WHITE fields under the branded dark shell.
+    const effectiveDark=JSON.parse(String(await evalJs(`(()=>{
+      const root=getComputedStyle(document.documentElement);
+      const button=getComputedStyle(document.querySelector('.v2-change-game'));
+      const wordmark=getComputedStyle(document.querySelector('.sb-v2-brand'));
+      return JSON.stringify({
+        accent:root.getPropertyValue('--color-accent').trim(),
+        field:root.getPropertyValue('--color-field-focus').trim(),
+        button:button.getPropertyValue('--button-bg').trim(),
+        brandFont:wordmark.fontFamily,
+        bodyFont:getComputedStyle(document.querySelector('.sb-v2-shell')).fontFamily,
+      });
+    })()`)));
+    if(effectiveDark.accent!=='#d1e99d'||effectiveDark.field!=='#203537'||
+      effectiveDark.button!=='#d1e99d'||
+      !/silkscreen/i.test(effectiveDark.brandFont)||
+      !/system-ui/i.test(effectiveDark.bodyFont))
+      throw Error('Dark actual HeroUI button/field or Slopboy typography regressed: '+JSON.stringify(effectiveDark));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(350);
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
@@ -77,6 +98,19 @@ async function main(){
       buttonTheme.accent!=='#496f45'||buttonTheme.neutral!=='#e5eee4'||
       buttonTheme.ink!=='#304744')
       throw Error('HeroUI Button did not inherit the Slopboy light semantic palette: '+JSON.stringify({brandedButton,buttonTheme}));
+
+    const effectiveLight=JSON.parse(String(await evalJs(`(()=>{
+      const root=getComputedStyle(document.documentElement);
+      const button=getComputedStyle(document.querySelector('.v2-change-game'));
+      return JSON.stringify({
+        accent:root.getPropertyValue('--color-accent').trim(),
+        field:root.getPropertyValue('--color-field-focus').trim(),
+        button:button.getPropertyValue('--button-bg').trim(),
+      });
+    })()`)));
+    if(effectiveLight.accent!=='#496f45'||effectiveLight.field!=='#f6f8f1'||
+      effectiveLight.button!=='#496f45')
+      throw Error('Light HeroUI actual button/field colors did not switch: '+JSON.stringify(effectiveLight));
     const duplicateTheme=await evalJs("!!document.querySelector('.v2-appearance-mode, .v2-theme-button')");
     if(duplicateTheme===true)throw Error('Redundant theme switches were not removed');
 
