@@ -6,6 +6,8 @@
 import {readFile, mkdir, writeFile} from "node:fs/promises";
 import {resolve, dirname} from "node:path";
 import {createHash} from "node:crypto";
+import ts from "typescript";
+import {validateManifestV2, validateCartridgeSource} from "../packages/cartridge/src/manifest-v2.ts";
 import {V2_DEVICE_1000, matchesCartridgeRequirements} from "../packages/hardware/src/v2.ts";
 
 const root = resolve(import.meta.dirname, "..");
@@ -47,5 +49,28 @@ export async function buildKaplaySpike(): Promise<{bytes:number; codeBytes:numbe
   await writeFile(output, html, "utf8");
   return {bytes:Buffer.byteLength(html), codeBytes, runtimeBytes, sha256:createHash("sha256").update(html).digest("hex")};
 }
-buildKaplaySpike().then(meta => console.log("KAPLAY pinned sandbox", meta))
+async function buildGemMiner(): Promise<void> {
+  // This is a vetted, bundled local example, not a user-upload compiler.
+  const [manifestText, source, shell, engine] = await Promise.all([
+    readFile(resolve(root, "examples/kaplay-gem-miner/manifest.json"), "utf8"),
+    readFile(resolve(root, "examples/kaplay-gem-miner/src/game.ts"), "utf8"),
+    readFile(resolve(root, "tools/kaplay-spike-document.html"), "utf8"),
+    readFile(resolve(root, "node_modules/kaplay/dist/kaplay.mjs"), "utf8")
+  ]);
+  const { engine: descriptor } = validateManifestV2(JSON.parse(manifestText));
+  if (descriptor.id !== "kaplay" || descriptor.version !== engineVersion) throw Error("Unexpected Gem Miner engine");
+  validateCartridgeSource(source, descriptor);
+  const output = ts.transpileModule(source, {
+    fileName: "game.ts",
+    compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022, verbatimModuleSyntax: false }
+  }).outputText;
+  if (/\\bfrom\\s*["']|\\bimport\\s*\\(/.test(output)) throw Error("Gem Miner output contains unresolved imports");
+  const html = shell.replace("__KAPLAY_ENGINE_SOURCE__", literal(engine))
+    .replace("__SLOPBOY_CARTRIDGE_SOURCE__", literal(output));
+  if (Buffer.byteLength(html) > 8 * 1024 * 1024) throw Error("Gem Miner sandbox exceeds size limit");
+  const path = resolve(root, "apps/web/public/v2/kaplay-gem-miner.html");
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, html, "utf8");
+}
+Promise.all([buildKaplaySpike(), buildGemMiner()]).then(([meta]) => console.log("KAPLAY pinned sandboxes", meta))
   .catch(error => {console.error(error); process.exitCode = 1;});
