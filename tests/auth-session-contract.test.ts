@@ -42,4 +42,10 @@ test('session-bearing mutations require an explicit same-origin request',()=>{
   assert.equal(sameOriginMutation(null,route,'same-origin'),false);
   assert.equal(sameOriginMutation('null',route,'same-origin'),false);
   assert.equal(sameOriginMutation('https://slopboy.example:444',route,'same-origin'),false);
+  assert.equal(sameOriginMutation('http://localhost:3000','http://127.0.0.1:3000/api/account/bootstrap',
+    'same-origin','localhost:3000'),true,'Trusted proxy Host is allowed with browser same-origin metadata');
+  assert.equal(sameOriginMutation('https://attacker.example',route,
+    'cross-site','attacker.example'),false);
+  assert.equal(sameOriginMutation('https://attacker.example',route,
+    'same-origin','slopboy.example'),false,'Origin must match Host even with forged Fetch Metadata');
 });
