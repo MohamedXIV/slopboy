@@ -29,7 +29,7 @@ Supporting semantic roles include `--default`, `--overlay`, `--success`, `--warn
 - Subtle surface and overlay shadows are shared through `--surface-shadow` and `--overlay-shadow`; neither the dark theme nor the light theme should fake a raised glass panel by default.
 - Modern typography: system UI sans for legible controls, restrained monospaced labels for hardware serial numbers and tiny informational badges. Avoid importing fonts just for a theme.
 - Both modes are available via the **existing** `slopboy:v2:theme` setting. The single `V2AppShell` applies `light`/`dark` plus `data-theme` on the modern-route wrapper. Avoid introducing another theme provider or duplicate light/dark toggle.
-- Portaled HeroUI drawers receive their own `data-theme` and theme class, since they don't inherit variables from the wrapper when portaled to `document.body`.
+- Portaled HeroUI drawers receive their own `light`/`dark` class; some compound components do not forward custom `data-theme` props, so the class is the verified CSS selector. Portals do not inherit the V2 wrapper tokens when attached to `document.body`.
 - Use semantic hover/focus states from HeroUI. Preserve sufficient contrast in light/dark. Keep keyboard focus clearly visible.
 
 ## Component ownership
