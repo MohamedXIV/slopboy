@@ -173,20 +173,10 @@ test('KaplayEngineAdapter handles lifecycle, input, frame delivery and save pers
   adapter.dispose();
 });
 
-test('KAPLAY occlusion mitigation maintains non-zero geometry to prevent Chromium throttling', () => {
-  // Document and test the geometry requirements for Chromium occlusion mitigation
-  // When an iframe has width=0, height=0, opacity=0, or display=none, Chrome throttles
-  // requestAnimationFrame to 1 Hz or completely pauses it.
-  const requiredGeometry = {
-    width: '160px',
-    height: '144px',
-    display: 'block',
-    pointerEvents: 'none',
-    opacity: 0.05, // Non-zero opacity keeps compositor scheduling active
-  };
-
-  assert.equal(requiredGeometry.width, '160px');
-  assert.equal(requiredGeometry.height, '144px');
-  assert.ok(requiredGeometry.opacity > 0);
-  assert.equal(requiredGeometry.display, 'block');
+test('KAPLAY compositor is deliberately visible and no longer alpha-overlaid', async () => {
+  const source = await readFile(resolve(root, 'packages/runtime/src/kaplay-adapter.ts'), 'utf8');
+  assert.match(source, /iframe\\.style\\.width = '160px'/);
+  assert.match(source, /iframe\\.style\\.height = '144px'/);
+  assert.match(source, /iframe\\.style\\.opacity = '1'/);
+  assert.doesNotMatch(source, /iframe\\.style\\.opacity = '0\\.05'/);
 });
