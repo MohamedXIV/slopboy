@@ -22,8 +22,20 @@ export function authReady(env:{NEON_AUTH_BASE_URL?:string;NEON_AUTH_COOKIE_SECRE
 }
 
 /** Reject cross-origin mutation requests even when a browser sends cookies. */
-export function sameOriginMutation(origin:string|null,url:string,fetchSite:string|null):boolean{
+export function sameOriginMutation(
+  origin:string|null,url:string,fetchSite:string|null,requestHost?:string|null,
+):boolean{
+  // Fetch Metadata headers are browser-controlled. Origin is mandatory for all
+  // state changes; a cross-site browser request must never pass.
   if(!origin||origin==='null'||fetchSite==='cross-site')return false;
-  try{return new URL(origin).origin===new URL(url).origin&&origin===new URL(origin).origin;}
-  catch{return false;}
+  try{
+    const source=new URL(origin),internal=new URL(url);
+    if(origin!==source.origin||source.username||source.password)return false;
+    if(source.origin===internal.origin)return true;
+    // Next.js behind a proxy may have an internal request.url hostname. Accept
+    // only the actual Host header *plus* the browser's same-origin metadata.
+    // A foreign-origin browser cannot forge Sec-Fetch-Site: same-origin.
+    return fetchSite==='same-origin'&&!!requestHost&&source.host===requestHost&&
+      source.protocol===internal.protocol;
+  }catch{return false;}
 }
