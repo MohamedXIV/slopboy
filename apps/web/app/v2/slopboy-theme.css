@@ -68,6 +68,9 @@
   --sb-subtle: var(--muted);
   --sb-accent: var(--accent);
   --sb-accent-ink: var(--accent-foreground);
+  --sb-control: var(--default);
+  --sb-control-hover: color-mix(in oklch, var(--default) 88%, var(--accent) 12%);
+  --sb-control-border: var(--border);
 }
 
 /* Light: warm cream canvas, porcelain surfaces and deep sage accents. */
@@ -129,4 +132,7 @@
   --sb-subtle: var(--muted);
   --sb-accent: var(--accent);
   --sb-accent-ink: var(--accent-foreground);
+  --sb-control: var(--default);
+  --sb-control-hover: color-mix(in oklch, var(--default) 88%, var(--accent) 12%);
+  --sb-control-border: var(--border);
 }
