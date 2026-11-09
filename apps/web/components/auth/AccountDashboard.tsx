@@ -3,6 +3,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import Link from 'next/link';
+import {Alert,Card,Spinner} from '@heroui/react';
 import SignOutButton from './SignOutButton';
 import ActivateProfileButton from './ActivateProfileButton';
 
@@ -54,37 +55,96 @@ export default function AccountDashboard(){
     return()=>{active=false;ref.current++;};
   },[refresh]);
 
-  if(status==='loading')return <main className="sb-account-wrap"><section className="sb-account-panel">
-    <p role="status">Checking your private account…</p>
-  </section></main>;
-  if(status==='unavailable'||!account)return <main className="sb-account-wrap"><section className="sb-account-panel">
-    <h1>Account service unavailable.</h1>
-    <p>Sign-in or private storage could not be verified. Your guest games and local saves remain available.</p>
-    <Link href="/library">Open guest library</Link>
-  </section></main>;
+  if(status==='loading')return <main className="mx-auto w-full max-w-2xl px-4 py-12">
+    <Card>
+      <Card.Content className="flex flex-row items-center gap-3">
+        <Spinner size="sm"/>
+        <p role="status" className="text-sm text-muted">Checking your private account…</p>
+      </Card.Content>
+    </Card>
+  </main>;
+
+  if(status==='unavailable'||!account)return <main className="mx-auto w-full max-w-2xl px-4 py-12">
+    <Card>
+      <Card.Header>
+        <Card.Title>Account service unavailable</Card.Title>
+        <Card.Description>Sign-in or private storage could not be verified.</Card.Description>
+      </Card.Header>
+      <Card.Content>
+        <Alert status="warning">
+          <Alert.Indicator/>
+          <Alert.Content>
+            <Alert.Title>Guest games remain available</Alert.Title>
+            <Alert.Description>Your local saves are still on this device.</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      </Card.Content>
+      <Card.Footer>
+        <Link className="link" href="/library">Open guest library</Link>
+      </Card.Footer>
+    </Card>
+  </main>;
 
   const {user,profile}=account;
-  return <main className="sb-account-wrap"><section className="sb-account-panel">
-    <p className="sb-account-label">SLOPBOY · PRIVATE ACCOUNT</p>
-    <h1>Hello, {user.displayName}.</h1>
-    <p>Signed in as <strong>{user.email}</strong>.</p>
-    {!user.emailVerified&&<p role="status" className="sb-account-message">
-      Verify your email before using creator features.
-    </p>}
-    {user.emailVerified&&!profile&&<div className="sb-account-message">
-      <p>Finish setting up your private account. No guest saves will be uploaded automatically.</p>
-      <ActivateProfileButton onActivated={()=>void refresh()}/>
-    </div>}
-    {user.emailVerified&&profile&&<section aria-label="My owned games">
-      <h2>My Games</h2>
-      <p>Account role: <strong>{profile.role}</strong>. Only games owned by your verified account are shown.</p>
-      {error&&<p role="alert">{error}</p>}
-      {games.length===0?<p>No games have been created for this account yet.</p>:
-        <ul>{games.map(game=><li key={game.id}><strong>{game.title}</strong> · {game.status} · {game.visibility}</li>)}</ul>}
-      <p className="sb-account-small">New game creation and untrusted game previews are not enabled yet.</p>
-    </section>}
-    <SignOutButton/>
-    <p className="sb-account-small">Local guest saves and offline cartridges are never silently imported or deleted.</p>
-    <Link href="/library">Continue playing</Link>
-  </section></main>;
+  return <main className="mx-auto w-full max-w-2xl px-4 py-12">
+    <Card>
+      <Card.Header>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted">Slopboy · Private account</p>
+        <Card.Title>Hello, {user.displayName}</Card.Title>
+        <Card.Description>Signed in as {user.email}</Card.Description>
+      </Card.Header>
+      <Card.Content className="flex flex-col gap-4">
+        {!user.emailVerified&&<Alert status="warning">
+          <Alert.Indicator/>
+          <Alert.Content>
+            <Alert.Title>Verify your email</Alert.Title>
+            <Alert.Description>Email verification is required before creator features.</Alert.Description>
+          </Alert.Content>
+        )}
+        {user.emailVerified&&!profile&&<Card variant="secondary">
+          <Card.Header>
+            <Card.Title>Finish setting up your account</Card.Title>
+            <Card.Description>No guest saves will be uploaded automatically.</Card.Description>
+          </Card.Header>
+          <Card.Content>
+            <ActivateProfileButton onActivated={()=>void refresh()}/>
+          </Card.Content>
+        </Card>}
+        {user.emailVerified&&profile&&<Card variant="secondary">
+          <Card.Header>
+            <Card.Title>My Games</Card.Title>
+            <Card.Description>
+              Account role: {profile.role}. Only games owned by your verified account are listed.
+            </Card.Description>
+          </Card.Header>
+          <Card.Content className="flex flex-col gap-3">
+            {error&&<Alert status="danger">
+              <Alert.Indicator/>
+              <Alert.Content>
+                <Alert.Title>Library unavailable</Alert.Title>
+                <Alert.Description>{error}</Alert.Description>
+              </Alert.Content>
+            </Alert>}
+            {games.length===0?<p className="text-sm text-muted">No games have been created for this account yet.</p>:
+              <ul className="flex flex-col gap-2">
+                {games.map(game=><li key={game.id} className="flex flex-wrap items-center gap-2 text-sm">
+                  <strong>{game.title}</strong>
+                  <span className="text-muted">{game.status} · {game.visibility}</span>
+                </li>)}
+              </ul>}
+            <p className="text-xs text-muted">
+              New game creation and untrusted game previews are not enabled yet.
+            </p>
+          </Card.Content>
+        </Card>}
+        <SignOutButton/>
+      </Card.Content>
+      <Card.Footer className="flex flex-col items-start gap-2">
+        <p className="text-xs text-muted">
+          Local guest saves and offline cartridges are never silently imported or deleted.
+        </p>
+        <Link className="link" href="/library">Continue playing</Link>
+      </Card.Footer>
+    </Card>
+  </main>;
 }
