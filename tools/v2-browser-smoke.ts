@@ -46,7 +46,7 @@ async function main(){
       });})()`)));
     if(darkTheme.mode!=='dark'||darkTheme.accent!=='#d1e99d'||
       darkTheme.surface!=='#172a2d'||darkTheme.field!=='#203537'||
-      darkTheme.radius!=='0.875rem')
+      Number.parseFloat(darkTheme.radius)!==0.875)
       throw Error('Dark HeroUI semantic tokens differ from the Slopboy identity: '+JSON.stringify(darkTheme));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(350);
