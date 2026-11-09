@@ -17,6 +17,9 @@ captureCanvas.width = width;
 captureCanvas.height = height;
 const captureContext = captureCanvas.getContext("2d", {willReadFrequently:true, alpha:false});
 let state = "waiting", key = "", game = null, previousCapture = 0;
+let frameTransferTarget = 60, captureCostAverage = 0;
+// A 60 Hz presentation target is desirable, but not a virtual hardware FPS
+// limit. The fallback protects slow/mobile GPUs from costly readbacks.
 const post = (type, extra = {}, transfer = []) => parent.postMessage(
   {scope, type, key, ...extra}, "*", transfer
 );
@@ -33,7 +36,9 @@ async function loadModule(source) {
 function capture(now) {
   if (state !== "running") return;
   requestAnimationFrame(capture);
-  if (now - previousCapture < 1000 / 30) return;
+  // A 1.5 ms tolerance prevents accidental 20 FPS on 60 Hz displays when
+  // two ~16.67 ms rAF ticks narrowly miss a 33.33 ms cutoff.
+  if (now - previousCapture < 1000 / frameTransferTarget - 1.5) return;
   previousCapture = now;
   try {
     const started = performance.now();
@@ -45,6 +50,13 @@ function capture(now) {
       const value = (rgba[p] * 299 + rgba[p+1] * 587 + rgba[p+2] * 114) / 1000;
       pixels[i] = value >= 199 ? 0 : value >= 147 ? 1 : value >= 76 ? 2 : 3;
     }
+    const captureMs = performance.now() - started;
+    captureCostAverage = captureCostAverage === 0 ? captureMs
+      : captureCostAverage * 0.9 + captureMs * 0.1;
+    // Prefer 60 presents/s when feasible. Fall back to 30 only on devices
+    // with sustained costly GPU->CPU readback; use hysteresis to avoid toggles.
+    if (captureCostAverage > 9) frameTransferTarget = 30;
+    else if (captureCostAverage < 6) frameTransferTarget = 60;
     post("frame", {
       pixels,
       playerX: game.getPlayerX?.() ?? 0,
@@ -55,9 +67,9 @@ function capture(now) {
       assetProgress: game.getAssetProgress?.() ?? 0,
       score: game.getScore?.() ?? 0,
       highScore: game.getHighScore?.() ?? 0,
-      captureMs: performance.now() - started,
+      captureMs,
       engineFrameTarget: 60,
-      transferFrameTarget: 30
+      transferFrameTarget: frameTransferTarget
     }, [pixels.buffer]);
   } catch (error) { fail(error); }
 }
