@@ -19,12 +19,15 @@ async function main(){
       'Client-supplied owner ID must never enable reads');
     const mutation=(origin?:string)=>fetch(app.url+'/api/account/bootstrap',{
       method:'POST',redirect:'manual',
-      headers:origin?{'Origin':origin,'Content-Type':'application/json'}:{'Content-Type':'application/json'},
+      headers:origin?{'Origin':origin,'Content-Type':'application/json',
+        'Sec-Fetch-Site':origin===app.url?'same-origin':'cross-site'}:{'Content-Type':'application/json'},
       body:'{}',cache:'no-store',
     });
     assert.equal((await mutation()).status,403,'No-Origin mutation rejected');
     assert.equal((await mutation('https://attacker.example')).status,403,'Foreign-Origin mutation rejected');
-    assert.equal((await mutation(app.url)).status,401,'Same-origin mutation still needs real session');
+    const sameOrigin=await mutation(app.url);
+    assert.equal(sameOrigin.status,401,
+      'Same-origin mutation should pass CSRF guard then reject missing session: '+await sameOrigin.text());
     const login=await get('/auth/sign-in');
     assert.equal(login.status,200);
     assert.match(await login.text(),/Account sign-in is not configured/);
