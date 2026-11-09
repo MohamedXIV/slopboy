@@ -172,7 +172,7 @@ test('verifyAccessToken rejects insufficient scope with RFC 6750 403', () => {
   assert.ok(result.error?.wwwAuthenticate.includes('scope="mcp:write"'));
 });
 
-test('handleMcpHttpRequest responds to OPTIONS with CORS headers', async () => {
+test('handleMcpHttpRequest responds to OPTIONS without wildcard CORS', async () => {
   const res = await handleMcpHttpRequest(
     {
       method: 'OPTIONS',
@@ -183,8 +183,8 @@ test('handleMcpHttpRequest responds to OPTIONS with CORS headers', async () => {
   );
 
   assert.equal(res.status, 204);
-  assert.equal(res.headers['Access-Control-Allow-Origin'], '*');
-  assert.ok(res.headers['Access-Control-Allow-Methods'].includes('POST'));
+  assert.equal(res.headers['Access-Control-Allow-Origin'], undefined);
+  assert.equal(res.headers.Allow, undefined);
 });
 
 test('handleMcpHttpRequest responds to GET with server information and discovery', async () => {
