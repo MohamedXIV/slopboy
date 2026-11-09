@@ -13,7 +13,7 @@
 - `/api/auth/[...path]` is the official Managed Neon Auth request proxy, disabled (503) if the origin URL or strong cookie secret is absent.
 - `/auth/sign-in` is an actual email/password sign-in UI; no UI is shown in disabled deployments. `/dashboard` is an inert public HTML/client shell until `/api/account/me` verifies its session. The client approach avoids the beta SDK's session-cookie refresh write during React Server Component rendering.
 - `/api/account/me` returns only verified subject and a DB-read profile; response is private/no-store. User ID, expiry, emailVerified must come from the trusted provider response. Never trust a supplied `userId` or `role` query/body field.
-- `POST /api/account/bootstrap`: strict same-origin Origin requirement + session verification + verified email, then a parameterized, idempotent `public.users` INSERT/UPDATE that can **never set role to admin**. No guest save import or consent is implied.
+- `POST /api/account/bootstrap`: strict same-origin Origin requirement + session verification + verified email, then a parameterized, idempotent `public.users` INSERT/UPDATE that relies on the DB's **default player role**, with no ability to INSERT/UPDATE `role`. No guest save import or consent is implied.
 - `GET /api/account/games`: reads only `games.owner_id=verifiedSessionUserId`; private/draft game records are never returned to another account through this route. It does not create, upload, execute or publish source code.
 - `GET /api/admin/overview`: strictly requires a DB-proven `public.users.role='admin'`, not the Better Auth profile role or an MCP argument. Has no privileged mutation.
 - Session expiry, invalid sessions and DB outages fail closed. Guest routes never redirect to sign-in. No personalized response/page is service-worker cached.
@@ -27,9 +27,9 @@ Only `feat/26-neon-auth-session` **Vercel Preview** is configured. These are sec
 
 The PostgreSQL role `slopboy_web_preview` was created scoped read-only to an empty `slopboy_runtime` schema, then explicitly granted narrowly scoped permissions to existing tables:
 - `USAGE` on `public`.
-- `public.users`: `SELECT(id,email,display_name,role)`, `INSERT(id,email,display_name,role)`, `UPDATE(email,display_name)`.
+- `public.users`: `SELECT(id,email,display_name,role)`, `INSERT(id,email,display_name)`, `UPDATE(email,display_name)`.
 - `public.games`: `SELECT(id,owner_id,title,status,visibility,created_at)`.
-- **No** `UPDATE(role)`, `DELETE` on games/users, private audit logs, or `neon_auth.user` SELECT. Verified via Neon permission introspection and role-specific `EXPLAIN` without executing inserts.
+- **No** `INSERT(role)` or `UPDATE(role)`, `DELETE` on games/users, private audit logs, or `neon_auth.user` SELECT. Verified via Neon permission introspection and role-specific `EXPLAIN` without executing inserts.
 - The database owner/administrative connection string is **never** installed into Vercel. The restricted role is for #26; later #27 write endpoints will require explicit, reviewed privileges and authorization checks.
 
 Avoid storing the Neon connection URL or auth cookie secret in GitHub Issues, CI logs or public documentation. Do not add them to Production/other Preview branches.
