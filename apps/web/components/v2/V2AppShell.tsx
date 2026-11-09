@@ -46,6 +46,7 @@ export default function V2AppShell({children}:{children:ReactNode}){
           <nav className="sb-v2-nav" aria-label="Slopboy 2.0 navigation">
             <Link href="/" aria-current={pathname==='/'?'page':undefined}>Devices</Link>
             <Link href="/library" aria-current={pathname==='/library'?'page':undefined}>My library</Link>
+            <Link href="/dashboard" aria-current={pathname==='/dashboard'?'page':undefined}>Account</Link>
             <Button size="sm" variant="secondary" className="sb-control sb-v2-theme-toggle"
               onPress={toggleTheme} aria-label={theme==='dark'?'Switch to light theme':'Switch to dark theme'}
 >
