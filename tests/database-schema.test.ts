@@ -216,6 +216,50 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.equal(reMigrate.applied, 2);
     assert.deepEqual(reMigrate.versions, [1, 2]);
 
+    // 9. Two independent owners: the same SQL predicate used by the account
+    // data access layer MUST never return another owner's private game.
+    const alice='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+    const bob='bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb';
+    const aliceGame='11111111-1111-4111-8111-111111111111';
+    const bobGame='22222222-2222-4222-8222-222222222222';
+    await executePsql(config, {sql:`
+      INSERT INTO public.users(id,email,display_name,role) VALUES
+      ('${alice}','alice@example.invalid','Alice','player'),
+      ('${bob}','bob@example.invalid','Bob','player');
+      INSERT INTO public.games(id,owner_id,title,genre,visibility,status) VALUES
+      ('${aliceGame}','${alice}','Alice private game','Arcade','private','draft'),
+      ('${bobGame}','${bob}','Bob private game','Puzzle','private','draft');
+    `});
+    const ownedByAlice=await executePsql(config,{sql:`
+      SELECT id,title,status,visibility FROM public.games
+      WHERE owner_id='${alice}'::uuid ORDER BY created_at DESC,id DESC LIMIT 50;
+    `});
+    const ownedByBob=await executePsql(config,{sql:`
+      SELECT id,title,status,visibility FROM public.games
+      WHERE owner_id='${bob}'::uuid ORDER BY created_at DESC,id DESC LIMIT 50;
+    `});
+    assert.ok(ownedByAlice.stdout.includes(aliceGame));
+    assert.ok(!ownedByAlice.stdout.includes(bobGame));
+    assert.ok(ownedByBob.stdout.includes(bobGame));
+    assert.ok(!ownedByBob.stdout.includes(aliceGame));
+
+    // Scoped DB credentials can read only the required columns and cannot
+    // promote a user by updating role, or DELETE their games.
+    await executePsql(config,{sql:`
+      CREATE ROLE slopboy_test_web;
+      GRANT USAGE ON SCHEMA public TO slopboy_test_web;
+      GRANT SELECT(id,email,display_name,role), INSERT(id,email,display_name,role),
+        UPDATE(email,display_name) ON public.users TO slopboy_test_web;
+      GRANT SELECT(id,owner_id,title,status,visibility,created_at)
+        ON public.games TO slopboy_test_web;
+    `});
+    const grants=await executePsql(config,{sql:`
+      SELECT has_column_privilege('slopboy_test_web','public.users','role','UPDATE'),
+        has_table_privilege('slopboy_test_web','public.games','DELETE'),
+        has_column_privilege('slopboy_test_web','public.users','display_name','UPDATE');
+    `});
+    assert.equal(grants.stdout.trim(),'f|f|t');
+
   } finally {
     // Stop server and clean up temporary cluster
     try {
