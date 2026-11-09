@@ -3,32 +3,28 @@ import { handleMcpHttpRequest, type TokenVerificationOptions } from '@slopboy/mc
 
 export const dynamic = 'force-dynamic';
 
-function getAuthConfig(origin: string): TokenVerificationOptions | undefined {
-  const secretKey = process.env.MCP_JWT_SECRET || process.env.NEON_AUTH_SECRET || 'dev-mcp-secret-key-32-bytes-minimum-length!';
-  const expectedIssuer = process.env.OAUTH_AUTH_SERVER_URL || process.env.NEON_AUTH_URL || `${origin}/api/auth`;
-  const expectedAudience = process.env.MCP_RESOURCE_AUDIENCE || process.env.MCP_RESOURCE_URL || `${origin}/api/mcp`;
-
-  return {
-    secretKey,
-    expectedIssuer,
-    expectedAudience,
-    requiredScope: 'mcp:write',
-  };
+function getAuthConfig(): TokenVerificationOptions | undefined {
+  // This spike only supports explicitly configured HS256 test issuers.
+  // NEON_AUTH_SECRET is not a JWT access-token verification key, and there must
+  // never be a publicly known fallback secret in a deployed application.
+  const secretKey = process.env.MCP_JWT_SECRET;
+  const expectedIssuer = process.env.OAUTH_AUTH_SERVER_URL;
+  const expectedAudience = process.env.MCP_RESOURCE_AUDIENCE;
+  if (!secretKey || Buffer.byteLength(secretKey, 'utf8') < 32 ||
+      !expectedIssuer || !expectedAudience) {
+    return undefined; // fail closed; no authenticated writes
+  }
+  return { secretKey, expectedIssuer, expectedAudience, requiredScope: 'mcp:write' };
 }
 
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
+    headers: { Allow: 'GET, POST, OPTIONS' },
   });
 }
 
 export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin;
   const headers: Record<string, string> = {};
   request.headers.forEach((v, k) => {
     headers[k] = v;
@@ -40,7 +36,7 @@ export async function GET(request: NextRequest) {
       headers,
       body: '',
     },
-    { authConfig: getAuthConfig(origin) }
+    { authConfig: getAuthConfig() }
   );
 
   return new NextResponse(mcpResponse.body, {
@@ -50,7 +46,6 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const origin = request.nextUrl.origin;
   const headers: Record<string, string> = {};
   request.headers.forEach((v, k) => {
     headers[k] = v;
@@ -69,7 +64,7 @@ export async function POST(request: NextRequest) {
       headers,
       body,
     },
-    { authConfig: getAuthConfig(origin) }
+    { authConfig: getAuthConfig() }
   );
 
   return new NextResponse(mcpResponse.body, {
