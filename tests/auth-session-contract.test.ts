@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {authReady,verifySessionShape} from '../apps/web/lib/auth/auth-contract.ts';
+import {authReady,verifySessionShape,sameOriginMutation} from '../apps/web/lib/auth/auth-contract.ts';
 
 const A='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const B='bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb';
@@ -32,4 +32,14 @@ test('unconfigured, weak or non-HTTPS auth fails closed',()=>{
   assert.equal(authReady({NEON_AUTH_BASE_URL:'https://example.com/db/auth',NEON_AUTH_COOKIE_SECRET:'short'}),false);
   assert.equal(authReady({NEON_AUTH_BASE_URL:'https://example.com/db/auth',NEON_AUTH_COOKIE_SECRET:secret}),true);
   assert.equal(authReady({NEON_AUTH_BASE_URL:'https://evil:pw@example.com/db/auth',NEON_AUTH_COOKIE_SECRET:secret}),false);
+});
+
+test('session-bearing mutations require an explicit same-origin request',()=>{
+  const route='https://slopboy.example/api/account/bootstrap';
+  assert.equal(sameOriginMutation('https://slopboy.example',route,'same-origin'),true);
+  assert.equal(sameOriginMutation('https://slopboy.example',route,null),true);
+  assert.equal(sameOriginMutation('https://attacker.example',route,'cross-site'),false);
+  assert.equal(sameOriginMutation(null,route,'same-origin'),false);
+  assert.equal(sameOriginMutation('null',route,'same-origin'),false);
+  assert.equal(sameOriginMutation('https://slopboy.example:444',route,'same-origin'),false);
 });
