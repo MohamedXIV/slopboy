@@ -62,12 +62,14 @@ async function main(){
         button:button.getPropertyValue('--button-bg').trim(),
         brandFont:wordmark.fontFamily,
         bodyFont:getComputedStyle(document.querySelector('.sb-v2-shell')).fontFamily,
+        buttonFont:getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).fontFamily,
       });
     })()`)));
     if(effectiveDark.accent!=='#d1e99d'||effectiveDark.field!=='#203537'||
       effectiveDark.button!=='#d1e99d'||
-      !/silkscreen/i.test(effectiveDark.brandFont)||
-      !/system-ui/i.test(effectiveDark.bodyFont))
+      !/outfit/i.test(effectiveDark.brandFont)||
+      !/outfit/i.test(effectiveDark.bodyFont)||
+      !/outfit/i.test(effectiveDark.buttonFont))
       throw Error('Dark actual HeroUI button/field or Slopboy typography regressed: '+JSON.stringify(effectiveDark));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(350);

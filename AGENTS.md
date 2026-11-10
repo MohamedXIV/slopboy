@@ -22,7 +22,7 @@
 
 ## UI component contract — HeroUI v3, not bespoke controls
 
-- Slopboy typography is two-tier: **Silkscreen** for brand, small display labels and HeroUI action buttons; readable **system sans** for longer content and form input. Use the shared theme font variables and preserve self-hosted/offline loading.
+- Slopboy modern UI typography uses **Outfit variable** for brand, headings, HeroUI controls and readable content; only technical cartridge/screen micro-labels retain monospace. Use shared theme font variables and preserve self-hosted/offline loading. Do not reintroduce decorative pixel fonts into ordinary UI.
 - Root-level HeroUI `--color-*` aliases must resolve to the Slopboy palette; never validate theme colors only on `.sb-v2-shell` while leaving real buttons blue or inputs white.
 - Follow the canonical [Slopboy HeroUI theme contract](docs/design/slopboy-theme.md) and `apps/web/app/v2/slopboy-theme.css` for all modern-route colors, radii, fields, overlays, typography and dark/light behavior. Use semantic tokens, not hardcoded per-page skins.
 - **HeroUI v3 is the canonical Slopboy UI component system** (`@heroui/react` and `@heroui/styles` are already installed). Before implementing any new UI, inspect the existing HeroUI components and official **v3** API.

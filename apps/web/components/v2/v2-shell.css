@@ -2,7 +2,7 @@
 .sb-v2-shell{
   background:var(--background);
   color:var(--foreground);
-  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-family:var(--sb-font-ui,system-ui,-apple-system,"Segoe UI",sans-serif);
   min-height:100vh;display:flex;flex-direction:column;
 }
 .sb-v2-shell *{box-sizing:border-box}

@@ -145,25 +145,21 @@ html:has(.sb-v2-shell[data-theme='light']),
   --sb-control-border: var(--border);
 }
 
-/* Typography is identity too. Self-hosted Silkscreen is the Slopboy display face;
- * retain a readable system sans for longer form descriptions and text entry. */
+/* One friendly, legible type family across modern routes and native HeroUI
+ * controls. Keep retro character in devices, cartridge art and palette;
+ * technical serials can retain monospace without pixelating navigation.
+ * Next.js bundles Outfit at build time for offline PWA support. */
 .sb-v2-shell,
 .sb-v2-dialog {
-  --sb-font-ui: system-ui,-apple-system,"Segoe UI",sans-serif;
-  --sb-font-pixel: var(--font-slopboy-pixel, ui-monospace),monospace;
+  --sb-font-ui: var(--font-slopboy-sans, system-ui),-apple-system,"Segoe UI",sans-serif;
+  --sb-font-display: var(--font-slopboy-sans, system-ui),-apple-system,"Segoe UI",sans-serif;
   font-family:var(--sb-font-ui);
 }
 .sb-v2-shell :is(button,input,select,textarea),
 .sb-v2-dialog :is(button,input,select,textarea) {
   font-family:inherit;
 }
-.sb-v2-shell :is(.sb-v2-brand,.sb-v2-footer-brand,.v2-library-eyebrow,.v2-hub-kicker,
-  .v2-cart-serial,.v2-cart-title strong,.v2-library-title h3,.v2-library-play,
-  .v2-shelf-heading h2 span),
-.sb-v2-dialog :is(.v2-cart-serial,.v2-cart-title strong) {
-  font-family:var(--sb-font-pixel);
-}
-.sb-v2-shell :is(.button,.card__title),
-.sb-v2-dialog .button {
-  font-family:var(--sb-font-pixel);
+.sb-v2-shell :is(.sb-v2-brand,.sb-v2-footer-brand,.v2-cart-title strong,.v2-library-title h3),
+.sb-v2-dialog .v2-cart-title strong {
+  font-family:var(--sb-font-display);
 }
