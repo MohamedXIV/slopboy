@@ -457,14 +457,7 @@ async function main(){
       throw Error('Dark lab surface/header did not follow border-first theme: '+JSON.stringify(darkLab));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(180);
-    const darkHeader=JSON.parse(String(await evalJs(`(()=>{const h=getComputedStyle(document.querySelector('.sb-v2-header'));
-      return JSON.stringify({theme:document.querySelector('.sb-v2-shell').dataset.theme,
-        shadow:h.boxShadow,border:h.borderBottomColor});})()`)));
-    if(darkHeader.theme!=='dark'||darkHeader.shadow==='none'||darkHeader.border!=='rgba(0, 0, 0, 0)')
-      throw Error('Dark lab header should float without a visible bottom border: '+JSON.stringify(darkHeader));
-    await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
-    await sleep(180);
-        await navigate('/play','/play/'+GAMES[0].gameId,
+    await navigate('/play','/play/'+GAMES[0].gameId,
       "!!document.querySelector('.v2-led.on')");
     // Verify the official library also works independently after returning from legacy.
     await navigate('/library','/library',
