@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {authReady,verifySessionShape,sameOriginMutation} from '../apps/web/lib/auth/auth-contract.ts';
+import {signInFailureMessage} from '../apps/web/lib/auth/sign-in-errors.ts';
 
 const A='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
 const B='bbbbbbbb-bbbb-4bbb-abbb-bbbbbbbbbbbb';
@@ -58,4 +59,14 @@ test('auth proxy forwards catch-all route params to the Neon handler for GET and
   assert.match(source,/POST\(request:NextRequest,context:AuthRouteContext\)/);
   assert.match(source,/auth\.handler\(\)\.GET\(request,context\)/);
   assert.match(source,/auth\.handler\(\)\.POST\(request,context\)/);
+});
+
+test('auth UI distinguishes rejected credentials from server errors without disclosing account existence',()=>{
+  assert.match(signInFailureMessage({status:401}),/email and password/);
+  assert.match(signInFailureMessage({error:{status:401}}),/email and password/);
+  assert.match(signInFailureMessage({response:{status:401}}),/email and password/);
+  assert.match(signInFailureMessage({status:403}),/verify your email/);
+  assert.match(signInFailureMessage({status:429}),/Too many/);
+  assert.match(signInFailureMessage({status:503}),/temporarily unavailable/);
+  assert.doesNotMatch(signInFailureMessage({status:401}),/unknown email|user not found/i);
 });

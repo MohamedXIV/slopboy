@@ -31,6 +31,12 @@ async function main(){
     const login=await get('/auth/sign-in');
     assert.equal(login.status,200);
     assert.match(await login.text(),/Authentication is not configured in this deployment/);
+    assert.match(await (await get('/auth/sign-in')).text(),/Reset password/,
+      'Sign-in must link to recovery for existing accounts');
+    const recovery=await get('/auth/reset-password');
+    assert.equal(recovery.status,200,'Recovery must be routed in modern UI');
+    assert.match(await recovery.text(),/Authentication is not configured in this deployment/,
+      'Unconfigured password reset must fail closed');
     const activation=await get('/auth/activate');
     assert.equal(activation.status,200,'Invited-account activation page remains reachable');
     assert.match(await activation.text(),/Authentication is not configured in this deployment/,

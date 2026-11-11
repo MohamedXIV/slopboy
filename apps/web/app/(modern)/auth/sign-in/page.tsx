@@ -33,6 +33,7 @@ export default function SignInPage(){
       </Card.Content>
       <Card.Footer className="flex flex-col items-start gap-2">
         <p className="text-sm text-muted">New account registration is closed during the private development rollout.</p>
+        <Link className="link" href="/auth/reset-password">Reset password</Link>
         <Link className="link" href="/auth/activate">Activate an invited account</Link>
         <Link className="link" href="/library">Continue as guest</Link>
       </Card.Footer>

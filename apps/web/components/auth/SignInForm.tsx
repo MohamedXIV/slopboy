@@ -3,6 +3,7 @@ import {useState,type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {Alert,Button,Input,Label,TextField} from '@heroui/react';
 import {authClient} from '../../lib/auth/client';
+import {signInFailureMessage} from '../../lib/auth/sign-in-errors';
 
 export default function SignInForm(){
   const router=useRouter();
@@ -16,15 +17,15 @@ export default function SignInForm(){
     if(busy)return;
     setBusy(true);setError('');
     try{
-      const result=await authClient.signIn.email({email,password});
+      const result=await authClient.signIn.email({email:email.trim().toLowerCase(),password});
       if(result.error){
-        setError('Could not sign in. Check your credentials and try again.');
+        setError(signInFailureMessage(result.error));
         return;
       }
       router.replace('/dashboard');
       router.refresh();
-    }catch{
-      setError('Sign-in service unavailable. Try again later.');
+    }catch(failure){
+      setError(signInFailureMessage(failure));
     }finally{
       setBusy(false);
     }
