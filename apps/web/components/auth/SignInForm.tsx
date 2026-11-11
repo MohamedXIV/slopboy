@@ -8,6 +8,7 @@ export default function SignInForm(){
   const router=useRouter();
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
+  const [showPassword,setShowPassword]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
 
@@ -36,10 +37,15 @@ export default function SignInForm(){
       <Input variant="secondary" type="email" autoComplete="email"
         maxLength={254} value={email} onChange={event=>setEmail(event.target.value)}/>
     </TextField>
-    <TextField name="password" type="password" isRequired>
+    <TextField name="password" isRequired>
       <Label>Password</Label>
-      <Input variant="secondary" type="password" autoComplete="current-password"
-        value={password} onChange={event=>setPassword(event.target.value)}/>
+      <div className="sb-auth-password-row">
+        <Input variant="secondary" type={showPassword?'text':'password'} autoComplete="current-password"
+          value={password} onChange={event=>setPassword(event.target.value)}/>
+        <Button type="button" variant="ghost" size="sm"
+          aria-label={showPassword?'Hide password':'Show password'}
+          onPress={()=>setShowPassword(value=>!value)}>{showPassword?'Hide':'Show'}</Button>
+      </div>
     </TextField>
     {error&&<Alert status="danger">
       <Alert.Indicator/>

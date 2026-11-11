@@ -1,0 +1,26 @@
+/* Approved Sign-in panel composition. All interactive controls remain HeroUI v3. */
+.sb-auth-panel{width:100%;min-width:0;border:1px solid var(--border);border-radius:22px;padding:clamp(12px,2vw,20px);background:var(--surface)}
+.sb-auth-ribbon{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px;color:var(--muted);font:700 9px/1.4 ui-monospace,monospace;letter-spacing:.07em}
+.sb-auth-card{width:100%;min-width:0;border:1px solid var(--border);border-radius:30px;background:var(--surface);box-shadow:none}
+.sb-auth-inner{display:flex;flex-direction:column;gap:21px;padding:clamp(18px,2.7vw,32px)}
+.sb-auth-hardware{display:flex;justify-content:space-between;align-items:center;gap:8px;color:var(--foreground);font:700 9px ui-monospace,monospace}
+.sb-auth-vents{display:inline-flex;align-items:center;gap:3px;padding:6px 8px;border-radius:9999px;background:var(--surface-secondary)}
+.sb-auth-vents i{height:12px;width:3px;border-radius:2px;background:var(--border)}
+.sb-auth-power{white-space:nowrap;border-radius:9999px;padding:6px 10px;background:var(--surface-secondary)}
+.sb-auth-tabs{width:100%;min-width:0}
+.sb-auth-tabs .tabs__list-container,.sb-auth-tabs .tabs__list-container__scroller{width:100%;min-width:0}
+.sb-auth-tabs .tabs__list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;width:100%;padding:4px;border-radius:9999px;background:var(--sb-ui-field)}
+.sb-auth-tabs .tabs__tab{display:flex;align-items:center;justify-content:center;min-width:0;width:100%;text-align:center;padding-inline:8px;font-size:11px;white-space:nowrap}
+.sb-auth-tabs .tabs__tab[aria-disabled='true']{opacity:.6;cursor:not-allowed}
+.sb-auth-tabs .tabs__panel{display:flex;flex-direction:column;gap:21px;min-width:0;padding:21px 0 0;margin:0}
+.sb-auth-heading h1{letter-spacing:-.040em;margin:10px 0 3px;font-size:clamp(25px,2.5vw,33px);font-weight:500}
+.sb-auth-heading p{color:var(--foreground);opacity:.8;line-height:1.6;font-size:13px;margin:0}
+.sb-auth-fields{display:flex;flex-direction:column;gap:15px;min-width:0}
+.sb-auth-fields .textfield{width:100%;min-width:0}
+.sb-auth-fields .input{width:100%;min-width:0;min-height:45px}
+.sb-auth-password-row{display:flex;align-items:center;gap:6px;min-width:0}
+.sb-auth-password-row .input{flex:1;min-width:0}
+.sb-auth-password-row .button{flex:none}
+.sb-auth-guest{font-size:13px;font-weight:600;text-align:center;align-self:center}
+.sb-auth-footnote{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:14px;border-top:1px solid var(--border);color:var(--muted);font:700 9px ui-monospace,monospace}
+@media(max-width:430px){.sb-auth-inner{padding:17px}.sb-auth-tabs .tabs__tab{font-size:10px}.sb-auth-footnote{font-size:8px}}

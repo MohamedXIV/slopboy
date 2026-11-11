@@ -850,7 +850,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       <Drawer>
         <Drawer.Backdrop isOpen={libraryOpen} onOpenChange={setLibraryOpen} variant="blur">
           <Drawer.Content placement="left">
-            <Drawer.Dialog className={`v2-quick-library-drawer sb-v2-dialog ${theme}`}
+            <Drawer.Dialog className={`v2-quick-library-drawer sb-v2-dialog sb-heroui-live ${theme}`}
               data-v2-theme={theme} data-theme={theme} aria-label="Change game from your library">
               <Drawer.Header>
                 <Drawer.Heading>Change cartridge</Drawer.Heading>
@@ -888,7 +888,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       {compact && <Drawer>
         <Drawer.Backdrop isOpen={mobileSettingsOpen} onOpenChange={setMobileSettingsOpen} variant="blur">
           <Drawer.Content placement="right">
-            <Drawer.Dialog className={`v2-mobile-drawer sb-v2-dialog ${theme}`} aria-label="Slopboy display and shell settings"
+            <Drawer.Dialog className={`v2-mobile-drawer sb-v2-dialog sb-heroui-live ${theme}`} aria-label="Slopboy display and shell settings"
               data-v2-theme={theme}>
               <Drawer.Header>
                 <Drawer.Heading>Device settings</Drawer.Heading>

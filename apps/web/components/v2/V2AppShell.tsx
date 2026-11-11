@@ -20,6 +20,8 @@ export function useV2Theme():V2ThemeState {
 /** One header/footer/theme owner for canonical routes; legacy pages are separate. */
 export default function V2AppShell({children}:{children:ReactNode}){
   const pathname=usePathname();
+  // The Design Lab keeps an unmodified historical baseline on its left.
+  const sharedHeroUI=pathname!=='/labs/design-system';
   const [theme,setTheme]=useState<V2Theme>('dark');
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>{
@@ -36,7 +38,7 @@ export default function V2AppShell({children}:{children:ReactNode}){
   },[theme]);
   const state=useMemo(()=>({theme,toggleTheme}),[theme,toggleTheme]);
   return <ThemeContext.Provider value={state}>
-    <div className={`sb-v2-shell ${theme}`} data-v2-theme={theme} data-theme={theme}>
+    <div className={`sb-v2-shell ${theme}${sharedHeroUI?' sb-heroui-live':''}`} data-v2-theme={theme} data-theme={theme}>
       <header className="sb-v2-header">
         <div className="sb-v2-header-inner">
           <Link className="sb-v2-brand" href="/" aria-label="Slopboy 2.0 home">

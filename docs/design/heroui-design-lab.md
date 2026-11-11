@@ -149,3 +149,13 @@ React hydration mismatches from experimental overlay composition, keeps portal
 controls client-owned, and does not alter any actual product route. Browser
 tests wait for all nine new families and both auth previews to mount and then
 verify the real Mobile toggle.
+
+
+## Approval and shared promotion — November 11, 2026
+
+Owner-approved: dark body `#16282d`, warm-white cards, border-first surfaces,
+shadow-free 1px header border, restrained coral and balanced native auth Tabs.
+Reusable rules move to the canonical `app/v2/slopboy-components.css` stylesheet;
+live modern routes opt in while the old Lab baseline stays isolated. The real
+sign-in page now uses the approved composition without changing the auth backend.
+All modifications remain on Draft PR #80; no merge or production deployment.

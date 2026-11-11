@@ -4,7 +4,6 @@ import {useState} from 'react';
 import {Alert,Button,Card,Checkbox,Chip,Drawer,Input,Label,Spinner,Tabs,TextField} from '@heroui/react';
 import {useV2Theme} from '../v2/V2AppShell';
 import dynamic from 'next/dynamic';
-import '../../app/v2/slopboy-components-preview.css';
 import './design-lab.css';
 
 /* The extended overlay showcase is intentionally client-only: native HeroUI
@@ -170,9 +169,9 @@ export default function DesignSystemLab(){
     <header className="sb-lab-intro">
       <div className="sb-lab-eyebrow">SLOPBOY / DESIGN SYSTEM / BATCH 2</div>
       <h1>Same Slopboy. <em>Better foundations.</em></h1>
-      <p>Real HeroUI v3 primitives on both sides. The left uses the current app theme; the right previews a softer tactile treatment inspired by our existing platform and auth reference. Nothing here changes the production components.</p>
+      <p>Real HeroUI v3 primitives on both sides. The left uses the current app theme; the right previews a softer tactile treatment inspired by our existing platform and auth reference. The left keeps the historical baseline; the right shows the shared styles used by modern routes.</p>
       <div className="sb-lab-meta">
-        <Chip variant="soft" color="accent">Isolated experiment</Chip>
+        <Chip variant="soft" color="accent">Approved shared foundation</Chip>
         <span>Current theme: <strong>{theme}</strong> · Switch it in the site header</span>
       </div>
       <p className="sb-lab-experiment-note">Bordered cards only. Both headers use the same fine bottom border without a shadow; Dark uses a lighter petrol background. Coral remains a small optional accent inspired by the handheld A/B buttons.</p>
@@ -209,8 +208,7 @@ export default function DesignSystemLab(){
       {lastAction || 'Click any action to inspect real component feedback. No account or game data is changed.'}
     </div>
     <footer className="sb-lab-note">
-      <strong>Review gate:</strong> These styles stay scoped to this lab until we agree on a visual direction.
-      Existing routes, devices, game runtime and auth remain untouched.
+      <strong>Approved:</strong> Modern routes use the shared HeroUI component styles. This comparison keeps its original baseline. Cartridge visuals, game runtime and auth services remain independent.
     </footer>
   </main>;
 }

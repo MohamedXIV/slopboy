@@ -1,18 +1,18 @@
 # Slopboy V2 — HeroUI v3 theme contract
 
-**Status:** Active design system for all modern routes on the Sprint 2 review stack; V1 /legacy is separate.
+**Status:** Owner-approved HeroUI v3 design promoted on Draft PR #80 for Preview review. V1 /legacy is separate.
 
 ## Intent
 
 Slopboy should feel like a little world of imaginary retro handhelds, not a generic developer dashboard. Reuse the product's existing midnight-petrol, LCD-lime and sage palette. Keep the UI calm, readable, compact and tactile without turning every surface into a pixel-art texture.
 
-**Single source of truth:** [`apps/web/app/v2/slopboy-theme.css`](../../apps/web/app/v2/slopboy-theme.css), imported after `@heroui/styles` in `apps/web/app/v2/heroui.css`. All colors are **HeroUI v3 semantic CSS variables**. HeroUI's calculated variants and Tailwind `bg-surface`, `text-muted`, `bg-accent`, `border-border` utilities derive from these variables; do not paste these values into individual components. **Important:** HeroUI computes `--color-*` aliases on `:root`, so the active palette is also applied to `html:has(.sb-v2-shell[data-theme=...])`. If the theme is only applied inside the shell, real HeroUI buttons stay default blue and fields stay white even though `--accent` seems correct on the shell.
+**Semantic theme source of truth:** [`apps/web/app/v2/slopboy-theme.css`](../../apps/web/app/v2/slopboy-theme.css), imported after `@heroui/styles` in `apps/web/app/v2/heroui.css`. All colors are **HeroUI v3 semantic CSS variables**. HeroUI's calculated variants and Tailwind `bg-surface`, `text-muted`, `bg-accent`, `border-border` utilities derive from these variables; do not paste these values into individual components. **Important:** HeroUI computes `--color-*` aliases on `:root`, so the active palette is also applied to `html:has(.sb-v2-shell[data-theme=...])`. If the theme is only applied inside the shell, real HeroUI buttons stay default blue and fields stay white even though `--accent` seems correct on the shell.
 
 ## Palette
 
 | Purpose | Dark | Light | Theme variables |
 | --- | --- | --- | --- |
-| App background | `#0d1719` midnight petrol | `#f4f0e5` cream | `--background` |
+| App background | `#16282d` lighter midnight petrol (approved) | `#f4f0e5` cream | `--background` |
 | Surface / cards | `#172a2d` | `#fffdf7` | `--surface` |
 | Primary text | `#edf4e5` | `#304744` | `--foreground` |
 | Secondary text | `#adbfba` | `#526d64` | `--muted` |
@@ -43,3 +43,20 @@ Shared header/footer are custom *structure* but their colors are token-based. Ha
 `pnpm security:v2-browser` checks **computed root `--color-accent`/`--color-field-focus` and live HeroUI primary Button background tokens**, Outfit wordmark + UI + button font, semantic radius in dark/light, portal drawer inheritance, existing keyboard/gameplay behavior, and persistent palette across library navigation. A check of shell `--accent` alone is insufficient. `pnpm security:auth-routes`, `pnpm typecheck`, `pnpm lint`, `pnpm build` must pass too.
 
 Official references: [HeroUI Colors](https://heroui.com/en/docs/react/getting-started/colors), [HeroUI Theming](https://heroui.com/en/docs/react/getting-started/theming). Future agents must update this contract and the central theme file together for deliberate design-system changes.
+
+
+## Owner-approved shared component promotion — November 11, 2026
+
+The owner approved the Design Lab appearance and lighter dark canvas. `slopboy-theme.css`
+contains semantic tokens; `slopboy-components.css` contains opt-in native HeroUI BEM
+styling. The modern shell applies `.sb-heroui-live` except inside the historical
+Lab, whose proposed column retains `.sb-heroui-preview` for comparison. Real portaled
+drawers opt in explicitly. No UI primitives were reimplemented.
+
+Actual sign-in uses native HeroUI Card, Tabs, Chip and the existing sign-in handler,
+with new account registration still disabled. The password visibility toggle is a
+native Button; account/Neon backend logic remains unchanged. Cards are border-first
+with no surface shadow; header is shadow-free with a 1px bottom border.
+
+All changes stay on the isolated stacked Draft PR #80. Do not merge PR #79 until
+two verified Neon Auth accounts pass live acceptance. No changes to main/Production.

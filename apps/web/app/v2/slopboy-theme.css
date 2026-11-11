@@ -20,7 +20,7 @@ html:has(.sb-v2-shell[data-theme='dark']),
 .sb-v2-dialog[data-theme='dark'] {
   color-scheme: dark;
 
-  --background: #0d1719;
+  --background: #16282d;
   --background-secondary: #132225;
   --background-tertiary: #1a2e30;
   --foreground: #edf4e5;
@@ -62,7 +62,7 @@ html:has(.sb-v2-shell[data-theme='dark']),
   --border-width: 1px;
   --field-border-width: 1px;
   --disabled-opacity: 0.5;
-  --surface-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
+  --surface-shadow: none;
   --overlay-shadow: 0 16px 38px rgb(0 0 0 / 0.24);
   --field-shadow: none;
 
@@ -70,6 +70,7 @@ html:has(.sb-v2-shell[data-theme='dark']),
   --sb-top: #111f22;
   --sb-panel: var(--surface);
   --sb-line: var(--border);
+  --sb-header-line: #272b2a;
   --sb-text: var(--foreground);
   --sb-subtle: var(--muted);
   --sb-accent: var(--accent);
@@ -128,7 +129,7 @@ html:has(.sb-v2-shell[data-theme='light']),
   --border-width: 1px;
   --field-border-width: 1px;
   --disabled-opacity: 0.5;
-  --surface-shadow: 0 9px 24px rgb(48 71 68 / 0.08);
+  --surface-shadow: none;
   --overlay-shadow: 0 16px 38px rgb(48 71 68 / 0.15);
   --field-shadow: none;
 
@@ -136,6 +137,7 @@ html:has(.sb-v2-shell[data-theme='light']),
   --sb-top: #fffdf7;
   --sb-panel: var(--surface);
   --sb-line: var(--border);
+  --sb-header-line: var(--border);
   --sb-text: var(--foreground);
   --sb-subtle: var(--muted);
   --sb-accent: var(--accent);

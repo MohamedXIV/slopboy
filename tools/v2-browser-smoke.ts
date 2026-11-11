@@ -111,8 +111,10 @@ async function main(){
       });
     })()`)));
     if(effectiveLight.accent!=='#496f45'||effectiveLight.field!=='#f6f8f1'||
-      effectiveLight.button!=='#496f45')
+      effectiveLight.button!=='#28442e')
       throw Error('Light HeroUI actual button/field colors did not switch: '+JSON.stringify(effectiveLight));
+    const sharedOnApp=await evalJs("document.querySelector('.sb-v2-shell').classList.contains('sb-heroui-live')&&getComputedStyle(document.querySelector('.sb-v2-header')).boxShadow==='none'");
+    if(sharedOnApp!==true)throw Error('Approved HeroUI component styles not applied to modern app');
     const duplicateTheme=await evalJs("!!document.querySelector('.v2-appearance-mode, .v2-theme-button')");
     if(duplicateTheme===true)throw Error('Redundant theme switches were not removed');
 
@@ -413,6 +415,8 @@ async function main(){
     // on the canonical app shell without changing auth or game routes.
     await navigate('/labs/design-system','/labs/design-system',
       "document.querySelectorAll('.sb-design-lab > .sb-lab-family').length===9 && document.querySelectorAll('.sb-design-lab > .sb-lab-family .sb-lab-frame[data-variant=current]').length===9 && document.querySelectorAll('.sb-design-lab > .sb-lab-family .sb-lab-frame[data-variant=proposed]').length===9");
+    const labBaseline=await evalJs("!document.querySelector('.sb-v2-shell').classList.contains('sb-heroui-live')&&document.querySelectorAll('.sb-lab-proposed.sb-heroui-preview').length>=9");
+    if(labBaseline!==true)throw Error('Lab historical baseline lost its isolated styling');
     const labPrimitives=await evalJs("document.querySelectorAll('[data-component=buttons] .sb-lab-proposed .button').length>=4 && !!document.querySelector('[data-component=fields] .sb-lab-proposed .input') && !!document.querySelector('[data-component=cards] .sb-lab-proposed .card')");
     if(labPrimitives!==true)throw Error('Design Lab does not use real HeroUI component primitives');
     // Next can render server HTML before React has hydrated the interactive
@@ -519,6 +523,24 @@ async function main(){
     await sleep(180);
     await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:first-child').click();true");
     await sleep(180);
+    await navigate('/auth/sign-in','/auth/sign-in',
+      "!!document.querySelector('.sb-auth-panel .sb-auth-tabs')&&!!document.querySelector('.sb-auth-card')");
+    const liveAuth=JSON.parse(String(await evalJs(`(()=>{
+      const root=document.querySelector('.sb-auth-tabs'),list=root.querySelector('.tabs__list'),
+        tabs=[...root.querySelectorAll('[role=tab]')];
+      const a=tabs[0]?.getBoundingClientRect(),b=tabs[1]?.getBoundingClientRect(),l=list?.getBoundingClientRect();
+      return JSON.stringify({
+        count:tabs.length,active:tabs[0]?.getAttribute('aria-selected'),
+        closed:tabs[1]?.getAttribute('aria-disabled'),
+        equal:!!a&&!!b&&Math.abs(a.width-b.width)<2,
+        aligned:!!a&&!!b&&!!l&&Math.abs(a.left-l.left)<14&&Math.abs(b.right-l.right)<14,
+        guest:document.querySelector('.sb-auth-guest')?.getAttribute('href'),
+        shadow:getComputedStyle(document.querySelector('.sb-auth-card')).boxShadow
+      });
+    })()`)));
+    if(liveAuth.count!==2||liveAuth.active!=='true'||liveAuth.closed!=='true'||
+      !liveAuth.equal||!liveAuth.aligned||liveAuth.guest!=='/library'||liveAuth.shadow!=='none')
+      throw Error('Approved live sign-in panel failed: '+JSON.stringify(liveAuth));
     await navigate('/play','/play/'+GAMES[0].gameId,
       "!!document.querySelector('.v2-led.on')");
     // Verify the official library also works independently after returning from legacy.
