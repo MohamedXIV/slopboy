@@ -415,10 +415,16 @@ async function main(){
       "document.querySelectorAll('.sb-lab-family').length===9 && document.querySelectorAll('.sb-lab-frame[data-variant=current]').length===9 && document.querySelectorAll('.sb-lab-frame[data-variant=proposed]').length===9");
     const labPrimitives=await evalJs("document.querySelectorAll('[data-component=buttons] .sb-lab-proposed .button').length>=4 && !!document.querySelector('[data-component=fields] .sb-lab-proposed .input') && !!document.querySelector('[data-component=cards] .sb-lab-proposed .card')");
     if(labPrimitives!==true)throw Error('Design Lab does not use real HeroUI component primitives');
-    await evalJs("document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary').click();true");
-    await sleep(100);
-    const labAction=await evalJs("document.querySelector('.sb-lab-action-status').textContent.includes('proposed primary button pressed')");
-    if(labAction!==true)throw Error('Proposed HeroUI controls in the Design Lab are not interactive');
+    // Next can render server HTML before React has hydrated the interactive
+    // handlers. Retry the actual button press until onPress is connected.
+    let labAction=false;
+    for(let attempt=0;attempt<30;attempt++){
+      await evalJs("document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary').click();true");
+      await sleep(150);
+      labAction=await evalJs("document.querySelector('.sb-lab-action-status').textContent.includes('proposed primary button pressed')")===true;
+      if(labAction)break;
+    }
+    if(!labAction)throw Error('Proposed HeroUI controls did not respond after client hydration');
     const proposedLight=JSON.parse(String(await evalJs(`(()=>{
       const frame=getComputedStyle(document.querySelector('.sb-lab-proposed'));
       const card=getComputedStyle(document.querySelector('.sb-lab-proposed .card'));
