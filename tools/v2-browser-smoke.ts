@@ -468,14 +468,14 @@ async function main(){
     if(batchState.families!==9||batchState.proposed!==9||batchState.auth!==2||
       batchState.forms!==2||batchState.disabled!==1||!batchState.previewOnly)
       throw Error('Batch 2 gallery or demo-only auth compositions missing: '+JSON.stringify(batchState));
-    let mobileReady=false;
+    let authPreviewMobileReady=false;
     for(let attempt=0;attempt<25;attempt++){
       await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:last-child').click();true");
       await sleep(120);
-      mobileReady=await evalJs("document.querySelector('[data-auth-preview]').dataset.authPreview==='mobile'")===true;
-      if(mobileReady)break;
+      authPreviewMobileReady=await evalJs("document.querySelector('[data-auth-preview]').dataset.authPreview==='mobile'")===true;
+      if(authPreviewMobileReady)break;
     }
-    if(!mobileReady)throw Error('Batch 2 mobile width toggle did not respond after hydration');
+    if(!authPreviewMobileReady)throw Error('Batch 2 mobile width toggle did not respond after hydration');
     await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:first-child').click();true");
     await sleep(180);
     await navigate('/play','/play/'+GAMES[0].gameId,
