@@ -419,6 +419,29 @@ async function main(){
     await sleep(100);
     const labAction=await evalJs("document.querySelector('.sb-lab-action-status').textContent.includes('proposed primary button pressed')");
     if(labAction!==true)throw Error('Proposed HeroUI controls in the Design Lab are not interactive');
+    const proposedLight=JSON.parse(String(await evalJs(`(()=>{const el=document.querySelector('.sb-lab-proposed');const css=getComputedStyle(el);
+      const warm=document.querySelector('.sb-lab-proposed .sb-lab-warm-action');
+      return JSON.stringify({surface:css.getPropertyValue('--lab-surface').trim(),
+        background:css.backgroundColor,coral:css.getPropertyValue('--lab-coral').trim(),
+        warmButton:!!warm,shadow:css.boxShadow,mode:document.querySelector('.sb-v2-shell').dataset.theme});})()`)));
+    if(proposedLight.mode!=='light'||proposedLight.surface!=='#fffdf7'||proposedLight.coral!=='#c77361'||
+       !proposedLight.warmButton||proposedLight.shadow==='none')
+      throw Error('Light preview not warm-white, coral-accented or initially elevated: '+JSON.stringify(proposedLight));
+    await evalJs("document.querySelector('[data-elevation-choice=outline]').click();true");
+    const noShadow=await evalJs("getComputedStyle(document.querySelector('.sb-lab-proposed')).boxShadow==='none'");
+    if(noShadow!==true)throw Error('Border-only component preview retained its shadow');
+    await evalJs("document.querySelector('[data-elevation-choice=shadow]').click();true");
+    const hasShadow=await evalJs("getComputedStyle(document.querySelector('.sb-lab-proposed')).boxShadow!=='none'");
+    if(hasShadow!==true)throw Error('Soft-shadow preview did not restore elevation');
+    await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
+    await sleep(180);
+    const darkHeader=JSON.parse(String(await evalJs(`(()=>{const h=getComputedStyle(document.querySelector('.sb-v2-header'));
+      return JSON.stringify({theme:document.querySelector('.sb-v2-shell').dataset.theme,
+        shadow:h.boxShadow,border:h.borderBottomColor});})()`)));
+    if(darkHeader.theme!=='dark'||darkHeader.shadow==='none'||darkHeader.border!=='rgba(0, 0, 0, 0)')
+      throw Error('Dark lab header should float without a visible bottom border: '+JSON.stringify(darkHeader));
+    await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
+    await sleep(180);
         await navigate('/play','/play/'+GAMES[0].gameId,
       "!!document.querySelector('.v2-led.on')");
     // Verify the official library also works independently after returning from legacy.

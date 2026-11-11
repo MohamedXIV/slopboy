@@ -24,6 +24,7 @@ const COLORS=[
   {name:'Sage',value:'#496f45'},
   {name:'Cream',value:'#f4f0e5'},
   {name:'Surface',value:'#fffdf7'},
+  {name:'Warm coral · A/B buttons',value:'#c77361'},
 ];
 
 function Example({family,flavor,onAction,openDrawer,setOpenDrawer,theme}:{
@@ -40,6 +41,8 @@ function Example({family,flavor,onAction,openDrawer,setOpenDrawer,theme}:{
           <Button variant="secondary" onPress={()=>onAction(flavor+' secondary button pressed')}>Secondary</Button>
           <Button variant="outline" onPress={()=>onAction(flavor+' outline button pressed')}>Outline</Button>
           <Button variant="ghost" onPress={()=>onAction(flavor+' ghost button pressed')}>Ghost</Button>
+          <Button variant="secondary" className="sb-lab-warm-action"
+            onPress={()=>onAction(flavor+' special edition action pressed')}>Special edition</Button>
         </div>
         <div className="sb-lab-wrap">
           <Button size="sm" variant="primary" onPress={()=>onAction(flavor+' compact action pressed')}>Compact</Button>
@@ -85,6 +88,7 @@ function Example({family,flavor,onAction,openDrawer,setOpenDrawer,theme}:{
         <Chip color="warning" variant="soft">Review</Chip>
         <Chip color="danger" variant="soft">Offline</Chip>
         <Chip variant="secondary">Slopboy 1000</Chip>
+        <Chip variant="secondary" className="sb-lab-coral-chip">Coral shell</Chip>
       </div>;
     case 'alerts':
       return <div className="sb-lab-stack">
@@ -153,8 +157,9 @@ export default function DesignSystemLab(){
   const {theme}=useV2Theme();
   const [lastAction,setLastAction]=useState('');
   const [openDrawer,setOpenDrawer]=useState<Flavor|null>(null);
+  const [elevation,setElevation]=useState<'outline'|'shadow'>('shadow');
 
-  return <main className="sb-design-lab" data-lab-theme={theme}>
+  return <main className="sb-design-lab" data-lab-theme={theme} data-lab-elevation={elevation}>
     <header className="sb-lab-intro">
       <div className="sb-lab-eyebrow">SLOPBOY / DESIGN SYSTEM / EXPERIMENT 001</div>
       <h1>Same Slopboy. <em>Better foundations.</em></h1>
@@ -163,6 +168,19 @@ export default function DesignSystemLab(){
         <Chip variant="soft" color="accent">Isolated experiment</Chip>
         <span>Current theme: <strong>{theme}</strong> · Switch it in the site header</span>
       </div>
+      <div className="sb-lab-experiments">
+        <div className="sb-lab-experiment-copy">
+          <strong>Surface elevation</strong>
+          <span>Compare an outlined card with a subtle floating shadow. Proposed column only.</span>
+        </div>
+        <div className="sb-lab-elevation-switch" aria-label="Proposed card elevation">
+          <Button size="sm" variant="secondary" data-elevation-choice="outline"
+            aria-pressed={elevation==='outline'} onPress={()=>setElevation('outline')}>Border only</Button>
+          <Button size="sm" variant="secondary" data-elevation-choice="shadow"
+            aria-pressed={elevation==='shadow'} onPress={()=>setElevation('shadow')}>Soft shadow</Button>
+        </div>
+      </div>
+      <p className="sb-lab-experiment-note">Dark header: shadow instead of the bottom rule, on this lab route only. Coral: a small optional accent inspired by the device's A/B buttons.</p>
     </header>
     <section className="sb-lab-palette" aria-label="Existing Slopboy identity colors">
       {COLORS.map(color=><div className="sb-lab-swatch" key={color.name}>

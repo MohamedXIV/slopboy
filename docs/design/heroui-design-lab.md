@@ -51,3 +51,23 @@ Review URL: /labs/design-system (under existing modern V2 AppShell).
    adopting them in production; this first page covers the core 9 families.
 
 This document is a deliberate experiment scope, not a global design-system change.
+
+
+## Experiment 002 — November 11, 2026
+
+User review changes, preview-only:
+- Light proposed panels are **warm white** (`#fffdf7`), not a darker cream fill.
+- Lab **dark header only** replaces the bottom border with a soft drop shadow.
+  This is explicitly scoped by `:has(.sb-design-lab)`; other app routes
+  must keep existing navigation styling.
+- Introduce a small **coral** device-face-button accent (`#c77361` light,
+  `#dc917b` dark) for optional accents only: demonstration secondary action,
+  edition Chip and proposed label dot. Primary actions remain Sage/LCD Lime.
+- Proposed cards can be switched between **Border only** and **Soft shadow**
+  through real HeroUI Buttons, with state stored only in the lab component.
+- Current/baseline column is unchanged; dark/light state continues to use the
+  existing V2 theme toggle. No production decision has been made.
+
+Acceptance: white/near-white proposed light panel, dark floating header
+on this route only, visible coral use in native HeroUI demos, live
+elevation toggle, and no visual change to actual Library/Sign-in/Play.
