@@ -412,7 +412,7 @@ async function main(){
     // Non-destructive HeroUI Design Lab: both live component columns must render
     // on the canonical app shell without changing auth or game routes.
     await navigate('/labs/design-system','/labs/design-system',
-      "document.querySelectorAll('.sb-lab-family').length===9 && document.querySelectorAll('.sb-lab-frame[data-variant=current]').length===9 && document.querySelectorAll('.sb-lab-frame[data-variant=proposed]').length===9");
+      "document.querySelectorAll('.sb-design-lab > .sb-lab-family').length===9 && document.querySelectorAll('.sb-design-lab > .sb-lab-family .sb-lab-frame[data-variant=current]').length===9 && document.querySelectorAll('.sb-design-lab > .sb-lab-family .sb-lab-frame[data-variant=proposed]').length===9");
     const labPrimitives=await evalJs("document.querySelectorAll('[data-component=buttons] .sb-lab-proposed .button').length>=4 && !!document.querySelector('[data-component=fields] .sb-lab-proposed .input') && !!document.querySelector('[data-component=cards] .sb-lab-proposed .card')");
     if(labPrimitives!==true)throw Error('Design Lab does not use real HeroUI component primitives');
     // Next can render server HTML before React has hydrated the interactive
