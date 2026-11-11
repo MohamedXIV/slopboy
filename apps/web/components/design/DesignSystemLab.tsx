@@ -3,8 +3,15 @@
 import {useState} from 'react';
 import {Alert,Button,Card,Checkbox,Chip,Drawer,Input,Label,Spinner,Tabs,TextField} from '@heroui/react';
 import {useV2Theme} from '../v2/V2AppShell';
-import BatchTwoLab from './BatchTwoLab';
+import dynamic from 'next/dynamic';
 import './design-lab.css';
+
+/* The extended overlay showcase is intentionally client-only: native HeroUI
+ * controls with dynamic portal/IDs have no SEO or SSR requirement in this Lab. */
+const BatchTwoLab=dynamic(()=>import('./BatchTwoLab'),{
+  ssr:false,
+  loading:()=> <p className="sb-lab-help" role="status">Loading Batch 2 components…</p>,
+});
 
 type Flavor='current'|'proposed';
 type Family='buttons'|'fields'|'cards'|'tabs'|'chips'|'alerts'|'selection'|'feedback'|'drawers';

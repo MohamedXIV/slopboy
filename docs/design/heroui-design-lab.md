@@ -123,3 +123,14 @@ lighter petrol dark Lab background and restrained coral accents.
 
 **Next gate:** owner visual review and consolidated tweaks, then separately
 promote approved styles into the canonical component theme.
+
+
+### Client-only mounting note
+
+The expanded nine-family gallery uses Next dynamic loading with SSR disabled,
+inside the existing client-rendered Design Lab. The original nine-family
+comparison continues to SSR normally. This deliberate Lab-only decision avoids
+React hydration mismatches from experimental overlay composition, keeps portal
+controls client-owned, and does not alter any actual product route. Browser
+tests wait for all nine new families and both auth previews to mount and then
+verify the real Mobile toggle.

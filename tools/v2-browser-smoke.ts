@@ -467,7 +467,14 @@ async function main(){
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(180);
     // Batch 2 adds isolated native HeroUI primitives and two auth-layout demos.
-    const batchState=JSON.parse(String(await evalJs("JSON.stringify((()=>{const lab=document.querySelector('[data-batch=\"2\"]');const families=lab?.querySelectorAll('[data-batch-two-component]')||[];const auth=lab?.querySelectorAll('[data-auth-variant]')||[];return {families:families.length,proposed:lab?.querySelectorAll('.sb-b2-proposed').length||0,auth:auth.length,forms:lab?.querySelectorAll('form').length||0,disabled:lab?.querySelectorAll('.sb-b2-auth-tabs button:disabled').length||0,previewOnly:[...auth].every(el=>el.dataset.previewOnly==='true')};})())")));
+    // The expanded gallery is asynchronously mounted after the initial SSR
+    // comparison hydrates; wait for its actual components, never a fixed delay.
+    let batchState={families:0,proposed:0,auth:0,forms:0,disabled:0,previewOnly:false};
+    for(let i=0;i<80;i++){
+      batchState=JSON.parse(String(await evalJs("JSON.stringify((()=>{const lab=document.querySelector('[data-batch=\"2\"]');const families=lab?.querySelectorAll('[data-batch-two-component]')||[];const auth=lab?.querySelectorAll('[data-auth-variant]')||[];return {families:families.length,proposed:lab?.querySelectorAll('.sb-b2-proposed').length||0,auth:auth.length,forms:lab?.querySelectorAll('form').length||0,disabled:lab?.querySelectorAll('.sb-b2-auth-tabs button:disabled').length||0,previewOnly:[...auth].every(el=>el.dataset.previewOnly==='true')};})())")));
+      if(batchState.families===9&&batchState.auth===2)break;
+      await sleep(150);
+    }
     if(batchState.families!==9||batchState.proposed!==9||batchState.auth!==2||
       batchState.forms!==2||batchState.disabled!==1||!batchState.previewOnly)
       throw Error('Batch 2 gallery or demo-only auth compositions missing: '+JSON.stringify(batchState));
