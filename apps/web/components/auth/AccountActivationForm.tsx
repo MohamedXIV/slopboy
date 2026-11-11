@@ -71,7 +71,7 @@ export default function AccountActivationForm(){
         <Alert.Description>Your email is verified and your password has been set. Sign in to start the session test.</Alert.Description>
       </Alert.Content>
     </Alert>
-    <Button variant="primary" fullWidth render={<Link href="/auth/sign-in"/>}>Go to sign in</Button>
+    <Link className="link" href="/auth/sign-in">Go to sign in</Link>
   </div>;
 
   const heading={
