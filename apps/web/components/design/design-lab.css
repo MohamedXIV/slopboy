@@ -39,14 +39,14 @@
 .sb-lab-proposed{
  --lab-ink:#28442e;--lab-on-primary:#fffdf7;--lab-primary:#28442e;
  --lab-field:#dbe5db;--lab-soft:#f0eee4;--lab-surface:#fffdf7;
- --lab-line:#dedad0;--lab-shadow:0 12px 30px rgb(11 21 21 / .07);
+ --lab-line:#dedad0;
  --lab-coral:#c77361;--lab-coral-ink:#281b17;
  background:var(--lab-surface);color:var(--lab-ink);border-color:#d8dfd1;
 }
 .sb-v2-shell[data-theme='dark'] .sb-lab-proposed{
  --lab-ink:#edf4e5;--lab-on-primary:#263d34;--lab-primary:#d1e99d;
  --lab-field:#294447;--lab-soft:#20363a;--lab-surface:#172a2d;
- --lab-line:#405b56;--lab-shadow:0 10px 26px rgb(0 0 0 / .23);
+ --lab-line:#405b56;
  --lab-coral:#dc917b;--lab-coral-ink:#1c2420;
  background:#132225;color:var(--lab-ink);border-color:#405b56;
 }
@@ -64,7 +64,7 @@
  .sb-lab-proposed .button--outline{border-color:var(--lab-line);color:var(--lab-ink)}
  .sb-lab-proposed .input{background:var(--lab-field);color:var(--lab-ink);border:1px solid transparent;border-radius:9999px;box-shadow:none;min-height:44px;padding-inline:16px}
  .sb-lab-proposed .input:focus-visible,.sb-lab-proposed .input[data-focus-visible='true']{border-color:var(--lab-primary);outline:2px solid var(--lab-primary);outline-offset:2px}
- .sb-lab-proposed .card{background:var(--lab-surface);border-radius:24px;border:1px solid var(--lab-line);box-shadow:var(--lab-shadow)}
+ .sb-lab-proposed .card{background:var(--lab-surface);border-radius:24px;border:1px solid var(--lab-line);box-shadow:none}
  .sb-lab-proposed .card__title{font-weight:650;letter-spacing:-.03em;color:var(--lab-ink)}
  .sb-lab-proposed .tabs__list{border-radius:9999px;background:var(--lab-field);padding:4px}
  .sb-lab-proposed .tabs__tab{border-radius:9999px;color:var(--lab-ink)}
@@ -93,25 +93,23 @@
 @media(prefers-reduced-motion:reduce){.sb-lab-proposed .button{transition:none}}
 
 
-/* Experiment 002: preserve warm-white light cards; test two distinct dark
- * elevation strategies without touching the shared app's global theme. */
-.sb-lab-experiments{display:flex;gap:18px;flex-wrap:wrap;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--separator);border-radius:16px;padding:13px 16px;margin-top:24px}
-.sb-lab-experiment-copy{display:flex;flex-direction:column;gap:3px;flex:1 1 260px}
-.sb-lab-experiment-copy strong{font-size:13px}
-.sb-lab-experiment-copy span,.sb-lab-experiment-note{color:var(--muted);font-size:11px;line-height:1.55}
-.sb-lab-experiment-note{margin:10px 0 0}
-.sb-lab-elevation-switch{display:flex;gap:8px;flex-wrap:wrap}
-.sb-lab-elevation-switch .button[aria-pressed="true"]{background:var(--accent);color:var(--accent-foreground)}
-.sb-design-lab[data-lab-elevation="outline"] .sb-lab-proposed,
-.sb-design-lab[data-lab-elevation="outline"] .sb-lab-proposed .card{box-shadow:none}
-.sb-design-lab[data-lab-elevation="shadow"] .sb-lab-proposed{
- box-shadow:0 12px 28px rgb(11 21 21 / .09);border-color:transparent;
+/* Experiment 003: border-only components, warm white light surfaces,
+ * and a symmetric low-elevation header. No global theme is mutated. */
+.sb-lab-experiment-note{color:var(--muted);font-size:11px;line-height:1.55;margin:16px 0 0}
+.sb-lab-proposed{box-shadow:none;border:1px solid var(--lab-line)}
+.sb-lab-proposed .card{box-shadow:none}
+/* The same header treatment in BOTH modes, except for background and border tone.
+ * Page-local :has() keeps this from changing the Library, Sign-in, or Play. */
+.sb-v2-shell:has(.sb-design-lab) .sb-v2-header{
+ border-bottom:1px solid var(--sb-line);
+ box-shadow:0 1px 2px 1px #0000003d;
 }
-.sb-v2-shell[data-theme='dark'] .sb-design-lab[data-lab-elevation="shadow"] .sb-lab-proposed{
- box-shadow:0 16px 34px rgb(0 0 0 / .28);border-color:rgb(115 150 130 / .19);
+.sb-v2-shell[data-theme='dark']:has(.sb-design-lab){
+ background:#16282d;
 }
-.sb-design-lab[data-lab-elevation="outline"] .sb-lab-proposed{border-color:var(--lab-line)}
-.sb-design-lab[data-lab-elevation="shadow"] .sb-lab-proposed .card{box-shadow:var(--lab-shadow)}
+.sb-v2-shell[data-theme='dark']:has(.sb-design-lab) .sb-v2-header{
+ border-bottom-color:#272b2a;
+}
 /* HeroUI component customization stays scoped to the proposed preview. Coral
  * is an occasional hardware-inspired accent, not an error/warning color. */
 @layer components{
@@ -128,10 +126,4 @@
  content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
  background:var(--lab-coral);margin-right:7px;vertical-align:1px;
 }
-/* The shared header becomes floating ONLY while the Design Lab is present
- * in dark mode. The actual production navbar is left exactly as before. */
-.sb-v2-shell[data-theme='dark']:has(.sb-design-lab) .sb-v2-header{
- border-bottom-color:transparent;
- box-shadow:0 8px 25px rgb(0 0 0 / .24);
-}
-@media(max-width:680px){.sb-lab-experiments{align-items:stretch}.sb-lab-elevation-switch{width:100%}}
+

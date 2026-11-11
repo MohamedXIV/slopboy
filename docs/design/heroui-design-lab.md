@@ -71,3 +71,22 @@ User review changes, preview-only:
 Acceptance: white/near-white proposed light panel, dark floating header
 on this route only, visible coral use in native HeroUI demos, live
 elevation toggle, and no visual change to actual Library/Sign-in/Play.
+
+## Experiment 003 — border-first direction
+
+The owner has chosen **borders instead of card drop shadows**. Remove the
+border/shadow toggle, keep normal outlined surfaces and keep light cards warm
+white. The only shadow exception is the **small header elevation**, with the
+same property in both modes: `box-shadow: 0 1px 2px 1px #0000003d`.
+
+Header comparison is deliberately page-scoped:
+- Light: existing warm-white header surface, light bottom border, subtle shadow.
+- Dark: existing dark header surface, bottom border `#272b2a`, *same*
+  subtle header shadow.
+- Dark lab body canvas is lighter petrol `#16282d` rather than `#0d1719`;
+  this is a lab-only candidate, not a global change.
+- Coral is still a secondary, sparing hardware-inspired accent.
+
+Do not change the original current/baseline column, the actual `main`/PR #79
+theme tokens or the live product routes. The change is not approved for
+global adoption yet.

@@ -157,9 +157,7 @@ export default function DesignSystemLab(){
   const {theme}=useV2Theme();
   const [lastAction,setLastAction]=useState('');
   const [openDrawer,setOpenDrawer]=useState<Flavor|null>(null);
-  const [elevation,setElevation]=useState<'outline'|'shadow'>('shadow');
-
-  return <main className="sb-design-lab" data-lab-theme={theme} data-lab-elevation={elevation}>
+  return <main className="sb-design-lab" data-lab-theme={theme}>
     <header className="sb-lab-intro">
       <div className="sb-lab-eyebrow">SLOPBOY / DESIGN SYSTEM / EXPERIMENT 001</div>
       <h1>Same Slopboy. <em>Better foundations.</em></h1>
@@ -168,19 +166,7 @@ export default function DesignSystemLab(){
         <Chip variant="soft" color="accent">Isolated experiment</Chip>
         <span>Current theme: <strong>{theme}</strong> · Switch it in the site header</span>
       </div>
-      <div className="sb-lab-experiments">
-        <div className="sb-lab-experiment-copy">
-          <strong>Surface elevation</strong>
-          <span>Compare an outlined card with a subtle floating shadow. Proposed column only.</span>
-        </div>
-        <div className="sb-lab-elevation-switch" aria-label="Proposed card elevation">
-          <Button size="sm" variant="secondary" data-elevation-choice="outline"
-            aria-pressed={elevation==='outline'} onPress={()=>setElevation('outline')}>Border only</Button>
-          <Button size="sm" variant="secondary" data-elevation-choice="shadow"
-            aria-pressed={elevation==='shadow'} onPress={()=>setElevation('shadow')}>Soft shadow</Button>
-        </div>
-      </div>
-      <p className="sb-lab-experiment-note">Dark header: shadow instead of the bottom rule, on this lab route only. Coral: a small optional accent inspired by the handheld A/B buttons.</p>
+      <p className="sb-lab-experiment-note">Bordered cards only. Both headers use the same fine bottom border and subtle shadow; Dark uses a lighter petrol background. Coral remains a small optional accent inspired by the handheld A/B buttons.</p>
     </header>
     <section className="sb-lab-palette" aria-label="Existing Slopboy identity colors">
       {COLORS.map(color=><div className="sb-lab-swatch" key={color.name}>
