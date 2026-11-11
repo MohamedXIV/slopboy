@@ -444,8 +444,8 @@ async function main(){
     if(proposedLight.theme!=='light'||proposedLight.surface!=='#fffdf7'||
       proposedLight.coral!=='#c77361'||proposedLight.frameBorder!=='1px'||
       proposedLight.frameShadow!=='none'||proposedLight.cardShadow!=='none'||
-      proposedLight.headerBorder!=='1px'||proposedLight.headerShadow==='none')
-      throw Error('Light lab must have warm-white bordered surfaces and fine header elevation: '+JSON.stringify(proposedLight));
+      proposedLight.headerBorder!=='1px'||proposedLight.headerShadow!=='none')
+      throw Error('Light lab must have warm-white bordered surfaces and a shadow-free header: '+JSON.stringify(proposedLight));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(180);
     const darkLab=JSON.parse(String(await evalJs(`(()=>{
@@ -461,7 +461,7 @@ async function main(){
     })()`)));
     if(darkLab.theme!=='dark'||darkLab.body!=='rgb(22, 40, 45)'||
       darkLab.border!=='rgb(39, 43, 42)'||darkLab.borderWidth!=='1px'||
-      darkLab.shadow!==proposedLight.headerShadow||
+      darkLab.shadow!=='none'||
       darkLab.frameShadow!=='none'||darkLab.cardShadow!=='none')
       throw Error('Dark lab surface/header did not follow border-first theme: '+JSON.stringify(darkLab));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
@@ -471,13 +471,34 @@ async function main(){
     // comparison hydrates; wait for its actual components, never a fixed delay.
     let batchState={families:0,proposed:0,auth:0,forms:0,disabled:0,previewOnly:false};
     for(let i=0;i<80;i++){
-      batchState=JSON.parse(String(await evalJs("JSON.stringify((()=>{const lab=document.querySelector('[data-batch=\"2\"]');const families=lab?.querySelectorAll('[data-batch-two-component]')||[];const auth=lab?.querySelectorAll('[data-auth-variant]')||[];return {families:families.length,proposed:lab?.querySelectorAll('.sb-b2-proposed').length||0,auth:auth.length,forms:lab?.querySelectorAll('form').length||0,disabled:lab?.querySelectorAll('.sb-b2-auth-tabs button:disabled').length||0,previewOnly:[...auth].every(el=>el.dataset.previewOnly==='true')};})())")));
+      batchState=JSON.parse(String(await evalJs("JSON.stringify((()=>{const lab=document.querySelector('[data-batch=\"2\"]');const families=lab?.querySelectorAll('[data-batch-two-component]')||[];const auth=lab?.querySelectorAll('[data-auth-variant]')||[];return {families:families.length,proposed:lab?.querySelectorAll('.sb-b2-proposed').length||0,auth:auth.length,forms:lab?.querySelectorAll('form').length||0,disabled:lab?.querySelectorAll('.sb-b2-auth-tabs [role=tab][aria-disabled=true]').length||0,previewOnly:[...auth].every(el=>el.dataset.previewOnly==='true')};})())")));
       if(batchState.families===9&&batchState.auth===2)break;
       await sleep(150);
     }
     if(batchState.families!==9||batchState.proposed!==9||batchState.auth!==2||
       batchState.forms!==2||batchState.disabled!==1||!batchState.previewOnly)
       throw Error('Batch 2 gallery or demo-only auth compositions missing: '+JSON.stringify(batchState));
+    // Inspect actual HeroUI Tabs widths, active/disabled states and alignment.
+    // The old faux Buttons rendered as two small, floating pills.
+    const authTabs=async()=>JSON.parse(String(await evalJs(`(()=>{
+      const root=document.querySelector('.sb-b2-auth-proposed .sb-b2-auth-tabs');
+      const list=root?.querySelector('.tabs__list');
+      const tabs=[...(root?.querySelectorAll('[role=tab]')||[])];
+      if(!list||tabs.length!==2)return JSON.stringify({count:tabs.length});
+      const a=tabs[0].getBoundingClientRect(),b=tabs[1].getBoundingClientRect(),
+        l=list.getBoundingClientRect();
+      return JSON.stringify({
+        count:tabs.length,enabled:tabs[0].getAttribute('aria-selected')==='true',
+        closed:tabs[1].getAttribute('aria-disabled')==='true',
+        equal:Math.abs(a.width-b.width)<2,
+        edges:Math.abs(a.left-l.left)<14&&Math.abs(b.right-l.right)<14,
+        wide:a.width>70,theme:document.querySelector('.sb-v2-shell').dataset.theme
+      });
+    })()`)));
+    const authDesktop=await authTabs();
+    if(authDesktop.count!==2||!authDesktop.enabled||!authDesktop.closed||
+      !authDesktop.equal||!authDesktop.edges||!authDesktop.wide||authDesktop.theme!=='light')
+      throw Error('Native HeroUI auth tabs are not balanced on desktop: '+JSON.stringify(authDesktop));
     let authPreviewMobileReady=false;
     for(let attempt=0;attempt<25;attempt++){
       await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:last-child').click();true");
@@ -486,6 +507,16 @@ async function main(){
       if(authPreviewMobileReady)break;
     }
     if(!authPreviewMobileReady)throw Error('Batch 2 mobile width toggle did not respond after hydration');
+    const authMobile=await authTabs();
+    if(authMobile.count!==2||!authMobile.equal||!authMobile.edges||!authMobile.closed)
+      throw Error('Native HeroUI auth tabs are not balanced on mobile: '+JSON.stringify(authMobile));
+    await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
+    await sleep(180);
+    const authMobileDark=await authTabs();
+    if(authMobileDark.theme!=='dark'||!authMobileDark.equal||!authMobileDark.edges||!authMobileDark.closed)
+      throw Error('Dark/mobile auth tabs regressed: '+JSON.stringify(authMobileDark));
+    await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
+    await sleep(180);
     await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:first-child').click();true");
     await sleep(180);
     await navigate('/play','/play/'+GAMES[0].gameId,

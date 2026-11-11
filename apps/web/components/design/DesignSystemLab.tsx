@@ -4,6 +4,7 @@ import {useState} from 'react';
 import {Alert,Button,Card,Checkbox,Chip,Drawer,Input,Label,Spinner,Tabs,TextField} from '@heroui/react';
 import {useV2Theme} from '../v2/V2AppShell';
 import dynamic from 'next/dynamic';
+import '../../app/v2/slopboy-components-preview.css';
 import './design-lab.css';
 
 /* The extended overlay showcase is intentionally client-only: native HeroUI
@@ -138,7 +139,7 @@ function Example({family,flavor,onAction,openDrawer,setOpenDrawer,theme}:{
         <Drawer>
           <Drawer.Backdrop isOpen={openDrawer===flavor} onOpenChange={isOpen=>setOpenDrawer(isOpen?flavor:null)} variant="blur">
             <Drawer.Content placement="right">
-              <Drawer.Dialog className={'sb-v2-dialog sb-lab-drawer '+(flavor==='proposed'?'sb-lab-drawer-proposed ':'')+theme}
+              <Drawer.Dialog className={'sb-v2-dialog sb-lab-drawer '+(flavor==='proposed'?'sb-heroui-preview sb-lab-drawer-proposed ':'')+theme}
                 aria-label="Design lab device settings">
                 <Drawer.Header>
                   <Drawer.Heading>Display preferences</Drawer.Heading>
@@ -174,7 +175,7 @@ export default function DesignSystemLab(){
         <Chip variant="soft" color="accent">Isolated experiment</Chip>
         <span>Current theme: <strong>{theme}</strong> · Switch it in the site header</span>
       </div>
-      <p className="sb-lab-experiment-note">Bordered cards only. Both headers use the same fine bottom border and subtle shadow; Dark uses a lighter petrol background. Coral remains a small optional accent inspired by the handheld A/B buttons.</p>
+      <p className="sb-lab-experiment-note">Bordered cards only. Both headers use the same fine bottom border without a shadow; Dark uses a lighter petrol background. Coral remains a small optional accent inspired by the handheld A/B buttons.</p>
     </header>
     <section className="sb-lab-palette" aria-label="Existing Slopboy identity colors">
       {COLORS.map(color=><div className="sb-lab-swatch" key={color.name}>
@@ -193,7 +194,7 @@ export default function DesignSystemLab(){
       </div>
       <div className="sb-lab-pair">
         {(['current','proposed'] as const).map(flavor=><div key={flavor}
-          className={'sb-lab-frame sb-lab-'+flavor}
+          className={'sb-lab-frame sb-lab-'+flavor+(flavor==='proposed'?' sb-heroui-preview':'')}
           data-variant={flavor}>
           <div className="sb-lab-frame-label">{flavor==='current'?'Current / baseline':'Proposed / preview'}</div>
           <div className="sb-lab-stage">

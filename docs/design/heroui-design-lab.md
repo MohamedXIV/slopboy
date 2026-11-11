@@ -10,7 +10,7 @@ Review URL: /labs/design-system (under existing modern V2 AppShell).
 - LEFT: real HeroUI v3 components with the current production-candidate theme.
 - RIGHT: the exact same HeroUI components with proposed local scoped styles.
 - Both columns stay interactive; dark/light uses the existing global toggle.
-- The source for the experiment is components/design/design-lab.css only.
+- Shared opt-in HeroUI BEM rules live in app/v2/slopboy-components-preview.css; gallery and composition CSS remains in components/design/*.css.
 - No product component, global theme, auth behavior, or hardware runtime is modified.
 
 ## What we are preserving
@@ -76,13 +76,11 @@ elevation toggle, and no visual change to actual Library/Sign-in/Play.
 
 The owner has chosen **borders instead of card drop shadows**. Remove the
 border/shadow toggle, keep normal outlined surfaces and keep light cards warm
-white. The only shadow exception is the **small header elevation**, with the
-same property in both modes: `box-shadow: 0 1px 2px 1px #0000003d`.
+white. A prior header elevation was tried and then **rejected**: the accepted header has a subtle bottom border with no drop shadow.
 
 Header comparison is deliberately page-scoped:
-- Light: existing warm-white header surface, light bottom border, subtle shadow.
-- Dark: existing dark header surface, bottom border `#272b2a`, *same*
-  subtle header shadow.
+- Light: existing warm-white header surface and subtle bottom border, no shadow.
+- Dark: existing dark header surface, bottom border `#272b2a`, no shadow.
 - Dark lab body canvas is lighter petrol `#16282d` rather than `#0d1719`;
   this is a lab-only candidate, not a global change.
 - Coral is still a secondary, sparing hardware-inspired accent.
@@ -105,7 +103,7 @@ Below the gallery, a composed authentication preview compares the CURRENT
 sign-in structure against the proposed pocket-hardware aesthetic. The user
 can select desktop or 375px mobile composition without resizing the browser.
 The page inherits the existing Light/Dark toggle and respects the agreed
-cream/white light cards, border-only card design, faint shared-header shadow,
+cream/white light cards, border-only card design, shadow-free shared header,
 lighter petrol dark Lab background and restrained coral accents.
 
 **Safety and review constraints:**
@@ -115,14 +113,31 @@ lighter petrol dark Lab background and restrained coral accents.
   navigation, enabled sign-up, passkeys, ROM Dock actions, or real game data.
   Form submission explicitly prevents navigation and shows demo-only feedback.
 - Create account remains disabled during the private rollout.
-- All new styling lives in the dedicated design component files.
-  Do NOT copy changes into the canonical theme or live sign-in page yet.
+- Generic HeroUI styles live in the opt-in shared preview file; gallery and Auth composition styles stay in dedicated design files.
+  Do NOT import them from the canonical live theme or sign-in page yet.
 - Continue to protect PR #79, main, production and game runtime from edits.
 - Review Light/Dark + Desktop/Mobile and all native interactions before
   deciding what to promote into shared HeroUI tokens.
 
-**Next gate:** owner visual review and consolidated tweaks, then separately
-promote approved styles into the canonical component theme.
+## Shared HeroUI foundation — pending visual approval
+
+The latest isolated batch consolidates 18 native HeroUI component families using
+`apps/web/app/v2/slopboy-components-preview.css`, explicitly opted into via
+`.sb-heroui-preview`. Proposed palette, BEM selectors, focus/selected states
+and reduced-motion styles now have one reusable source. Auth composition and
+two-column Lab layout remain separate. Portaled HeroUI overlays opt in
+independently with their correct light/dark classes.
+
+Consolidated review feedback: no header shadow (1px bottom border remains);
+proposed frame uses `border:1px solid var(--border)`; no redundant frame
+`box-shadow:none`; exact requested Auth heading typography; native full-width
+HeroUI Tabs in the auth preview with the create-account option disabled.
+
+The browser smoke covers desktop/mobile tab geometry and disabled semantics,
+including dark/mobile, while existing sign-in, library and game checks remain.
+
+**Next gate:** review the new PR #80 Preview in Light/Dark and Desktop/Mobile.
+No live theme import or promotion, no production edits, and no automatic PR merge.
 
 
 ### Client-only mounting note

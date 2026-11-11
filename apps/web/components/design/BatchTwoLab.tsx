@@ -5,7 +5,7 @@ import type {FormEvent} from 'react';
 import {
   Alert,Button,Card,Chip,Description,Dropdown,FieldError,Form,Input,
   Label,ListBox,Modal,Popover,Radio,RadioGroup,Select,Switch,TextArea,
-  TextField,Tooltip,
+  Tabs,TextField,Tooltip,
 } from '@heroui/react';
 import './batch-two.css';
 
@@ -27,7 +27,7 @@ const FAMILIES:ReadonlyArray<{id:Family;name:string;description:string}>=[
 ];
 
 function overlayClasses(flavor:Flavor,theme:Theme){
-  return 'sb-v2-dialog sb-b2-overlay '+theme+(flavor==='proposed'?' sb-b2-overlay-proposed':'');
+  return 'sb-v2-dialog sb-b2-overlay '+theme+(flavor==='proposed'?' sb-heroui-preview sb-b2-overlay-proposed':'');
 }
 
 function ComponentSample({family,flavor,theme,onAction}:{
@@ -182,7 +182,7 @@ function AuthPanel({flavor}:{flavor:Flavor}){
     event.preventDefault();
     setStatus('Visual preview only — no credentials submitted or stored.');
   };
-  return <article className={'sb-b2-auth-sample'+(proposed?' sb-lab-proposed sb-b2-auth-proposed':' sb-b2-auth-current')}
+  return <article className={'sb-b2-auth-sample'+(proposed?' sb-lab-proposed sb-heroui-preview sb-b2-auth-proposed':' sb-b2-auth-current')}
     data-auth-variant={flavor} data-preview-only="true">
     <div className="sb-b2-auth-ribbon" aria-hidden="true">
       <span>● {proposed?'SYS.LINK // ACCOUNT':'CURRENT / ACCOUNT'}</span>
@@ -194,17 +194,23 @@ function AuthPanel({flavor}:{flavor:Flavor}){
           <span className="sb-b2-auth-vents"><i/><i/><i/><i/> MIC/SLOT</span>
           <span className="sb-b2-auth-power">● &nbsp; READY</span>
         </div>
-        <div className="sb-b2-auth-tabs">
-          <Button variant="secondary" aria-current="page">Sign in</Button>
-          <Button variant="secondary" isDisabled>Create account · closed</Button>
-        </div>
-        <div className="sb-b2-auth-heading">
-          <Chip variant="soft" color="accent">SLOPBOY · ACCOUNT</Chip>
-          <h3>Welcome back</h3>
-          <p>Sign in to access your private creator dashboard. Guest games remain available without an account.</p>
-        </div>
-        <AuthFields flavor={flavor} showPassword={showPassword} onVisibilityChange={()=>setShowPassword(v=>!v)}
-          onSubmit={onSubmit} onStatus={setStatus}/>
+        <Tabs className="sb-b2-auth-tabs" defaultSelectedKey="sign-in">
+          <Tabs.ListContainer>
+            <Tabs.List aria-label="Account options (preview only)">
+              <Tabs.Tab id="sign-in"><Tabs.Indicator/>Sign in</Tabs.Tab>
+              <Tabs.Tab id="create-account" isDisabled>Create account · closed</Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+          <Tabs.Panel id="sign-in">
+            <div className="sb-b2-auth-heading">
+              <Chip variant="soft" color="accent">SLOPBOY · ACCOUNT</Chip>
+              <h3>Welcome back</h3>
+              <p>Sign in to access your private creator dashboard. Guest games remain available without an account.</p>
+            </div>
+            <AuthFields flavor={flavor} showPassword={showPassword} onVisibilityChange={()=>setShowPassword(v=>!v)}
+              onSubmit={onSubmit} onStatus={setStatus}/>
+          </Tabs.Panel>
+        </Tabs>
         <div className="sb-b2-auth-footnote" aria-hidden="true"><span>INDEXED · 4 SHADES</span><span>VIRTUAL HANDHELD</span></div>
       </Card.Content>:
       <>
@@ -267,7 +273,7 @@ export default function BatchTwoLab({theme}:{theme:Theme}){
       <div className="sb-lab-family-heading"><h2>{item.name}</h2><p>{item.description}</p></div>
       <div className="sb-lab-pair">
         {(['current','proposed'] as const).map(flavor=><div key={flavor}
-          className={'sb-lab-frame sb-lab-'+flavor+(flavor==='proposed'?' sb-b2-proposed':'')}
+          className={'sb-lab-frame sb-lab-'+flavor+(flavor==='proposed'?' sb-heroui-preview sb-b2-proposed':'')}
           data-variant={flavor}>
           <div className="sb-lab-frame-label">{flavor==='current'?'Current / baseline':'Proposed / preview'}</div>
           <div className="sb-lab-stage sb-b2-sample-stage">

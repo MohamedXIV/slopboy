@@ -34,54 +34,17 @@
 .sb-lab-note{color:var(--muted);font-size:12px;line-height:1.65;max-width:750px}
 .sb-lab-note strong{color:var(--foreground)}
 
-/* Local proposed color primitives. Original global V2 tokens are not changed.
- * The dark variant retains the platform's petrol + LCD-lime vocabulary. */
-.sb-lab-proposed{
- --lab-ink:#28442e;--lab-on-primary:#fffdf7;--lab-primary:#28442e;
- --lab-field:#dbe5db;--lab-soft:#f0eee4;--lab-surface:#fffdf7;
- --lab-line:#dedad0;
- --lab-coral:#c77361;--lab-coral-ink:#281b17;
- background:var(--lab-surface);color:var(--lab-ink);border-color:#d8dfd1;
+/* Preview frames use centralized colors and HeroUI component rules.
+ * These remain independent of the live app's semantic theme. */
+.sb-lab-proposed {
+ background:var(--sb-ui-surface);
+ color:var(--sb-ui-ink);
+ border:1px solid var(--border);
 }
-.sb-v2-shell[data-theme='dark'] .sb-lab-proposed{
- --lab-ink:#edf4e5;--lab-on-primary:#263d34;--lab-primary:#d1e99d;
- --lab-field:#294447;--lab-soft:#20363a;--lab-surface:#172a2d;
- --lab-line:#405b56;
- --lab-coral:#dc917b;--lab-coral-ink:#1c2420;
- background:#132225;color:var(--lab-ink);border-color:#405b56;
-}
-.sb-lab-proposed .sb-lab-frame-label{color:var(--lab-ink);border-color:var(--lab-line)}
-/* HeroUI BEM hooks, not rebuilt controls. Small and reversible. */
-@layer components{
- .sb-lab-proposed .button{font-family:var(--sb-font-ui);font-weight:600;border-radius:9999px;transition:background-color .15s,box-shadow .15s,transform .15s}
- .sb-lab-proposed .button--primary{
-   --button-bg:var(--lab-primary);--button-fg:var(--lab-on-primary);
-   background:var(--lab-primary);color:var(--lab-on-primary);
-   box-shadow:0 4px 12px rgb(0 0 0 / .13);
- }
- .sb-lab-proposed .button--primary:hover{filter:brightness(1.07)}
- .sb-lab-proposed .button--secondary{background:var(--lab-soft);color:var(--lab-ink);border-color:var(--lab-line)}
- .sb-lab-proposed .button--outline{border-color:var(--lab-line);color:var(--lab-ink)}
- .sb-lab-proposed .input{background:var(--lab-field);color:var(--lab-ink);border:1px solid transparent;border-radius:9999px;box-shadow:none;min-height:44px;padding-inline:16px}
- .sb-lab-proposed .input:focus-visible,.sb-lab-proposed .input[data-focus-visible='true']{border-color:var(--lab-primary);outline:2px solid var(--lab-primary);outline-offset:2px}
- .sb-lab-proposed .card{background:var(--lab-surface);border-radius:24px;border:1px solid var(--lab-line);box-shadow:none}
- .sb-lab-proposed .card__title{font-weight:650;letter-spacing:-.03em;color:var(--lab-ink)}
- .sb-lab-proposed .tabs__list{border-radius:9999px;background:var(--lab-field);padding:4px}
- .sb-lab-proposed .tabs__tab{border-radius:9999px;color:var(--lab-ink)}
- .sb-lab-proposed .tabs__indicator{border-radius:9999px;background:var(--lab-surface);box-shadow:0 2px 5px #00000012}
- .sb-lab-proposed .chip{border-radius:9999px;font-weight:600}
- .sb-lab-proposed .alert{border-radius:18px}
- .sb-lab-proposed .checkbox__control{border-radius:7px}
-}
-.sb-lab-proposed .sb-lab-card-copy,.sb-lab-proposed .sb-lab-tab-copy,.sb-lab-proposed .sb-lab-help{color:var(--lab-ink);opacity:.75}
-.sb-lab-drawer-proposed{
- --lab-primary:#28442e;--lab-surface:#fffdf7;--lab-field:#dbe5db;
- border-radius:26px 0 0 26px;background:var(--lab-surface);color:#28442e;
-}
-.sb-lab-drawer-proposed.dark{--lab-primary:#d1e99d;--lab-surface:#172a2d;--lab-field:#294447;color:#edf4e5}
-.sb-lab-drawer-proposed .button--primary{background:var(--lab-primary);color:var(--lab-surface);border-radius:9999px}
-.sb-lab-drawer-proposed.dark .button--primary{color:#263d34}
-.sb-lab-drawer-proposed .drawer__close-trigger{border-radius:9999px;background:var(--lab-field)}
+.sb-v2-shell[data-theme='dark'] .sb-lab-proposed {background:#132225}
+.sb-lab-proposed .sb-lab-frame-label{color:var(--sb-ui-ink);border-color:var(--sb-ui-line)}
+.sb-lab-proposed .sb-lab-card-copy,.sb-lab-proposed .sb-lab-tab-copy,.sb-lab-proposed .sb-lab-help{color:var(--sb-ui-ink);opacity:.75}
+.sb-lab-drawer-proposed{border-radius:26px 0 0 26px;background:var(--sb-ui-surface);color:var(--sb-ui-ink)}
 @media(max-width:900px){.sb-lab-palette{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:680px){
  .sb-design-lab{padding:28px 14px 70px}
@@ -90,19 +53,16 @@
  .sb-lab-pair{grid-template-columns:1fr;gap:10px}
  .sb-lab-stage{padding:18px;min-height:120px}
 }
-@media(prefers-reduced-motion:reduce){.sb-lab-proposed .button{transition:none}}
+
 
 
 /* Experiment 003: border-only components, warm white light surfaces,
- * and a symmetric low-elevation header. No global theme is mutated. */
+ * and a shadow-free header with a fine bottom border. No global theme is mutated. */
 .sb-lab-experiment-note{color:var(--muted);font-size:11px;line-height:1.55;margin:16px 0 0}
-.sb-lab-proposed{box-shadow:none;border:1px solid var(--lab-line)}
-.sb-lab-proposed .card{box-shadow:none}
 /* The same header treatment in BOTH modes, except for background and border tone.
  * Page-local :has() keeps this from changing the Library, Sign-in, or Play. */
 .sb-v2-shell:has(.sb-design-lab) .sb-v2-header{
  border-bottom:1px solid var(--sb-line);
- box-shadow:0 1px 2px 1px #0000003d;
 }
 .sb-v2-shell[data-theme='dark']:has(.sb-design-lab){
  background:#16282d;
@@ -114,16 +74,16 @@
  * is an occasional hardware-inspired accent, not an error/warning color. */
 @layer components{
  .sb-lab-proposed .sb-lab-warm-action.button{
-   background:var(--lab-coral);color:var(--lab-coral-ink);border-color:transparent;
+   background:var(--sb-ui-coral);color:var(--sb-ui-coral-ink);border-color:transparent;
  }
  .sb-lab-proposed .sb-lab-warm-action.button:hover{filter:brightness(1.06)}
  .sb-lab-proposed .sb-lab-coral-chip.chip{
-   background:color-mix(in srgb,var(--lab-coral) 24%,var(--lab-surface));
-   color:var(--lab-ink);border:1px solid color-mix(in srgb,var(--lab-coral) 55%,transparent);
+   background:color-mix(in srgb,var(--sb-ui-coral) 24%,var(--sb-ui-surface));
+   color:var(--sb-ui-ink);border:1px solid color-mix(in srgb,var(--sb-ui-coral) 55%,transparent);
  }
 }
 .sb-lab-proposed .sb-lab-frame-label:before{
  content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
- background:var(--lab-coral);margin-right:7px;vertical-align:1px;
+ background:var(--sb-ui-coral);margin-right:7px;vertical-align:1px;
 }
 
