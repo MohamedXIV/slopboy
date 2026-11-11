@@ -180,7 +180,7 @@ export default function DesignSystemLab(){
             aria-pressed={elevation==='shadow'} onPress={()=>setElevation('shadow')}>Soft shadow</Button>
         </div>
       </div>
-      <p className="sb-lab-experiment-note">Dark header: shadow instead of the bottom rule, on this lab route only. Coral: a small optional accent inspired by the device's A/B buttons.</p>
+      <p className="sb-lab-experiment-note">Dark header: shadow instead of the bottom rule, on this lab route only. Coral: a small optional accent inspired by the handheld A/B buttons.</p>
     </header>
     <section className="sb-lab-palette" aria-label="Existing Slopboy identity colors">
       {COLORS.map(color=><div className="sb-lab-swatch" key={color.name}>
