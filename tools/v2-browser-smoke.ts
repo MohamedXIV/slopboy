@@ -434,8 +434,8 @@ async function main(){
       const header=getComputedStyle(document.querySelector('.sb-v2-header'));
       return JSON.stringify({
         theme:document.querySelector('.sb-v2-shell').dataset.theme,
-        surface:frame.getPropertyValue('--lab-surface').trim(),
-        coral:frame.getPropertyValue('--lab-coral').trim(),
+        surface:frame.getPropertyValue('--sb-ui-surface').trim(),
+        coral:frame.getPropertyValue('--sb-ui-coral').trim(),
         frameBorder:frame.borderBottomWidth,
         frameShadow:frame.boxShadow,cardShadow:card.boxShadow,
         headerBorder:header.borderBottomWidth,headerShadow:header.boxShadow
