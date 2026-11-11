@@ -463,6 +463,21 @@ async function main(){
       throw Error('Dark lab surface/header did not follow border-first theme: '+JSON.stringify(darkLab));
     await evalJs("document.querySelector('.sb-v2-theme-toggle').click();true");
     await sleep(180);
+    // Batch 2 adds isolated native HeroUI primitives and two auth-layout demos.
+    const batchState=JSON.parse(String(await evalJs("JSON.stringify((()=>{const lab=document.querySelector('[data-batch=\"2\"]');const families=lab?.querySelectorAll('[data-batch-two-component]')||[];const auth=lab?.querySelectorAll('[data-auth-variant]')||[];return {families:families.length,proposed:lab?.querySelectorAll('.sb-b2-proposed').length||0,auth:auth.length,forms:lab?.querySelectorAll('form').length||0,disabled:lab?.querySelectorAll('.sb-b2-auth-tabs button:disabled').length||0,previewOnly:[...auth].every(el=>el.dataset.previewOnly==='true')};})())")));
+    if(batchState.families!==9||batchState.proposed!==9||batchState.auth!==2||
+      batchState.forms!==2||batchState.disabled!==1||!batchState.previewOnly)
+      throw Error('Batch 2 gallery or demo-only auth compositions missing: '+JSON.stringify(batchState));
+    let mobileReady=false;
+    for(let attempt=0;attempt<25;attempt++){
+      await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:last-child').click();true");
+      await sleep(120);
+      mobileReady=await evalJs("document.querySelector('[data-auth-preview]').dataset.authPreview==='mobile'")===true;
+      if(mobileReady)break;
+    }
+    if(!mobileReady)throw Error('Batch 2 mobile width toggle did not respond after hydration');
+    await evalJs("document.querySelector('[data-auth-preview] .sb-b2-viewport-switch button:first-child').click();true");
+    await sleep(180);
     await navigate('/play','/play/'+GAMES[0].gameId,
       "!!document.querySelector('.v2-led.on')");
     // Verify the official library also works independently after returning from legacy.

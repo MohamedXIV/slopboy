@@ -90,3 +90,36 @@ Header comparison is deliberately page-scoped:
 Do not change the original current/baseline column, the actual `main`/PR #79
 theme tokens or the live product routes. The change is not approved for
 global adoption yet.
+
+
+## Batch 2 — extended component gallery and composed authentication
+
+**Status:** Design Lab only, Draft PR #80; not a production adoption.
+
+Nine additional side-by-side HeroUI v3 examples: Select/ListBox, TextArea,
+Switch, RadioGroup, Modal, Popover, Dropdown, Tooltip, and TextField/FieldError
+validation. Both columns use native HeroUI behavior and retain keyboard,
+focus, selected, disabled and invalid states.
+
+Below the gallery, a composed authentication preview compares the CURRENT
+sign-in structure against the proposed pocket-hardware aesthetic. The user
+can select desktop or 375px mobile composition without resizing the browser.
+The page inherits the existing Light/Dark toggle and respects the agreed
+cream/white light cards, border-only card design, faint shared-header shadow,
+lighter petrol dark Lab background and restrained coral accents.
+
+**Safety and review constraints:**
+- The preview uses native HeroUI Card, Form, Button, TextField, Input,
+  Label, FieldError, Alert and Chip components.
+- No authentication client, network calls, account credentials, URL
+  navigation, enabled sign-up, passkeys, ROM Dock actions, or real game data.
+  Form submission explicitly prevents navigation and shows demo-only feedback.
+- Create account remains disabled during the private rollout.
+- All new styling lives in the dedicated design component files.
+  Do NOT copy changes into the canonical theme or live sign-in page yet.
+- Continue to protect PR #79, main, production and game runtime from edits.
+- Review Light/Dark + Desktop/Mobile and all native interactions before
+  deciding what to promote into shared HeroUI tokens.
+
+**Next gate:** owner visual review and consolidated tweaks, then separately
+promote approved styles into the canonical component theme.

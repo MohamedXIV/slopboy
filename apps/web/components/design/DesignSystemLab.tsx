@@ -3,6 +3,7 @@
 import {useState} from 'react';
 import {Alert,Button,Card,Checkbox,Chip,Drawer,Input,Label,Spinner,Tabs,TextField} from '@heroui/react';
 import {useV2Theme} from '../v2/V2AppShell';
+import BatchTwoLab from './BatchTwoLab';
 import './design-lab.css';
 
 type Flavor='current'|'proposed';
@@ -159,7 +160,7 @@ export default function DesignSystemLab(){
   const [openDrawer,setOpenDrawer]=useState<Flavor|null>(null);
   return <main className="sb-design-lab" data-lab-theme={theme}>
     <header className="sb-lab-intro">
-      <div className="sb-lab-eyebrow">SLOPBOY / DESIGN SYSTEM / EXPERIMENT 001</div>
+      <div className="sb-lab-eyebrow">SLOPBOY / DESIGN SYSTEM / BATCH 2</div>
       <h1>Same Slopboy. <em>Better foundations.</em></h1>
       <p>Real HeroUI v3 primitives on both sides. The left uses the current app theme; the right previews a softer tactile treatment inspired by our existing platform and auth reference. Nothing here changes the production components.</p>
       <div className="sb-lab-meta">
@@ -195,6 +196,7 @@ export default function DesignSystemLab(){
         </div>)}
       </div>
     </section>)}
+    <BatchTwoLab theme={theme}/>
     <div className="sb-lab-action-status" aria-live="polite">
       {lastAction || 'Click any action to inspect real component feedback. No account or game data is changed.'}
     </div>
