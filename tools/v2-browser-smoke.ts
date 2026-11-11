@@ -409,7 +409,17 @@ async function main(){
       "!!document.querySelector('.player-root')&&!!document.querySelector('.isolated-game-frame')");
     await navigate('/create','/legacy/create',
       "!!document.querySelector('.creator-main')&&!document.querySelector('.sb-v2-header')");
-    await navigate('/play','/play/'+GAMES[0].gameId,
+    // Non-destructive HeroUI Design Lab: both live component columns must render
+    // on the canonical app shell without changing auth or game routes.
+    await navigate('/labs/design-system','/labs/design-system',
+      "document.querySelectorAll('.sb-lab-family').length===9 && document.querySelectorAll('.sb-lab-frame[data-variant=current]').length===9 && document.querySelectorAll('.sb-lab-frame[data-variant=proposed]').length===9");
+    const labPrimitives=await evalJs("document.querySelectorAll('[data-component=buttons] .sb-lab-proposed .button').length>=4 && !!document.querySelector('[data-component=fields] .sb-lab-proposed .input') && !!document.querySelector('[data-component=cards] .sb-lab-proposed .card')");
+    if(labPrimitives!==true)throw Error('Design Lab does not use real HeroUI component primitives');
+    await evalJs("document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary').click();true");
+    await sleep(100);
+    const labAction=await evalJs("document.querySelector('.sb-lab-action-status').textContent.includes('proposed primary button pressed')");
+    if(labAction!==true)throw Error('Proposed HeroUI controls in the Design Lab are not interactive');
+        await navigate('/play','/play/'+GAMES[0].gameId,
       "!!document.querySelector('.v2-led.on')");
     // Verify the official library also works independently after returning from legacy.
     await navigate('/library','/library',
