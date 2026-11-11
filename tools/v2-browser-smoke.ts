@@ -424,7 +424,10 @@ async function main(){
       labAction=await evalJs("document.querySelector('.sb-lab-action-status').textContent.includes('proposed primary button pressed')")===true;
       if(labAction)break;
     }
-    if(!labAction)throw Error('Proposed HeroUI controls did not respond after client hydration');
+    if(!labAction){
+      const state=await evalJs("JSON.stringify({ready:document.readyState,body:document.body.textContent.slice(0,450),primary:!!document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary'),status:document.querySelector('.sb-lab-action-status')?.textContent,batchCount:document.querySelectorAll('[data-batch-two-component]').length,reactOverlay:document.querySelector('nextjs-portal')?.textContent?.slice(0,400)})");
+      throw Error('Design Lab client did not hydrate: '+state+' | Chrome errors: '+JSON.stringify(browser.diagnostics()));
+    }
     const proposedLight=JSON.parse(String(await evalJs(`(()=>{
       const frame=getComputedStyle(document.querySelector('.sb-lab-proposed'));
       const card=getComputedStyle(document.querySelector('.sb-lab-proposed .card'));

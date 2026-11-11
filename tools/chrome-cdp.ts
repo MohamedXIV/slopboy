@@ -14,7 +14,7 @@ function chromeBinary():string{
   }
   throw Error('Chrome/Chromium binary not available on this runner');
 }
-interface CdpResponse { id?:number; sessionId?:string; result?:Record<string,unknown>; error?:{message:string} }
+interface CdpResponse { id?:number; sessionId?:string; method?:string; params?:Record<string,unknown>; result?:Record<string,unknown>; error?:{message:string} }
 export async function openChromePage(url:string,profile:string){
   const process=spawn(chromeBinary(),[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
@@ -50,10 +50,18 @@ export async function openChromePage(url:string,profile:string){
       socket!.addEventListener('error',()=>reject(Error('Chrome WebSocket failed')),{once:true});
     });
     const pending=new Map<number,{resolve:(v:Record<string,unknown>)=>void;reject:(e:Error)=>void}>();
+    const runtimeErrors:string[]=[];
     let sequence=0;
     socket.addEventListener('message',e=>{
       let packet:CdpResponse;
       try{packet=JSON.parse(String(e.data)) as CdpResponse;}catch{return;}
+      if(packet.method==='Runtime.exceptionThrown'){
+        runtimeErrors.push(JSON.stringify(packet.params??{}).slice(0,2400));
+        if(runtimeErrors.length>30)runtimeErrors.shift();
+      }else if(packet.method==='Runtime.consoleAPICalled'&&packet.params?.type==='error'){
+        runtimeErrors.push(JSON.stringify(packet.params).slice(0,1200));
+        if(runtimeErrors.length>30)runtimeErrors.shift();
+      }
       if(typeof packet.id!=='number')return;
       const task=pending.get(packet.id);
       if(!task)return;
@@ -91,7 +99,7 @@ export async function openChromePage(url:string,profile:string){
       await send('Network.emulateNetworkConditions',{offline:value,latency:0,
         downloadThroughput:0,uploadThroughput:0},validatedSessionId);
     }
-    return {evaluate,setViewport,setOffline,close:()=>{
+    return {evaluate,setViewport,setOffline,diagnostics:()=>runtimeErrors.slice(),close:()=>{
       socket?.close();
       process.kill('SIGTERM');
     }};
