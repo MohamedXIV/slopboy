@@ -421,11 +421,11 @@ async function main(){
     for(let attempt=0;attempt<30;attempt++){
       await evalJs("document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary').click();true");
       await sleep(150);
-      labAction=await evalJs("document.querySelector('.sb-lab-action-status').textContent.includes('proposed primary button pressed')")===true;
+      labAction=await evalJs("document.querySelector('.sb-design-lab > .sb-lab-action-status').textContent.includes('proposed primary button pressed')")===true;
       if(labAction)break;
     }
     if(!labAction){
-      const state=await evalJs("JSON.stringify({ready:document.readyState,body:document.body.textContent.slice(0,450),primary:!!document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary'),status:document.querySelector('.sb-lab-action-status')?.textContent,batchCount:document.querySelectorAll('[data-batch-two-component]').length,reactOverlay:document.querySelector('nextjs-portal')?.textContent?.slice(0,400)})");
+      const state=await evalJs("JSON.stringify({ready:document.readyState,body:document.body.textContent.slice(0,450),primary:!!document.querySelector('[data-component=buttons] .sb-lab-proposed .button--primary'),status:document.querySelector('.sb-design-lab > .sb-lab-action-status')?.textContent,batchCount:document.querySelectorAll('[data-batch-two-component]').length,reactOverlay:document.querySelector('nextjs-portal')?.textContent?.slice(0,400)})");
       throw Error('Design Lab client did not hydrate: '+state+' | Chrome errors: '+JSON.stringify(browser.diagnostics()));
     }
     const proposedLight=JSON.parse(String(await evalJs(`(()=>{
