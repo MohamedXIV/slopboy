@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {authReady,verifySessionShape,sameOriginMutation} from '../apps/web/lib/auth/auth-contract.ts';
 
 const A='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
@@ -48,4 +49,13 @@ test('session-bearing mutations require an explicit same-origin request',()=>{
     'cross-site','attacker.example'),false);
   assert.equal(sameOriginMutation('https://attacker.example',route,
     'same-origin','slopboy.example'),false,'Origin must match Host even with forged Fetch Metadata');
+});
+
+test('auth proxy forwards catch-all route params to the Neon handler for GET and POST',()=>{
+  // Guards the production 500 regression: Neon SDK reads context.params.
+  const source=readFileSync(new URL('../apps/web/app/api/auth/[...path]/route.ts',import.meta.url),'utf8');
+  assert.match(source,/GET\(request:NextRequest,context:AuthRouteContext\)/);
+  assert.match(source,/POST\(request:NextRequest,context:AuthRouteContext\)/);
+  assert.match(source,/auth\.handler\(\)\.GET\(request,context\)/);
+  assert.match(source,/auth\.handler\(\)\.POST\(request,context\)/);
 });
