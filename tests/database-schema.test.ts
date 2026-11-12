@@ -227,7 +227,28 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const full=await executePsql(config,{sql:preparedPage('24')});
     assert.ok(full.stdout.includes('Tiny Catcher Deluxe')&&full.stdout.includes('Star Patrol'));
     const single=await executePsql(config,{sql:preparedPage('1')});
-    assert.equal(pgQueryRows(single.stdout).length,1,'Limit 1 returns one row');
+    const firstPage=pgQueryRows(single.stdout);
+    assert.equal(firstPage.length,1,'Limit 1 returns one row');
+    const firstCells=firstPage[0].split('|');
+    assert.equal(firstCells.length,13,'Public catalog exposes only approved metadata columns');
+    // Reuse the *exact* database timestamp, including microsecond precision,
+    // rather than rounding it through JavaScript Date and skipping tied rows.
+    const firstId=firstCells[0],firstTimestamp=firstCells[7];
+    const second=await executePsql(config,{sql:`
+      PREPARE qa_catalog(timestamptz,uuid,int) AS ${LIST_PUBLIC_GAMES_SQL};
+      EXECUTE qa_catalog('${firstTimestamp}','${firstId}',1);
+    `});
+    const secondPage=pgQueryRows(second.stdout);
+    assert.equal(secondPage.length,1,'Keyset cursor reaches the second reviewed game');
+    assert.notEqual(secondPage[0].split('|')[0],firstId,'Cursor pagination must not repeat first-page entries');
+    // Metadata edits are read on every request: the immutable UUID is stable,
+    // and no CDN or Next.js cache may pin an old title.
+    await executePsql(config,{sql:`
+      UPDATE games SET title='Star Patrol Retitled' WHERE id='${CURATED_GAME_FIXTURES[1].gameId}';
+    `});
+    const afterRename=await executePsql(config,{sql:preparedPage('24')});
+    assert.ok(afterRename.stdout.includes('Star Patrol Retitled'),'Renamed metadata is readable without a rebuild');
+    assert.ok(afterRename.stdout.includes(CURATED_GAME_FIXTURES[1].gameId),'Renaming must not change a game UUID');
 
     // Owner-only metadata access to third, still-private curated draft.
     const privateId=CURATED_GAME_FIXTURES[2].gameId;
