@@ -2,7 +2,13 @@
 import assert from 'node:assert/strict';
 import {startNextTestServer,BROWSER_RUNTIME_FIXTURE} from './next-test-server.ts';
 import {GAMES} from '../packages/catalog/src/index.ts';
+import {createHash} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
 async function main(){
+  const index=JSON.parse(await readFile(resolve(import.meta.dirname,'../packages/catalog/curated-revision-lock.json'),'utf8')) as {
+    revisions:{gameId:string;revisionId:string;sha256:string;byteSize:number}[]
+  };
   const server=await startNextTestServer();
   try{
     const get=(path:string)=>fetch(server.url+path,{redirect:'manual'});
@@ -28,6 +34,19 @@ async function main(){
       const manifest=await get('/api/public-games/'+game.gameId);
       assert.equal(manifest.status,200,game.title);
       assert.equal((await manifest.json()).cartridge,game.cartridge);
+      // The reviewed legacy URL remains byte-identical to its immutable SHA path.
+      const locked=index.revisions.find(r=>r.gameId===game.gameId&&r.revisionId===game.revisionId);
+      assert.ok(locked,'Missing locked immutable revision');
+      const [alias,immutable]=await Promise.all([
+        get(game.cartridge),get('/cartridges/by-sha256/'+locked.sha256+'.slop')
+      ]);
+      assert.equal(alias.status,200,'Legacy cartridge remains accessible');
+      assert.equal(immutable.status,200,'Immutable cartridge must resolve in real Next HTTP');
+      const aliasBytes=Buffer.from(await alias.arrayBuffer());
+      const immutableBytes=Buffer.from(await immutable.arrayBuffer());
+      assert.deepEqual(immutableBytes,aliasBytes,'Static SHA artifact must preserve reviewed bytes');
+      assert.equal(immutableBytes.byteLength,locked.byteSize);
+      assert.equal(createHash('sha256').update(immutableBytes).digest('hex'),locked.sha256);
     }
     const sw=await get('/sw.js');
     assert.equal(sw.status,200);
@@ -40,7 +59,7 @@ async function main(){
     assert.equal((await get('/icons/slopboy-512.png')).status,200);
     assert.equal((await get('/library')).status,200);
     assert.equal((await get('/legacy')).status,200);
-    console.log('Runtime Next server smoke PASS: fresh runtime UUID, reviewed API, unknown 404, canonical fixtures, public PWA assets');
+    console.log('Runtime Next server smoke PASS: fresh UUID, reviewed API, immutable SHA paths, legacy aliases, canonical fixtures, public PWA assets');
   }finally{await server.stop();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
