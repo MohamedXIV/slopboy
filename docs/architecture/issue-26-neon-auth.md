@@ -20,7 +20,7 @@
 
 ## Real Neon Preview credentials
 
-The original `feat/26-neon-auth-session` Preview remains the **only** configured Neon Auth environment. The replacement branch is intentionally **not** provisioned with secrets. Never copy encrypted API envelopes as if they were plaintext; to use the new branch for live testing, securely move or enter the real branch-scoped values in Vercel. Required variables are:
+Only `feat/26-auth-current-main` has the **private Neon development Preview environment**. After the exact-head CI passed, the original three encrypted variables were moved by Git-branch scope (Vercel env IDs only, **without decrypting or copying values**) from the older branch. Both branches are Draft, but only the newer Preview is configured. Do not use opaque encrypted API envelopes as real secret values; no production Auth variables were set. Required variables are:
 - `NEON_AUTH_BASE_URL`: managed development auth origin (HTTPS).
 - `NEON_AUTH_COOKIE_SECRET`: private random cookie key (32+ bytes).
 - `DATABASE_URL`: dedicated limited-role PostgreSQL URL.
@@ -60,3 +60,8 @@ The first email-verification and OTP password-setup succeeded on the isolated Ne
 The new `apps/web/lib/auth/auth-diagnostics.ts` allows only fixed categories to be emitted to **server-only logs** when the official Auth proxy returns HTTP 401 for `sign-in/email`. The route logs no raw provider response, email address, user ID, password, OTP, cookie, authorization token or IP. On the next owner-driven test, inspect that specific Preview's logs for the category, preserving privacy.
 
 The old Draft PR #79 had diverged from main and included superseded visual changes. This branch contains **only** SDK, session/owner/admin APIs, auth-specific HeroUI pages, tests, and dependency pins, all on the current approved main. No public account signup, untrusted cartridge execution, user-save import, or production Auth is permitted until two real users pass the full acceptance test.
+
+
+## Verified preview after extraction — 2026-11-12
+
+GitHub CI on `724dfb0` succeeded with TypeScript, lint, Next build, unit tests, Chromium sandbox, KAPLAY and offline/PWA checks; real anonymous Auth/CSRF smoke was included in the existing runtime-route step. Vercel Preview deployment `dpl_H3tJhS9nTXruNeoTwiFK1MqtasqN` was READY on that SHA after securely transferring **branch scope only** for the encrypted dev variables. The stable URL is `https://slopboy-git-feat-26-auth-current-main-mxiv.vercel.app` and was the only remaining Neon Auth trusted origin after stale Preview origins were removed. Anonymous managed `/api/auth/get-session` returned HTTP 200 with `null`; actual sign-in is **not** yet demonstrated. The new PostgreSQL test restores explicit Alice/Bob owner separation and limited SQL role privileges from the prior branch. Do not expose credentials, OTPs or provider response bodies in CI or logs.
