@@ -94,5 +94,13 @@ test('refuses a malformed or modified private import transaction at serializatio
     assert.throws(()=>buildCuratedDraftImportSql({...plan,revisions:plan.revisions.map(
       (r,i)=>i===0?{...r,storage_key:'some-fake-neon-object'}:r
     )}),/Invalid curated draft import row/);
+    const forged='f'.repeat(64);
+    assert.throws(()=>buildCuratedDraftImportSql({...plan,revisions:plan.revisions.map(
+      (r,i)=>i===0?{...r,content_digest:forged,artifact_sha256:forged,
+        storage_key:CURATED_STATIC_STORAGE_SCHEME+'/cartridges/by-sha256/'+forged+'.slop'}:r
+    )}),/Invalid curated draft import row/,'Matching forged digests must still fail independent lock');
+    assert.throws(()=>buildCuratedDraftImportSql({...plan,revisions:plan.revisions.map(
+      (r,i)=>i===0?{...r,manifest:{...r.manifest,title:'Forged manifest'}}:r
+    )}),/Invalid curated draft import row/,'SQL builder cannot bless forged manifest metadata');
   }finally{await rm(root,{recursive:true,force:true});}
 });
