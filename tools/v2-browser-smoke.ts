@@ -356,8 +356,18 @@ async function main(){
     // Verify the official library also works independently after returning from legacy.
     await navigate('/library','/library',
       "!!document.querySelector('.sb-v2-header')&&document.querySelectorAll('.v2-library-game').length===3");
-    const liveStyle=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell'),h=document.querySelector('.sb-v2-header');return !!s?.classList.contains('sb-heroui-live')&&getComputedStyle(h).boxShadow==='none'&&getComputedStyle(s).getPropertyValue('--sb-ui-primary').trim()==='#28442e'})()");
-    if(liveStyle!==true)throw Error('Approved HeroUI shared rules not applied to modern routes');
+    // Route navigation can finish before the theme's saved preference is applied.
+    // Guard the actual rehydrated light theme rather than racing its first dark frame.
+    let liveTheme:{enabled:boolean;theme:string;headerShadow:string;primary:string}|null=null;
+    const themedDeadline=Date.now()+5000;
+    while(Date.now()<themedDeadline){
+      const value=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell'),h=document.querySelector('.sb-v2-header');return JSON.stringify({enabled:!!s?.classList.contains('sb-heroui-live'),theme:s?.dataset.theme??'',headerShadow:h?getComputedStyle(h).boxShadow:'missing',primary:s?getComputedStyle(s).getPropertyValue('--sb-ui-primary').trim():''})})()");
+      liveTheme=JSON.parse(String(value));
+      if(liveTheme?.enabled&&liveTheme.theme==='light'&&liveTheme.headerShadow==='none'&&liveTheme.primary==='#28442e')break;
+      await sleep(120);
+    }
+    if(!liveTheme?.enabled||liveTheme.theme!=='light'||liveTheme.headerShadow!=='none'||liveTheme.primary!=='#28442e')
+      throw Error('Approved live HeroUI theme did not rehydrate correctly after legacy navigation: '+JSON.stringify(liveTheme));
     await navigate('/labs/design-system','/labs/design-system',
       "!!document.querySelector('.sb-design-lab')&&!!document.querySelector('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview')");
     const labIsolated=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell');return !s.classList.contains('sb-heroui-live')&&document.querySelectorAll('.sb-lab-frame.sb-lab-current').length>0&&document.querySelectorAll('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview').length>0})()");
