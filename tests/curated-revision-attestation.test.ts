@@ -100,7 +100,7 @@ test('changing compiled source under a locked revision UUID is rejected',async()
     const sourceFile=resolve(root,game.source.game);
     const original=await readFile(sourceFile,'utf8');
     // A real compiled-code change (not a comment) must change the digest.
-    await writeFile(sourceFile,original+'\\nconst revisionMustChange = 1;\\n');
+    await writeFile(sourceFile,original+'\nconst revisionMustChange = 1;\n');
     await assert.rejects(
       ()=>attestCuratedRevision(game,{rootDir:root}),
       /Immutable curated revision changed/
