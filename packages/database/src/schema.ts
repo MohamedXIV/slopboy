@@ -43,6 +43,8 @@ export interface GameRevisionRecord {
   id: string; // Immutable Revision UUID v4
   game_id: string; // Game UUID v4
   revision_number: number;
+  /** Optional public SemVer; null for old imports not yet labeled. Never use engine_version here. */
+  release_version: string | null;
   engine_id: string;
   engine_version: string;
   device_profile: string;
@@ -81,11 +83,28 @@ export interface UserLibraryRecord {
   id: string; // UUID v4
   user_id: string;
   game_id: string;
+  /** Legacy hint only. CacheStorage, not this cross-device boolean, is authoritative. */
   installed_offline: boolean;
   added_at: Date;
   last_played_at: Date | null;
   play_count: number;
   total_playtime_ms: number;
+}
+
+/**
+ * Non-authoritative account record of a device's reported installed bundle.
+ * The actual device CacheStorage remains the source of truth and guest
+ * installations stay local. This record cannot authorize game access.
+ */
+export interface UserInstallationRecord {
+  id: string; // UUID v4
+  user_id: string;
+  device_id: string; // Random opaque device-install identity, not fingerprint
+  game_id: string;
+  revision_id: string; // Must belong to this game
+  artifact_id: string; // Must belong to this revision
+  installed_at: Date;
+  last_reported_at: Date;
 }
 
 export interface AuditEventRecord {
