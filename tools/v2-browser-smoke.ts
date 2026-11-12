@@ -42,12 +42,10 @@ async function main(){
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
     if(sharedLight!==true)throw Error('Shared theme did not propagate into player without duplicate controls');
     const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
-    const brandRgb=brandedButton.match(/[0-9]+/g)?.map(Number);
-    if(!brandRgb||brandRgb.length!==3||Number(brandRgb[0])<100||Number(brandRgb[1])<Number(brandRgb[0])+5
-      ||Number(brandRgb[1])<Number(brandRgb[2])+5)
-      throw Error('HeroUI toggle uses blue/gray defaults rather than a light Slopboy sage tone: '+brandedButton);
+    if(brandedButton!=='rgb(240, 238, 228)')
+      throw Error('Approved HeroUI light secondary surface missing: '+brandedButton);
     const brandedText=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).color"));
-    if(brandedText!=='rgb(48, 71, 68)')throw Error('HeroUI theme toggle text must use Slopboy ink: '+brandedText);
+    if(brandedText!=='rgb(40, 68, 46)')throw Error('HeroUI theme toggle text must use Slopboy ink: '+brandedText);
     const duplicateTheme=await evalJs("!!document.querySelector('.v2-appearance-mode, .v2-theme-button')");
     if(duplicateTheme===true)throw Error('Redundant theme switches were not removed');
 
@@ -203,7 +201,7 @@ async function main(){
     }
     if(!lightPersisted)throw Error('One shared theme did not persist after rehydration on library navigation');
     const libraryHeroControl=String(await evalJs("getComputedStyle(document.querySelector('.v2-library-actions button.sb-control')).color"));
-    if(libraryHeroControl!=='rgb(48, 71, 68)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
+    if(libraryHeroControl!=='rgb(40, 68, 46)')throw Error('HeroUI library button is not Slopboy light theme: '+libraryHeroControl);
 
     const libraryStats=await evalJs("JSON.parse(localStorage.getItem('slopboy:v2:history:v2:"+GAMES[0].gameId+"')||'{}').launches>=1");
     if(libraryStats!==true)throw Error('Real game launch was not recorded locally');
@@ -335,7 +333,14 @@ async function main(){
     // Verify the official library also works independently after returning from legacy.
     await navigate('/library','/library',
       "!!document.querySelector('.sb-v2-header')&&document.querySelectorAll('.v2-library-game').length===3");
-    console.log('Canonical route smoke passed: UUID root/library/play, old /v2 aliases, legacy V1 pages/creator, mobile/settings and save migration');
+    const liveStyle=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell'),h=document.querySelector('.sb-v2-header');return !!s?.classList.contains('sb-heroui-live')&&getComputedStyle(h).boxShadow==='none'&&getComputedStyle(s).getPropertyValue('--sb-ui-primary').trim()==='#28442e'})()");
+    if(liveStyle!==true)throw Error('Approved HeroUI shared rules not applied to modern routes');
+    await navigate('/labs/design-system','/labs/design-system',
+      "!!document.querySelector('.sb-design-lab')&&!!document.querySelector('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview')");
+    const labIsolated=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell');return !s.classList.contains('sb-heroui-live')&&document.querySelectorAll('.sb-lab-frame.sb-lab-current').length>0&&document.querySelectorAll('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview').length>0})()");
+    if(labIsolated!==true)throw Error('Original vs approved Design Lab comparison regressed');
+    await navigate('/library','/library',"document.querySelector('.sb-v2-shell.sb-heroui-live')&&document.querySelectorAll('.v2-library-game').length===3");
+    console.log('Canonical routes, offline guest continuity and approved HeroUI Lab smoke passed');
   }finally{
     browser?.close();
     await server.stop();
