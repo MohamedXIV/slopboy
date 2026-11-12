@@ -32,7 +32,7 @@ ALTER TABLE public.games
 -- An installation must name a bundle artifact that belongs to exactly its
 -- revision, which in turn must belong to the library game.
 ALTER TABLE public.cartridge_artifacts
-  ADD CONSTRAINT uq_cartridge_artifacts_id_revision UNIQUE (id, revision_id);
+  ADD CONSTRAINT uq_cartridge_artifacts_bundle_identity UNIQUE (id, revision_id, artifact_type);
 
 CREATE TABLE public.user_installations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -42,6 +42,7 @@ CREATE TABLE public.user_installations (
   game_id UUID NOT NULL,
   revision_id UUID NOT NULL,
   artifact_id UUID NOT NULL,
+  artifact_type TEXT NOT NULL DEFAULT 'bundle' CHECK (artifact_type = 'bundle'),
   installed_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
   last_reported_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
   CONSTRAINT uq_user_installations_device_game UNIQUE (user_id, device_id, game_id),
@@ -52,8 +53,8 @@ CREATE TABLE public.user_installations (
     FOREIGN KEY (revision_id, game_id)
     REFERENCES public.game_revisions(id, game_id) ON DELETE RESTRICT,
   CONSTRAINT fk_user_installations_artifact_same_revision
-    FOREIGN KEY (artifact_id, revision_id)
-    REFERENCES public.cartridge_artifacts(id, revision_id) ON DELETE RESTRICT,
+    FOREIGN KEY (artifact_id, revision_id, artifact_type)
+    REFERENCES public.cartridge_artifacts(id, revision_id, artifact_type) ON DELETE RESTRICT,
   CONSTRAINT ck_user_installations_reported_time CHECK (last_reported_at >= installed_at)
 );
 
