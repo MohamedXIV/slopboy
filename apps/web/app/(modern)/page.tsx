@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import {Card} from '@heroui/react';
+import {V2ActionLink} from '../../components/v2/V2RouteControls';
 import {GAMES} from '@slopboy/catalog';
 import {V2_DEVICE_1000,V2_DEVICE_FAMILIES} from '@slopboy/hardware/v2';
 import '../v2/v2-hub.css';
@@ -10,7 +11,7 @@ export default function V2LabHome(){
         <p className="v2-hub-kicker">SMALL DEVICES · INFINITE WORLDS</p>
         <h1>A pocket full<br/>of <em>possibility.</em></h1>
         <p>We are rebuilding Slopboy with original collectible handhelds, visual display limits, and a game-making platform for humans and AI.</p>
-        <Link className="v2-hub-cta" href="/library">Open my game library <span>↗</span></Link>
+        <V2ActionLink className="v2-hub-cta" variant="primary" size="lg" href="/library">Open my game library <span aria-hidden="true">↗</span></V2ActionLink>
         <div className="v2-hub-status"><span className="v2-dot"/> REAL PLAYABLE SLICE · NO FAKE ACCOUNT OR ONLINE FEATURES</div>
       </div>
       <div className="v2-hub-product" aria-label="Original slab-shaped handheld concept">
@@ -28,15 +29,24 @@ export default function V2LabHome(){
     <section className="v2-hub-library">
       <p className="v2-hub-kicker">CURRENTLY PLAYABLE / PIXEL V1 COMPATIBILITY</p>
       <h2>Three small worlds. One fresh shell.</h2>
-      <div className="v2-hub-games">{GAMES.map((game,index)=><article key={game.gameId} className="v2-hub-card">
+      <div className="v2-hub-games">{GAMES.map((game,index)=><Card key={game.gameId} className="v2-hub-card">
         <div className="v2-hub-art" style={{background:game.artwork.background,color:game.artwork.foreground}}>
           <span className="v2-hub-card-id">0{index+1} / GAME CARD</span><strong aria-hidden="true">{game.artwork.emblem}</strong><span>{game.genre.toUpperCase()}</span>
         </div>
-        <div className="v2-hub-card-body"><h3>{game.title}</h3><p>{game.description}</p>
-          <Link href={'/play/'+game.gameId}>Insert &amp; play <span aria-hidden="true">↗</span></Link></div>
-      </article>)}</div>
+        <Card.Header className="v2-hub-card-header">
+          <Card.Title>{game.title}</Card.Title>
+          <Card.Description>{game.description}</Card.Description>
+        </Card.Header>
+        <Card.Footer className="v2-hub-card-footer">
+          <V2ActionLink className="v2-hub-play" variant="secondary" size="sm" href={'/play/'+game.gameId}>
+            Insert &amp; play <span aria-hidden="true">↗</span>
+          </V2ActionLink>
+        </Card.Footer>
+      </Card>)}</div>
     </section>
-    <section className="v2-hub-concepts"><div><p className="v2-hub-kicker">ENGINE FEASIBILITY / REAL WEBGL</p><h2>Try a KAPLAY cartridge</h2><p>A separate test game with four-color WebGL capture, an opaque sandbox and instrumentation. Not a public cartridge uploader.</p><Link href="/labs/kaplay">Open KAPLAY spike ↗</Link></div></section>
+    <section className="v2-hub-concepts"><div><p className="v2-hub-kicker">ENGINE FEASIBILITY / REAL WEBGL</p><h2>Try a KAPLAY cartridge</h2><p>A separate test game with four-color WebGL capture, an opaque sandbox and instrumentation. Not a public cartridge uploader.</p><V2ActionLink variant="secondary" size="sm" href="/labs/kaplay">
+        Open KAPLAY spike <span aria-hidden="true">↗</span>
+      </V2ActionLink></div></section>
     <section className="v2-hub-concepts">
       <div><p className="v2-hub-kicker">HARDWARE IS A CONTRACT</p><h2>{V2_DEVICE_1000.display.width} × {V2_DEVICE_1000.display.height}</h2>
       <p>Each game targets a versioned fantasy display. Cosmetics change appearance; resolution and indexed color count define display limits. Inputs describe the device controls, not CPU or RAM caps.</p></div>

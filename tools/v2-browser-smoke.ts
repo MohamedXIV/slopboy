@@ -306,6 +306,29 @@ async function main(){
       throw Error('Navigation failed: '+path+' -> '+expected+' with '+expression);
     };
     await navigate('/','/',"!!document.querySelector('.sb-v2-header')&&!!document.querySelector('.v2-hub')&&!document.querySelector('.hero')");
+    const homeControls=JSON.parse(String(await evalJs(`(()=>{
+      const hero=document.querySelector('.v2-hub-cta');
+      const cards=[...document.querySelectorAll('.v2-hub-card')];
+      const playLinks=[...document.querySelectorAll('.v2-hub-play')];
+      const kaplay=document.querySelector('.v2-hub-concepts a[href="/labs/kaplay"]');
+      const nav=[...document.querySelectorAll('.sb-v2-nav a')];
+      const footer=[...document.querySelectorAll('.sb-v2-footer nav a')];
+      return JSON.stringify({
+        hero:!!hero&&hero.matches('a.button.button--primary[href="/library"]'),
+        cards:cards.length===3&&cards.every(c=>c.classList.contains('card')),
+        play:playLinks.length===3&&playLinks.every(a=>a.matches('a.button.button--secondary')),
+        kaplay:!!kaplay&&kaplay.matches('a.button.button--secondary'),
+        nav:nav.length===2&&nav.every(a=>a.classList.contains('button')),
+        activeNav:nav.filter(a=>a.getAttribute('aria-current')==='page').length,
+        footer:footer.length===3&&footer.every(a=>a.classList.contains('link')),
+        heroRadius:hero?getComputedStyle(hero).borderRadius:'',
+        cardShadow:cards[0]?getComputedStyle(cards[0]).boxShadow:'',
+      });
+    })()`)));
+    if(!homeControls.hero||!homeControls.cards||!homeControls.play||!homeControls.kaplay||
+      !homeControls.nav||homeControls.activeNav!==1||!homeControls.footer||
+      homeControls.heroRadius!=='9999px'||homeControls.cardShadow!=='none')
+      throw Error('Home still renders hand-styled controls instead of approved HeroUI: '+JSON.stringify(homeControls));
     const homeLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.v2-hub-card a')].map(a=>a.getAttribute('href')))");
     const actualLinks=JSON.parse(String(homeLinks)) as string[];
     if(actualLinks.length!==3||actualLinks.some((url,i)=>url!=='/play/'+GAMES[i].gameId))
@@ -333,8 +356,18 @@ async function main(){
     // Verify the official library also works independently after returning from legacy.
     await navigate('/library','/library',
       "!!document.querySelector('.sb-v2-header')&&document.querySelectorAll('.v2-library-game').length===3");
-    const liveStyle=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell'),h=document.querySelector('.sb-v2-header');return !!s?.classList.contains('sb-heroui-live')&&getComputedStyle(h).boxShadow==='none'&&getComputedStyle(s).getPropertyValue('--sb-ui-primary').trim()==='#28442e'})()");
-    if(liveStyle!==true)throw Error('Approved HeroUI shared rules not applied to modern routes');
+    // Route navigation can finish before the theme's saved preference is applied.
+    // Guard the actual rehydrated light theme rather than racing its first dark frame.
+    let liveTheme:{enabled:boolean;theme:string;headerShadow:string;primary:string}|null=null;
+    const themedDeadline=Date.now()+5000;
+    while(Date.now()<themedDeadline){
+      const value=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell'),h=document.querySelector('.sb-v2-header');return JSON.stringify({enabled:!!s?.classList.contains('sb-heroui-live'),theme:s?.dataset.theme??'',headerShadow:h?getComputedStyle(h).boxShadow:'missing',primary:s?getComputedStyle(s).getPropertyValue('--sb-ui-primary').trim():''})})()");
+      liveTheme=JSON.parse(String(value));
+      if(liveTheme?.enabled&&liveTheme.theme==='light'&&liveTheme.headerShadow==='none'&&liveTheme.primary==='#28442e')break;
+      await sleep(120);
+    }
+    if(!liveTheme?.enabled||liveTheme.theme!=='light'||liveTheme.headerShadow!=='none'||liveTheme.primary!=='#28442e')
+      throw Error('Approved live HeroUI theme did not rehydrate correctly after legacy navigation: '+JSON.stringify(liveTheme));
     await navigate('/labs/design-system','/labs/design-system',
       "!!document.querySelector('.sb-design-lab')&&!!document.querySelector('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview')");
     const labIsolated=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell');return !s.classList.contains('sb-heroui-live')&&document.querySelectorAll('.sb-lab-frame.sb-lab-current').length>0&&document.querySelectorAll('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview').length>0})()");
