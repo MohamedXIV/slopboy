@@ -2,11 +2,14 @@
 
 import type {ReactNode,Ref} from 'react';
 import NextLink from 'next/link';
-import {Button,Link as HeroLink} from '@heroui/react';
+import {Link as HeroLink} from '@heroui/react';
+import {buttonVariants} from '@heroui/styles';
 
 /**
- * Navigation adapter, not a custom control: HeroUI owns the appearance,
- * accessible interaction states and focus. NextLink owns client-side routing.
+ * A routing adapter — never a hand-written control. HeroUI Link supplies
+ * anchor semantics, accessible interaction/focus, and buttonVariants supplies
+ * the exact native HeroUI button appearance for navigation CTAs.
+ * NextLink retains client-side routing, modifier-click and new-tab behavior.
  */
 type RouteProps={
   href:string;
@@ -23,15 +26,14 @@ type ActionProps=RouteProps&{
 
 export function V2ActionLink({href,children,className,ariaLabel,ariaCurrent,
   variant='secondary',size='md'}:ActionProps){
-  return <Button
-    variant={variant}
-    size={size}
-    className={className}
+  return <HeroLink
+    href={href}
+    className={[buttonVariants({variant,size}),className].filter(Boolean).join(' ')}
     aria-label={ariaLabel}
     aria-current={ariaCurrent}
     render={({ref,...props})=><NextLink {...props} href={href} ref={ref as Ref<HTMLAnchorElement>}/>}>
     {children}
-  </Button>;
+  </HeroLink>;
 }
 
 export function V2TextLink({href,children,className,ariaLabel,ariaCurrent}:RouteProps){
