@@ -306,6 +306,29 @@ async function main(){
       throw Error('Navigation failed: '+path+' -> '+expected+' with '+expression);
     };
     await navigate('/','/',"!!document.querySelector('.sb-v2-header')&&!!document.querySelector('.v2-hub')&&!document.querySelector('.hero')");
+    const homeControls=JSON.parse(String(await evalJs(`(()=>{
+      const hero=document.querySelector('.v2-hub-cta');
+      const cards=[...document.querySelectorAll('.v2-hub-card')];
+      const playLinks=[...document.querySelectorAll('.v2-hub-play')];
+      const kaplay=document.querySelector('.v2-hub-concepts a[href="/labs/kaplay"]');
+      const nav=[...document.querySelectorAll('.sb-v2-nav a')];
+      const footer=[...document.querySelectorAll('.sb-v2-footer nav a')];
+      return JSON.stringify({
+        hero:!!hero&&hero.matches('a.button.button--primary[href="/library"]'),
+        cards:cards.length===3&&cards.every(c=>c.classList.contains('card')),
+        play:playLinks.length===3&&playLinks.every(a=>a.matches('a.button.button--secondary')),
+        kaplay:!!kaplay&&kaplay.matches('a.button.button--secondary'),
+        nav:nav.length===2&&nav.every(a=>a.classList.contains('button')),
+        activeNav:nav.filter(a=>a.getAttribute('aria-current')==='page').length,
+        footer:footer.length===3&&footer.every(a=>a.classList.contains('link')),
+        heroRadius:hero?getComputedStyle(hero).borderRadius:'',
+        cardShadow:cards[0]?getComputedStyle(cards[0]).boxShadow:'',
+      });
+    })()`)));
+    if(!homeControls.hero||!homeControls.cards||!homeControls.play||!homeControls.kaplay||
+      !homeControls.nav||homeControls.activeNav!==1||!homeControls.footer||
+      homeControls.heroRadius!=='9999px'||homeControls.cardShadow!=='none')
+      throw Error('Home still renders hand-styled controls instead of approved HeroUI: '+JSON.stringify(homeControls));
     const homeLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.v2-hub-card a')].map(a=>a.getAttribute('href')))");
     const actualLinks=JSON.parse(String(homeLinks)) as string[];
     if(actualLinks.length!==3||actualLinks.some((url,i)=>url!=='/play/'+GAMES[i].gameId))

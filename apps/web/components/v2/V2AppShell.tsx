@@ -2,6 +2,7 @@
 
 import {createContext,useCallback,useContext,useEffect,useMemo,useState,type ReactNode} from 'react';
 import Link from 'next/link';
+import {V2ActionLink,V2TextLink} from './V2RouteControls';
 import {usePathname} from 'next/navigation';
 import {Button} from '@heroui/react';
 import './v2-shell.css';
@@ -45,8 +46,10 @@ export default function V2AppShell({children}:{children:ReactNode}){
           </Link>
           <span className="sb-v2-header-descriptor">IMAGINARY HANDHELDS · REAL TINY GAMES</span>
           <nav className="sb-v2-nav" aria-label="Slopboy 2.0 navigation">
-            <Link href="/" aria-current={pathname==='/'?'page':undefined}>Devices</Link>
-            <Link href="/library" aria-current={pathname==='/library'?'page':undefined}>My library</Link>
+            <V2ActionLink href="/" size="sm" variant={pathname==='/'?'secondary':'ghost'}
+              ariaCurrent={pathname==='/'?'page':undefined}>Devices</V2ActionLink>
+            <V2ActionLink href="/library" size="sm" variant={pathname==='/library'?'secondary':'ghost'}
+              ariaCurrent={pathname==='/library'?'page':undefined}>My library</V2ActionLink>
             <Button size="sm" variant="secondary" className="sb-control sb-v2-theme-toggle"
               onPress={toggleTheme} aria-label={theme==='dark'?'Switch to light theme':'Switch to dark theme'}
 >
@@ -62,9 +65,9 @@ export default function V2AppShell({children}:{children:ReactNode}){
           <Link href="/" className="sb-v2-footer-brand">SLOPBOY <span>2.0</span></Link>
           <span>Imaginary handhelds, real tiny games. · Independent preview</span>
           <nav aria-label="Footer navigation">
-            <Link href="/library">Library</Link>
-            <Link href="/labs/kaplay">Engine lab</Link>
-            <Link href="/legacy">Legacy prototype</Link>
+            <V2TextLink href="/library">Library</V2TextLink>
+            <V2TextLink href="/labs/kaplay">Engine lab</V2TextLink>
+            <V2TextLink href="/legacy">Legacy prototype</V2TextLink>
           </nav>
         </div>
       </footer>

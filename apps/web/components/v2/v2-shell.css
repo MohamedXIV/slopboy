@@ -13,9 +13,8 @@
 .sb-v2-brand span{font:900 10px ui-monospace,monospace;letter-spacing:.2px;color:var(--sb-accent);border:1px solid var(--sb-line);border-radius:5px;padding:4px 5px}
 .sb-v2-header-descriptor{border-left:1px solid var(--sb-line);padding-left:16px;color:var(--sb-subtle);font:800 9px ui-monospace,monospace;letter-spacing:1.4px}
 .sb-v2-nav{display:flex;align-items:center;gap:7px;margin-left:auto}
-.sb-v2-nav>a{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 13px;border-radius:10px;border:1px solid transparent;color:var(--sb-subtle);font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap}
-.sb-v2-nav>a:hover{color:var(--sb-text);background:var(--sb-control)}
-.sb-v2-nav>a[aria-current='page']{color:var(--sb-accent);border-color:var(--sb-line);background:var(--sb-control)}
+/* Nav actions are actual HeroUI Buttons rendered as Next.js links; CSS only sizes the row. */
+.sb-v2-nav .button{white-space:nowrap}
 /* HeroUI owns button visuals, hover/focus and radius. Only typography is shared. */
 .sb-v2-shell button.sb-control{font-weight:700}
 .sb-v2-theme-toggle{white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
@@ -41,7 +40,7 @@
  .sb-v2-brand{font-size:18px}
  .sb-v2-header-descriptor{display:none}
  .sb-v2-nav{gap:2px}
- .sb-v2-nav>a{padding:7px 9px;font-size:11px}
+ .sb-v2-nav .button{padding-inline:9px;font-size:11px}
  .sb-v2-theme-toggle{padding:7px 9px;gap:4px}
  .sb-v2-theme-toggle span:last-child{display:none}
  .sb-v2-footer-inner{flex-wrap:wrap;gap:10px}
