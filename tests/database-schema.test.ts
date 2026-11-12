@@ -274,8 +274,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // not just any existing UUID (a gap in the original single-column FK).
     await assert.rejects(
       () => executePsql(config,{sql:`
-        UPDATE games SET current_published_revision_id='\${CURATED_GAME_FIXTURES[1].revisionId}'
-        WHERE id='\${CURATED_GAME_FIXTURES[0].gameId}';
+        UPDATE games SET current_published_revision_id='${CURATED_GAME_FIXTURES[1].revisionId}'
+        WHERE id='${CURATED_GAME_FIXTURES[0].gameId}';
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
     );
@@ -287,14 +287,14 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     await assert.rejects(
       () => executePsql(config,{sql:`
         UPDATE game_revisions SET content_digest=repeat('c',64)
-        WHERE id='\${firstRevision}';
+        WHERE id='${firstRevision}';
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('Immutable revision payload')
     );
     await assert.rejects(
       () => executePsql(config,{sql:`
         UPDATE game_revisions SET release_version='2.0.0'
-        WHERE id='\${firstRevision}';
+        WHERE id='${firstRevision}';
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('Immutable revision payload')
     );
@@ -302,8 +302,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       () => executePsql(config,{sql:`
         INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,
          engine_version,manifest,content_digest,storage_key,byte_size,created_by)
-        VALUES(gen_random_uuid(),'\${firstGame}',2,'1.0.0','pixel-v1','0.1.0',
-         '{}'::jsonb,repeat('d',64),'qa/duplicate-version.slop',12,'\${SYSTEM_CURATOR_USER_ID}');
+        VALUES(gen_random_uuid(),'${firstGame}',2,'1.0.0','pixel-v1','0.1.0',
+         '{}'::jsonb,repeat('d',64),'qa/duplicate-version.slop',12,'${SYSTEM_CURATOR_USER_ID}');
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('duplicate key value')
     );
@@ -311,16 +311,16 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       () => executePsql(config,{sql:`
         INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,
          engine_version,manifest,content_digest,storage_key,byte_size,created_by)
-        VALUES(gen_random_uuid(),'\${firstGame}',2,'v2','pixel-v1','0.1.0',
-         '{}'::jsonb,repeat('d',64),'qa/invalid-version.slop',12,'\${SYSTEM_CURATOR_USER_ID}');
+        VALUES(gen_random_uuid(),'${firstGame}',2,'v2','pixel-v1','0.1.0',
+         '{}'::jsonb,repeat('d',64),'qa/invalid-version.slop',12,'${SYSTEM_CURATOR_USER_ID}');
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('check constraint')
     );
     await executePsql(config,{sql:`
       INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,
         engine_version,manifest,content_digest,storage_key,byte_size,created_by)
-      VALUES(gen_random_uuid(),'\${firstGame}',2,'1.1.0-beta.1','pixel-v1','0.1.0',
-        '{}'::jsonb,repeat('d',64),'qa/prerelease.slop',12,'\${SYSTEM_CURATOR_USER_ID}');
+      VALUES(gen_random_uuid(),'${firstGame}',2,'1.1.0-beta.1','pixel-v1','0.1.0',
+        '{}'::jsonb,repeat('d',64),'qa/prerelease.slop',12,'${SYSTEM_CURATOR_USER_ID}');
     `});
 
     // 7i. Per-device installs require an actual library membership, a matching
@@ -334,62 +334,62 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     await executePsql(config,{sql:`
       INSERT INTO cartridge_artifacts(id,revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)
       VALUES
-       ('\${a}','\${firstRevision}','bundle','game-a.slop',repeat('a',64),50,
+       ('${a}','${firstRevision}','bundle','game-a.slop',repeat('a',64),50,
         'application/octet-stream','qa/game-a.slop'),
-       ('\${b}','\${revB}','bundle','game-b.slop',repeat('b',64),50,
+       ('${b}','${revB}','bundle','game-b.slop',repeat('b',64),50,
         'application/octet-stream','qa/game-b.slop');
       INSERT INTO user_library(user_id,game_id)
-      VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${firstGame}');
+      VALUES ('${SYSTEM_CURATOR_USER_ID}','${firstGame}');
       INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
-      VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${device}','\${firstGame}','\${firstRevision}','\${a}');
+      VALUES ('${SYSTEM_CURATOR_USER_ID}','${device}','${firstGame}','${firstRevision}','${a}');
     `});
     await assert.rejects(
       () => executePsql(config,{sql:`
-        UPDATE cartridge_artifacts SET storage_key='qa/rewritten.slop' WHERE id='\${a}';
+        UPDATE cartridge_artifacts SET storage_key='qa/rewritten.slop' WHERE id='${a}';
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('Immutable cartridge artifact')
     );
     await assert.rejects(
       () => executePsql(config,{sql:`
         INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
-        VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${otherDevice}','\${firstGame}','\${firstRevision}','\${b}');
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${firstRevision}','${b}');
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
     );
     await assert.rejects(
       () => executePsql(config,{sql:`
         INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
-        VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${otherDevice}','\${firstGame}','\${revB}','\${b}');
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${revB}','${b}');
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
     );
     await assert.rejects(
       () => executePsql(config,{sql:`
         INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
-        VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${otherDevice}','\${gameB}','\${revB}','\${b}');
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${gameB}','${revB}','${b}');
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
     );
     await assert.rejects(
       () => executePsql(config,{sql:`
         INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
-        VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${device}','\${firstGame}','\${firstRevision}','\${a}');
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${device}','${firstGame}','${firstRevision}','${a}');
       `}),
       (err: unknown) => err instanceof MigrationError && err.message.includes('duplicate key value')
     );
     await executePsql(config,{sql:`
       INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
-      VALUES ('\${SYSTEM_CURATOR_USER_ID}','\${otherDevice}','\${firstGame}','\${firstRevision}','\${a}');
+      VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${firstRevision}','${a}');
     `});
     const installed=await executePsql(config,{sql:`
-      SELECT count(*) FROM user_installations WHERE game_id='\${firstGame}';
+      SELECT count(*) FROM user_installations WHERE game_id='${firstGame}';
     `});
     assert.equal(installed.stdout.trim(),'2','Each device has its own installation row');
     await executePsql(config,{sql:`
-      DELETE FROM user_library WHERE user_id='\${SYSTEM_CURATOR_USER_ID}' AND game_id='\${firstGame}';
+      DELETE FROM user_library WHERE user_id='${SYSTEM_CURATOR_USER_ID}' AND game_id='${firstGame}';
     `});
     const afterLibraryRemoval=await executePsql(config,{sql:`
-      SELECT count(*) FROM user_installations WHERE game_id='\${firstGame}';
+      SELECT count(*) FROM user_installations WHERE game_id='${firstGame}';
     `});
     assert.equal(afterLibraryRemoval.stdout.trim(),'0','Removing library membership cascades device install mirrors only');
 
