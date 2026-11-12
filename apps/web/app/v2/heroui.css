@@ -1,2 +1,4 @@
-/* Route-scoped load: Tailwind CSS v4 is already imported by the root layout. */
+/* V2-only HeroUI v3 primitives and our semantic theme. The legacy app stays untouched. */
 @import '@heroui/styles';
+@import './slopboy-theme.css';
+@import './slopboy-components.css';
