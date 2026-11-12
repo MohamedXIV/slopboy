@@ -103,6 +103,7 @@ export interface UserInstallationRecord {
   game_id: string;
   revision_id: string; // Must belong to this game
   artifact_id: string; // Must belong to this revision
+  artifact_type: 'bundle'; // Non-bundle assets cannot be installed
   installed_at: Date;
   last_reported_at: Date;
 }
