@@ -5,6 +5,7 @@
  */
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
+import {isDeepStrictEqual} from 'node:util';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {GAMES,isGameUuid,type CatalogGame} from '../packages/catalog/src/index.ts';
@@ -74,7 +75,7 @@ export async function attestCuratedRevision(
   if(!bytes.equals(rebuilt))throw Error('Bundled cartridge differs from reviewed source: '+slug);
   const decoded=unpackCartridge(bytes);
   if(decoded.manifest.id!==slug||
-      JSON.stringify(decoded.manifest)!==JSON.stringify(manifest)){
+      !isDeepStrictEqual(decoded.manifest,manifest)){
     throw Error('Bundled cartridge manifest changed: '+slug);
   }
   const digest=createHash('sha256').update(bytes).digest('hex');
