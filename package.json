@@ -26,6 +26,7 @@
     "security:creator-preview": "node --experimental-strip-types tools/creator-preview-smoke.ts",
     "security:pwa-browser": "node --experimental-strip-types tools/offline-browser-smoke.ts",
     "security:runtime-routes": "node --experimental-strip-types tools/runtime-route-smoke.ts",
+    "security:auth-routes": "node --experimental-strip-types tools/auth-route-smoke.ts",
     "security:v2-browser": "node --experimental-strip-types tools/v2-browser-smoke.ts",
     "kaplay:spike-build": "node --experimental-strip-types tools/build-kaplay-spike.ts",
     "security:kaplay-spike": "node --experimental-strip-types tools/kaplay-browser-smoke.ts",
