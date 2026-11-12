@@ -343,6 +343,21 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
       VALUES ('${SYSTEM_CURATOR_USER_ID}','${device}','${firstGame}','${firstRevision}','${a}');
     `});
+    // Asset records from the correct revision still cannot masquerade as an
+    // installable cartridge: only artifact_type=bundle is an install target.
+    const nonBundle='66666666-6666-4666-8666-666666666666';
+    await executePsql(config,{sql:`
+      INSERT INTO cartridge_artifacts(id,revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)
+      VALUES('${nonBundle}','${firstRevision}','asset','assets/texture.png',
+        repeat('f',64),10,'image/png','qa/texture.png');
+    `});
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${firstRevision}','${nonBundle}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
+    );
     await assert.rejects(
       () => executePsql(config,{sql:`
         UPDATE cartridge_artifacts SET storage_key='qa/rewritten.slop' WHERE id='${a}';
