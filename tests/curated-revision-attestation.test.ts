@@ -87,3 +87,25 @@ test('on-disk attestation rejects substituted bundles, even if source manifests 
     await rm(root,{recursive:true,force:true});
   }
 });
+
+test('changing compiled source under a locked revision UUID is rejected',async()=>{
+  const root=await mkdtemp(resolve(tmpdir(),'slopboy-immutable-'));
+  const game=GAMES[0];
+  try{
+    for(const source of [game.source.manifest,game.source.game]){
+      const target=resolve(root,source);
+      await mkdir(dirname(target),{recursive:true});
+      await copyFile(resolve(import.meta.dirname,'..',source),target);
+    }
+    const sourceFile=resolve(root,game.source.game);
+    const original=await readFile(sourceFile,'utf8');
+    // A real compiled-code change (not a comment) must change the digest.
+    await writeFile(sourceFile,original+'\\nconst revisionMustChange = 1;\\n');
+    await assert.rejects(
+      ()=>attestCuratedRevision(game,{rootDir:root}),
+      /Immutable curated revision changed/
+    );
+  }finally{
+    await rm(root,{recursive:true,force:true});
+  }
+});
