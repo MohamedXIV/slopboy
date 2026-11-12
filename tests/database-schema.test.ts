@@ -34,16 +34,20 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 2);
-  assert.equal(down.length, 2);
+  assert.equal(up.length, 3);
+  assert.equal(down.length, 3);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
   assert.equal(up[1].version, 2);
   assert.equal(up[1].name, 'seed_curated_games');
 
-  assert.equal(down[0].version, 2);
-  assert.equal(down[1].version, 1);
+  assert.equal(up[2].version, 3);
+  assert.equal(up[2].name, 'versioned_installations');
+
+  assert.equal(down[0].version, 3);
+  assert.equal(down[1].version, 2);
+  assert.equal(down[2].version, 1);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -90,8 +94,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 2);
-    assert.deepEqual(upResult.versions, [1, 2]);
+    assert.equal(upResult.applied, 3);
+    assert.deepEqual(upResult.versions, [1, 2, 3]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -153,10 +157,10 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // Create a real constraint-test fixture after seeding; published release
     // records are deliberately absent until verified bundle import.
     await executePsql(config, {
-      sql: `INSERT INTO game_revisions (id, game_id, revision_number, engine_id,
+      sql: `INSERT INTO game_revisions (id, game_id, revision_number, release_version, engine_id,
         engine_version, manifest, content_digest, storage_key, byte_size, created_by)
         VALUES ('${CURATED_GAME_FIXTURES[0].revisionId}', '${existingGameId}',
-          1, 'pixel-v1', '0.1.0', '{}'::jsonb,
+          1, '1.0.0', 'pixel-v1', '0.1.0', '{}'::jsonb,
           encode(digest('constraint-test-source', 'sha256'), 'hex'),
           '/fixtures/constraint-test.slop', 22, '${SYSTEM_CURATOR_USER_ID}');`,
     });
@@ -215,10 +219,10 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // A second independent published row proves limit/order and next cursor behavior.
     await executePsql(config,{sql:`
-      INSERT INTO game_revisions(id,game_id,revision_number,engine_id,engine_version,
+      INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,engine_version,
        manifest,content_digest,storage_key,byte_size,created_by,status)
       VALUES ('${CURATED_GAME_FIXTURES[1].revisionId}','${CURATED_GAME_FIXTURES[1].gameId}',
-        1,'pixel-v1','0.1.0','{}'::jsonb,
+        1,'1.0.0','pixel-v1','0.1.0','{}'::jsonb,
         repeat('b',64),'qa-only/second.slop',22,'${SYSTEM_CURATOR_USER_ID}','published');
       UPDATE games SET status='published',visibility='public',
         current_published_revision_id='${CURATED_GAME_FIXTURES[1].revisionId}'
@@ -265,9 +269,160 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // This test only touches the disposable local cluster; rollback below
     // removes these temporary reviewed revision statuses and fixture revisions.
 
+
+    // 7g. The published pointer must reference a revision from the SAME game,
+    // not just any existing UUID (a gap in the original single-column FK).
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        UPDATE games SET current_published_revision_id='${CURATED_GAME_FIXTURES[1].revisionId}'
+        WHERE id='${CURATED_GAME_FIXTURES[0].gameId}';
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
+    );
+
+    // 7h. Display release versions are separate from engine versions and unique
+    // per game; the immutable revision cannot be silently repackaged.
+    const firstRevision=CURATED_GAME_FIXTURES[0].revisionId;
+    const firstGame=CURATED_GAME_FIXTURES[0].gameId;
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        UPDATE game_revisions SET content_digest=repeat('c',64)
+        WHERE id='${firstRevision}';
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('Immutable revision payload')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        UPDATE game_revisions SET release_version='2.0.0'
+        WHERE id='${firstRevision}';
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('Immutable revision payload')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,
+         engine_version,manifest,content_digest,storage_key,byte_size,created_by)
+        VALUES(gen_random_uuid(),'${firstGame}',2,'1.0.0','pixel-v1','0.1.0',
+         '{}'::jsonb,repeat('d',64),'qa/duplicate-version.slop',12,'${SYSTEM_CURATOR_USER_ID}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('duplicate key value')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,
+         engine_version,manifest,content_digest,storage_key,byte_size,created_by)
+        VALUES(gen_random_uuid(),'${firstGame}',2,'v2','pixel-v1','0.1.0',
+         '{}'::jsonb,repeat('d',64),'qa/invalid-version.slop',12,'${SYSTEM_CURATOR_USER_ID}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('check constraint')
+    );
+    await executePsql(config,{sql:`
+      INSERT INTO game_revisions(id,game_id,revision_number,release_version,engine_id,
+        engine_version,manifest,content_digest,storage_key,byte_size,created_by)
+      VALUES(gen_random_uuid(),'${firstGame}',2,'1.1.0-beta.1','pixel-v1','0.1.0',
+        '{}'::jsonb,repeat('d',64),'qa/prerelease.slop',12,'${SYSTEM_CURATOR_USER_ID}');
+    `});
+
+    // 7i. Per-device installs require an actual library membership, a matching
+    // game/revision and a real bundle artifact from that same revision.
+    const a='77777777-7777-4777-8777-777777777777';
+    const b='88888888-8888-4888-8888-888888888888';
+    const device='99999999-9999-4999-8999-999999999999';
+    const otherDevice='99999999-9999-4999-8999-999999999998';
+    const gameB=CURATED_GAME_FIXTURES[1].gameId;
+    const revB=CURATED_GAME_FIXTURES[1].revisionId;
+    await executePsql(config,{sql:`
+      INSERT INTO cartridge_artifacts(id,revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)
+      VALUES
+       ('${a}','${firstRevision}','bundle','game-a.slop',repeat('a',64),50,
+        'application/octet-stream','qa/game-a.slop'),
+       ('${b}','${revB}','bundle','game-b.slop',repeat('b',64),50,
+        'application/octet-stream','qa/game-b.slop');
+      INSERT INTO user_library(user_id,game_id)
+      VALUES ('${SYSTEM_CURATOR_USER_ID}','${firstGame}');
+      INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+      VALUES ('${SYSTEM_CURATOR_USER_ID}','${device}','${firstGame}','${firstRevision}','${a}');
+    `});
+    // Asset records from the correct revision still cannot masquerade as an
+    // installable cartridge: only artifact_type=bundle is an install target.
+    const nonBundle='66666666-6666-4666-8666-666666666666';
+    await executePsql(config,{sql:`
+      INSERT INTO cartridge_artifacts(id,revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)
+      VALUES('${nonBundle}','${firstRevision}','asset','assets/texture.png',
+        repeat('f',64),10,'image/png','qa/texture.png');
+    `});
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${firstRevision}','${nonBundle}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        UPDATE cartridge_artifacts SET storage_key='qa/rewritten.slop' WHERE id='${a}';
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('Immutable cartridge artifact')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${firstRevision}','${b}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${revB}','${b}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${gameB}','${revB}','${b}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('violates foreign key constraint')
+    );
+    await assert.rejects(
+      () => executePsql(config,{sql:`
+        INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+        VALUES ('${SYSTEM_CURATOR_USER_ID}','${device}','${firstGame}','${firstRevision}','${a}');
+      `}),
+      (err: unknown) => err instanceof MigrationError && err.message.includes('duplicate key value')
+    );
+    await executePsql(config,{sql:`
+      INSERT INTO user_installations(user_id,device_id,game_id,revision_id,artifact_id)
+      VALUES ('${SYSTEM_CURATOR_USER_ID}','${otherDevice}','${firstGame}','${firstRevision}','${a}');
+    `});
+    const installed=await executePsql(config,{sql:`
+      SELECT count(*) FROM user_installations WHERE game_id='${firstGame}';
+    `});
+    assert.equal(installed.stdout.trim(),'2','Each device has its own installation row');
+    await executePsql(config,{sql:`
+      DELETE FROM user_library WHERE user_id='${SYSTEM_CURATOR_USER_ID}' AND game_id='${firstGame}';
+    `});
+    const afterLibraryRemoval=await executePsql(config,{sql:`
+      SELECT count(*) FROM user_installations WHERE game_id='${firstGame}';
+    `});
+    assert.equal(afterLibraryRemoval.stdout.trim(),'0','Removing library membership cascades device install mirrors only');
+
     // 8. Test Rollback DOWN:
 
-    // 8a. Roll back migration 2 (seed data)
+    // 8a. Roll back additive migration 3 first (fixtures only).
+    const rollback3 = await migrateDown(config, migrationsDir, 2);
+    assert.equal(rollback3.rolledBack, 1);
+    assert.deepEqual(rollback3.versions, [3]);
+    const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
+    assert.equal(noInstallTable.stdout.trim(),'');
+    const noVersionColumn=await executePsql(config,{sql:`
+      SELECT count(*) FROM information_schema.columns
+      WHERE table_name='game_revisions' AND column_name='release_version';
+    `});
+    assert.equal(noVersionColumn.stdout.trim(),'0');
+
+    // 8b. Roll back migration 2 (seed data)
     const rollback2 = await migrateDown(config, migrationsDir, 1);
     assert.equal(rollback2.rolledBack, 1);
     assert.deepEqual(rollback2.versions, [2]);
@@ -277,7 +432,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     });
     assert.ok(gamesAfterRollback.stdout.includes('0'));
 
-    // 8b. Roll back migration 1 (initial schema)
+    // 8c. Roll back migration 1 (initial schema)
     const rollback1 = await migrateDown(config, migrationsDir, 0);
     assert.equal(rollback1.rolledBack, 1);
     assert.deepEqual(rollback1.versions, [1]);
@@ -288,10 +443,10 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     });
     assert.ok(!regRes.stdout.includes('games'));
 
-    // 8c. Re-run migrations UP on clean database to confirm clean repeatability
+    // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 2);
-    assert.deepEqual(reMigrate.versions, [1, 2]);
+    assert.equal(reMigrate.applied, 3);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3]);
 
     // 9. Two independent owners: the same SQL predicate used by the account
     // data access layer MUST never return another owner's private game.
