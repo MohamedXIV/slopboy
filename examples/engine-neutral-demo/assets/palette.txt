@@ -1,0 +1,4 @@
+moss: #dce9b1, #9ec27d, #507d5c, #203b33
+pocket: #e5e0c5, #b8b292, #73705a, #2c2c23
+phosphor: #c9f5b5, #76cf78, #2f8249, #0f2d1e
+paper: #f2efe4, #b6b8ae, #646c68, #1d2424

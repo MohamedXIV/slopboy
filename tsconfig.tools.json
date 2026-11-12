@@ -21,6 +21,9 @@
       ],
       "@slopboy/cartridge": [
         "packages/cartridge/src/index.ts"
+      ],
+      "@slopboy/mcp": [
+        "packages/mcp/src/index.ts"
       ]
     }
   },

@@ -6,10 +6,13 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 
 > **Project status:** constitution and prototype planning. Slopboy is a codename, not a cleared brand. A first curated play prototype is in development; no public submissions or production service exists yet.
 
+> **November 2026 direction:** Slopboy is an **agent-native game platform**: creators use ChatGPT/Claude connected to their Slopboy account through OAuth Remote MCP; their game drafts appear privately and become public only after review. The new visual/runtime platform remains on Draft PR #14, not yet merged into production. Read the [**Agent-Native Roadmap**](ROADMAP.md) before implementing features. There is no functioning public AI game uploader or cloud save service yet.
+
 ## Product pillars
 
 - **Invented hardware, real constraints.** Consoles are not clones of Game Boy, PSP, or any commercial device.
 - **Two play modes.** Interact with the complete handheld shell, or maximize the game display without stretching or changing aspect ratio.
+- **Approved framework cartridges.** New agent-authored games use vetted pinned frameworks (KAPLAY first candidate, Phaser 4 next, PixiJS if justified) and the same Slopboy host adapter; no arbitrary web page upload.
 - **One SDK, many creators.** Human developers, ChatGPT, Claude, and other assistants use the same build and validation contracts.
 - **Player-friendly collection.** A single earned currency eventually unlocks consoles, games, shell colors, stickers, editions, and boot animations.
 - **Safety and quality first.** Imported code is untrusted; validation and human publication review are mandatory.
@@ -20,10 +23,17 @@ Slopboy is a zero-budget-first, community-created fantasy handheld gaming platfo
 - [Platform Constitution v0.1](docs/platform-constitution.md)
 - [Architecture & security](docs/architecture-and-security.md)
 - [Slopboy 1000 draft hardware contract](docs/hardware/slopboy-1000.md)
-- [Roadmap and acceptance gates](docs/roadmap.md)
+- [**Agent-native Roadmap — Epics, Issues, Sprint 1**](ROADMAP.md)
+- [**Long-Term Product Vision — progression, assets, multiplayer, community, governance and device UX**](docs/product/long-term-vision.md)
+- [**AI Agent onboarding and architecture guardrails**](AGENTS.md)
+- [Legacy prototype roadmap](docs/roadmap.md)
+- [ADR-002: Canonical routes and UUIDs](docs/architecture/adr-002-production-cutover.md)
+- [ADR-003: ChatGPT/Claude MCP, roles, hosting](docs/architecture/adr-003-agent-native-platform.md)
+- [ADR-004: Approved game frameworks and engine-neutral cartridges](docs/architecture/adr-004-approved-game-frameworks.md)
+- [ADR-005: Manual code paste, private drafts and upload security](docs/architecture/adr-005-manual-source-ingestion.md)
 - [Development setup and P0 validation](docs/development.md)
 
-## Proposed implementation
+## Legacy V1 implementation (historical — not the current production cutover plan)
 
 Next.js + React + TypeScript, Tailwind + shadcn/ui, pnpm monorepo, standalone TypeScript SDK and browser runtime, static export/PWA, GitHub-driven submissions and bounded CI. Backend **deferred**; Neon and Supabase are candidates, not a commitment. Remote MCP connector **deferred** until manual cartridge workflow passes.
 
@@ -31,7 +41,7 @@ Next.js + React + TypeScript, Tailwind + shadcn/ui, pnpm monorepo, standalone Ty
 
 Run a separately packaged, validated demo cartridge on an original virtual console in both Console and Game modes, with keyboard/touch controls and no backend. See `/play` after starting `pnpm dev`.
 
-This repository is at planning stage. See the roadmap before beginning implementation.
+These notes describe the V1 prototype. For current implementation priorities, use [ROADMAP.md](ROADMAP.md); the V2 app remains in Draft PR #14.
 
 ## Play the curated games
 
@@ -48,3 +58,7 @@ Run `pnpm creator:new my-first-game`, edit the generated TypeScript source and m
 ### Local playable preview
 
 Run `pnpm creator:preview my-first-game` and open `creations/my-first-game/dist/my-first-game.preview.html` in Chromium. It uses the same isolated runtime as the curated site and requires no development server, but is **local-only** and must not be uploaded to public hosting. Preview saves live in memory for that page session. Firefox/Safari/mobile compatibility and public submissions are still gated by [security issue #4](https://github.com/MohamedXIV/slopboy/issues/4).
+
+## Slopboy 2.0 design lab (branch-only)
+
+A clean-slate V2 foundation lives on `feat/slopboy-2-foundation` for testing, with a [new V2 architecture contract](docs/v2/foundation.md), [original device design language](docs/v2/device-language.md), and playable `/v2` and `/v2/play/tiny-catcher` routes. The first player is a **V1 pixel-game compatibility slice** under the existing isolated Worker; this is **not yet KAPLAY, Neon Auth, OAuth/MCP, or WebRTC**. The production `main` retains the existing stable prototype until the V2 gates pass.

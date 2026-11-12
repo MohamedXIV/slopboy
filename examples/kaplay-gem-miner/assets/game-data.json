@@ -1,0 +1,6 @@
+{
+  "targetGems": 5,
+  "baseSpeed": 80,
+  "boostMultiplier": 1.5,
+  "gemValue": 100
+}

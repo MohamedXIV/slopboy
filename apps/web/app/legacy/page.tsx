@@ -4,7 +4,7 @@ const device=SLOPBOY_1000;
 export default function Home(){
  return <main>
   <header className="topbar">
-   <Link className="brand" href="/" aria-label="Slopboy home"><span className="brand-icon">S</span>SLOPBOY<span className="accent">.</span></Link>
+   <Link className="brand" href="/legacy" aria-label="Slopboy home"><span className="brand-icon">S</span>SLOPBOY<span className="accent">.</span></Link>
    <span className="pill">EARLY PROTOTYPE</span>
   </header>
   <div className="hero">
@@ -12,7 +12,7 @@ export default function Home(){
     <p className="eyebrow">● THE IMAGINARY CONSOLE CLUB</p>
     <h1>Tiny hardware.<br/><span>Limitless ideas.</span></h1>
     <p className="description">Original virtual handhelds, real technical limitations and tiny worlds built by people or AI. A new home for games you can hold in your imagination.</p>
-    <div className="links"><Link className="primary" href="/library">Explore 3 games ↗</Link><Link className="secondary" href="/create">Make a game ✦</Link><a className="secondary" href="https://github.com/MohamedXIV/slopboy">Follow development ↗</a></div>
+    <div className="links"><Link className="primary" href="/legacy/library">Explore 3 games ↗</Link><Link className="secondary" href="/legacy/create">Make a game ✦</Link><a className="secondary" href="https://github.com/MohamedXIV/slopboy">Follow development ↗</a></div>
     <p className="disclaimer">P2 curated library preview — three independent cartridges; public uploads and account features are not enabled.</p>
    </section>
    <aside className="stage" aria-label="Illustration of an original imaginary console; controls are not interactive">

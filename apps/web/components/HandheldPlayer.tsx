@@ -3,11 +3,11 @@
 import {useCallback,useEffect,useRef,useState,type PointerEvent as ReactPointerEvent} from 'react';
 import type {InputName} from '@slopboy/hardware';
 import {SLOPBOY_1000} from '@slopboy/hardware';
-import {getCatalogGame} from '@slopboy/catalog';
+import {resolveCatalogGame} from '@slopboy/catalog';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
 import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {LCD_PALETTE,rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
-import {browserSaveDriver,createSaveService,validSave} from '@slopboy/runtime/save-store';
+import {browserSaveDriver,createGameSaveService,validSave} from '@slopboy/runtime/save-store';
 import './player.css';
 
 const DEVICE=SLOPBOY_1000;
@@ -20,7 +20,7 @@ const keyMap:Record<string,InputName>={
 };
 
 export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string}){
-  const selectedGame=getCatalogGame(gameId);
+  const selectedGame=resolveCatalogGame(gameId);
   if(!selectedGame)throw Error('Unlisted cartridge: '+gameId);
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [mode,setMode]=useState<Mode>('console');
@@ -57,7 +57,7 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
   useEffect(()=>{
     let active=true;
     loadBundledCartridge(selectedGame.cartridge,DEVICE).then(game=>{
-      if(game.manifest.id!==selectedGame.id)throw Error('Catalog identity mismatch');
+      if(game.manifest.id!==selectedGame.legacySlug)throw Error('Catalog identity mismatch');
       if(active){setCartridge(game);updateStatus('booting');}
     }).catch(error=>{if(active)updateStatus('error',String(error));});
     return ()=>{active=false;};
@@ -67,12 +67,12 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
     if(!cartridge)return;
     let active=true;
     setSaveSnapshot(null);
-    const store=createSaveService(browserSaveDriver,DEVICE,selectedGame.id);
+    const store=createGameSaveService(browserSaveDriver,DEVICE,selectedGame);
     saveWriterRef.current.then(()=>store.read()).catch(()=>null).then(value=>{
       if(active)setSaveSnapshot({session,value});
     });
     return ()=>{active=false;};
-  },[cartridge,selectedGame.id,session]);
+  },[cartridge,selectedGame.gameId,session]);
 
   useEffect(()=>{
     if(!cartridge||!saveSnapshot||saveSnapshot.session!==session)return;
@@ -98,7 +98,7 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
         const now=Date.now();
         if(now-lastSaveAt.current<250)return;
         lastSaveAt.current=now;
-        const store=createSaveService(browserSaveDriver,DEVICE,selectedGame.id);
+        const store=createGameSaveService(browserSaveDriver,DEVICE,selectedGame);
         const value=data.value;
         saveWriterRef.current=saveWriterRef.current.catch(()=>{}).then(()=>store.write(value)).catch(error=>console.warn('Local save unavailable:',error));
         return;
@@ -124,7 +124,7 @@ export default function HandheldPlayer({gameId='tiny-catcher'}:{gameId?:string})
     };
     animation=requestAnimationFrame(run);
     return ()=>{cancelAnimationFrame(animation);window.removeEventListener('message',receive);ready.current=false;post('stop');};
-  },[cartridge,saveSnapshot,selectedGame.id,session,post,updateStatus]);
+  },[cartridge,saveSnapshot,selectedGame.gameId,session,post,updateStatus]);
 
   useEffect(()=>{
     const down=(event:KeyboardEvent)=>{

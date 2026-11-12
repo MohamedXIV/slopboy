@@ -72,7 +72,18 @@ export async function openChromePage(url:string,profile:string){
       if(!result||!('value' in result))return null;
       return result.value;
     }
-    return {evaluate,close:()=>{
+    async function setViewport(width:number,height:number){
+      if(!Number.isInteger(width)||!Number.isInteger(height)||width<240||height<240)
+        throw Error('Invalid Chrome viewport');
+      await send('Emulation.setDeviceMetricsOverride',
+        {width,height,deviceScaleFactor:1,mobile:width<=760},validatedSessionId);
+    }
+    async function setOffline(value:boolean){
+      await send('Network.enable',{},validatedSessionId);
+      await send('Network.emulateNetworkConditions',{offline:value,latency:0,
+        downloadThroughput:0,uploadThroughput:0},validatedSessionId);
+    }
+    return {evaluate,setViewport,setOffline,close:()=>{
       socket?.close();
       process.kill('SIGTERM');
     }};

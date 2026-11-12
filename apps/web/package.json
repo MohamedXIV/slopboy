@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "start": "next start",
     "build": "next build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -15,7 +16,11 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "@slopboy/runtime": "workspace:*",
-    "@slopboy/catalog": "workspace:*"
+    "@slopboy/catalog": "workspace:*",
+    "@slopboy/cartridge": "workspace:*",
+    "@slopboy/mcp": "workspace:*",
+    "@heroui/react": "3.0.0",
+    "@heroui/styles": "3.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

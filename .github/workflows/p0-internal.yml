@@ -37,8 +37,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install without lifecycle scripts (lockfile pending)
+      - name: Install without lifecycle scripts
         run: pnpm install --ignore-scripts --frozen-lockfile
+      - name: Install PostgreSQL 18 for real migration integration tests
+        if: ${{ hashFiles('packages/database/migrations/*.sql') != '' }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-18
       - name: Unit tests
         run: pnpm test
       - name: Chromium sandbox isolation regression
@@ -57,23 +62,30 @@ jobs:
         run: pnpm typecheck
       - name: Lint
         run: pnpm lint
-      - name: Static export build
+      - name: Production Next.js server build and PWA assets
         run: pnpm build
-      - name: Verify playable build artifacts
+      - name: Dynamic runtime UUID and reviewed metadata smoke
+        run: pnpm security:runtime-routes
+      - name: V2 real-browser playable device regression
+        run: pnpm security:v2-browser
+      - name: Real Chromium KAPLAY isolated rendering spike
+        run: pnpm security:kaplay-spike
+      - name: KAPLAY vetted game through real HostSession browser integration
+        if: ${{ hashFiles('tools/kaplay-host-browser-smoke.ts') != '' }}
+        run: pnpm security:kaplay-host
+      - name: Chromium offline PWA install / guest save / uninstall regression
+        run: pnpm security:pwa-browser
+      - name: Verify runtime Next deployment artifacts
         run: |
           pnpm cartridge:verify
-          test -f apps/web/out/cartridges/tiny-catcher.slop
-          test -f apps/web/out/cartridges/star-patrol.slop
-          test -f apps/web/out/cartridges/circuit-slide.slop
-          test -f apps/web/out/library.html || test -f apps/web/out/library/index.html
-          test -f apps/web/out/play/star-patrol.html || test -f apps/web/out/play/star-patrol/index.html
-          test -f apps/web/out/play/circuit-slide.html || test -f apps/web/out/play/circuit-slide/index.html
-          test -f apps/web/out/play.html || test -f apps/web/out/play/index.html
-          test -f apps/web/out/create.html || test -f apps/web/out/create/index.html
-          test -f apps/web/out/sw.js
-          node --check apps/web/out/sw.js
-          test -f apps/web/out/offline-build.json
-          test -f apps/web/out/manifest.webmanifest
-          test -f apps/web/out/icons/slopboy-192.png
-          test -f apps/web/out/icons/slopboy-512.png
-          grep -q '/cartridges/circuit-slide.slop' apps/web/out/sw.js
+          test -f apps/web/.next/BUILD_ID
+          test -f apps/web/public/cartridges/tiny-catcher.slop
+          test -f apps/web/public/cartridges/star-patrol.slop
+          test -f apps/web/public/cartridges/circuit-slide.slop
+          test -f apps/web/public/sw.js
+          node --check apps/web/public/sw.js
+          test -f apps/web/public/offline-build.json
+          test -f apps/web/public/icons/slopboy-192.png
+          test -f apps/web/public/icons/slopboy-512.png
+          grep -q 'slopboy-installed-index-v3' apps/web/public/sw.js
+          grep -q 'SL_OP_INSTALL' apps/web/public/sw.js

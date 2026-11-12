@@ -15,3 +15,12 @@ coverage/
 
 # Creator-produced bundles, never auto-published
 /creations/*/dist/
+
+# Generated pinned KAPLAY feasibility sandbox
+/apps/web/public/v2/kaplay-spike.html
+
+# Generated runtime PWA and Next build artifacts
+/apps/web/public/sw.js
+/apps/web/public/offline-build.json
+apps/web/next-env.d.ts
+

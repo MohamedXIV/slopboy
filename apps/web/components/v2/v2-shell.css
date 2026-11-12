@@ -1,0 +1,125 @@
+/* Single V2 design system: shared chrome, theme tokens, and HeroUI v3 controls. */
+.sb-v2-shell{
+  --sb-bg:#0d1719;--sb-top:#111f22;--sb-panel:#172a2d;
+  --sb-line:#38534f;--sb-text:#edf4e5;--sb-subtle:#9cb8aa;
+  --sb-accent:#d1e99d;--sb-accent-ink:#263d34;
+  --sb-control:#233b3b;--sb-control-hover:#34504a;--sb-control-border:#537066;
+  --background:oklch(.18 .025 188);--foreground:oklch(.95 .03 110);
+  --accent:oklch(.88 .12 114);--accent-foreground:oklch(.28 .045 164);
+  --border:oklch(.45 .035 170);--focus:oklch(.85 .13 119);
+  color-scheme:dark;
+  background:var(--sb-bg);color:var(--sb-text);
+  min-height:100vh;display:flex;flex-direction:column;
+}
+.sb-v2-shell[data-v2-theme='light']{
+  --sb-bg:#f4f0e5;--sb-top:#fffdf7;--sb-panel:#fffdf7;
+  --sb-line:#c6d0c3;--sb-text:#304744;--sb-subtle:#586f65;
+  --sb-accent:#66885d;--sb-accent-ink:#fffdf5;
+  --sb-control:#e5eee4;--sb-control-hover:#d6e5d3;--sb-control-border:#bbcbbd;
+  --background:oklch(.975 .013 107);--foreground:oklch(.34 .034 178);
+  --accent:oklch(.59 .10 148);--accent-foreground:oklch(.98 .01 104);
+  --border:oklch(.81 .028 153);--focus:oklch(.56 .1 150);
+  color-scheme:light;
+}
+.sb-v2-shell *{box-sizing:border-box}
+.sb-v2-main{flex:1;min-width:0}
+.sb-v2-header{position:relative;z-index:20;background:var(--sb-top);border-bottom:1px solid var(--sb-line)}
+.sb-v2-header-inner{max-width:1600px;margin:auto;min-height:74px;padding:12px clamp(16px,3.5vw,50px);display:flex;align-items:center;gap:19px}
+.sb-v2-brand{display:inline-flex;align-items:center;white-space:nowrap;gap:7px;font-size:22px;line-height:1.1;font-weight:950;letter-spacing:-1px;text-decoration:none;color:var(--sb-text)}
+.sb-v2-brand span{font:900 10px ui-monospace,monospace;letter-spacing:.2px;color:var(--sb-accent);border:1px solid var(--sb-line);border-radius:5px;padding:4px 5px}
+.sb-v2-header-descriptor{border-left:1px solid var(--sb-line);padding-left:16px;color:var(--sb-subtle);font:800 9px ui-monospace,monospace;letter-spacing:1.4px}
+.sb-v2-nav{display:flex;align-items:center;gap:7px;margin-left:auto}
+.sb-v2-nav>a{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 13px;border-radius:10px;border:1px solid transparent;color:var(--sb-subtle);font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap}
+.sb-v2-nav>a:hover{color:var(--sb-text);background:var(--sb-control)}
+.sb-v2-nav>a[aria-current='page']{color:var(--sb-accent);border-color:var(--sb-line);background:var(--sb-control)}
+/* Explicitly skin HeroUI components rather than relying on its generic blue/gray variant palette. */
+.sb-v2-shell button.sb-control,
+button.sb-control.sb-v2-dialog-control{
+  min-height:36px;padding:8px 13px;border:1px solid var(--sb-control-border)!important;
+  border-radius:10px;background:var(--sb-control)!important;color:var(--sb-text)!important;
+  font:800 12px/1.2 system-ui,-apple-system,Segoe UI,sans-serif;letter-spacing:0;
+  cursor:pointer;box-shadow:none!important;
+}
+.sb-v2-shell button.sb-control:hover:not(:disabled),
+.sb-v2-shell button.sb-control[data-hovered],
+button.sb-control.sb-v2-dialog-control:hover:not(:disabled){
+  background:var(--sb-control-hover)!important;border-color:var(--sb-accent)!important;
+}
+.sb-v2-shell button.sb-control.sb-control-primary,
+button.sb-control.sb-control-primary{
+  background:var(--sb-accent)!important;color:var(--sb-accent-ink)!important;
+  border-color:var(--sb-accent)!important;
+}
+.sb-v2-shell button.sb-control.sb-control-primary:hover:not(:disabled),
+button.sb-control.sb-control-primary:hover:not(:disabled){filter:brightness(1.06)}
+.sb-v2-shell button.sb-control:disabled,
+button.sb-control.sb-v2-dialog-control:disabled{opacity:.48;cursor:not-allowed}
+.sb-v2-shell button.sb-control:focus-visible,
+button.sb-control.sb-v2-dialog-control:focus-visible,
+.sb-v2-shell a:focus-visible{outline:2px solid var(--sb-accent);outline-offset:3px}
+.sb-v2-theme-toggle{white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
+.sb-v2-theme-toggle span:first-child{font-size:15px}
+.sb-v2-footer{border-top:1px solid var(--sb-line);background:var(--sb-top);color:var(--sb-subtle)}
+.sb-v2-footer-inner{max-width:1600px;margin:auto;padding:23px clamp(16px,3.5vw,50px);display:flex;align-items:center;gap:18px;font-size:11px}
+.sb-v2-footer-brand{white-space:nowrap;color:var(--sb-text);font-size:12px;font-weight:950;letter-spacing:-.5px}
+.sb-v2-footer-brand span{font:800 9px ui-monospace,monospace;color:var(--sb-accent)}
+.sb-v2-footer nav{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:16px}
+.sb-v2-footer nav a{font-weight:700;color:var(--sb-subtle)}
+.sb-v2-footer nav a:hover{color:var(--sb-accent)}
+/* Dialogs are portaled by HeroUI; they receive their own theme attributes. */
+.sb-v2-dialog[data-v2-theme='dark']{
+  --sb-top:#0f2022;--sb-panel:#14282b;--sb-text:#edf4e5;--sb-subtle:#a1b9ad;
+  --sb-accent:#d1e99d;--sb-accent-ink:#253c32;--sb-line:#3f5a52;
+  --sb-control:#223b3b;--sb-control-hover:#34504a;--sb-control-border:#557168;
+  --background:oklch(.18 .025 188);--foreground:oklch(.95 .03 110);
+  --accent:oklch(.88 .12 114);--accent-foreground:oklch(.28 .045 164);
+  color-scheme:dark;
+}
+.sb-v2-dialog[data-v2-theme='light']{
+  --sb-top:#f6f3e9;--sb-panel:#fffdf8;--sb-text:#304744;--sb-subtle:#5b756b;
+  --sb-accent:#66885d;--sb-accent-ink:#fffdf5;--sb-line:#c4cfc1;
+  --sb-control:#e5eee4;--sb-control-hover:#d6e5d3;--sb-control-border:#bbcbbd;
+  --background:oklch(.975 .013 107);--foreground:oklch(.34 .034 178);
+  --accent:oklch(.59 .10 148);--accent-foreground:oklch(.98 .01 104);
+  color-scheme:light;
+}
+.sb-v2-dialog{background:var(--sb-panel)!important;color:var(--sb-text)!important;border:1px solid var(--sb-line)!important}
+.sb-v2-dialog button.sb-control{
+  background:var(--sb-control)!important;color:var(--sb-text)!important;
+  border:1px solid var(--sb-control-border)!important;
+  box-shadow:none!important;border-radius:9px;min-height:34px;padding:7px 11px;font-weight:800;
+}
+.sb-v2-dialog button.sb-control:focus-visible{outline:2px solid var(--sb-accent);outline-offset:2px}
+.sb-v2-dialog button.sb-control.sb-control-primary{
+  background:var(--sb-accent)!important;color:var(--sb-accent-ink)!important;
+}
+.sb-v2-dialog [data-slot='close-button'],.sb-v2-dialog [data-slot='close-trigger']{color:var(--sb-text)!important}
+@media(max-width:760px){
+ .sb-v2-header-inner{min-height:62px;padding:10px 14px;gap:8px}
+ .sb-v2-brand{font-size:18px}
+ .sb-v2-header-descriptor{display:none}
+ .sb-v2-nav{gap:2px}
+ .sb-v2-nav>a{padding:7px 9px;font-size:11px}
+ .sb-v2-theme-toggle{padding:7px 9px!important;gap:4px!important}
+ .sb-v2-theme-toggle span:last-child{display:none}
+ .sb-v2-footer-inner{flex-wrap:wrap;gap:10px}
+ .sb-v2-footer nav{margin-left:0;width:100%}
+}
+
+/* Never let HeroUI's per-button variables override the V2 light palette. */
+.sb-v2-shell[data-v2-theme='light'] button.sb-control{
+  background-color:#e5eee4!important;color:#304744!important;
+  border-color:#bbcbbd!important;
+}
+.sb-v2-shell[data-v2-theme='light'] button.sb-control:hover:not(:disabled){
+  background-color:#d6e5d3!important;border-color:#66885d!important;
+}
+.sb-v2-shell[data-v2-theme='light'] button.sb-control.sb-control-primary{
+  background-color:#66885d!important;color:#fffdf5!important;border-color:#66885d!important;
+}
+.sb-v2-dialog[data-v2-theme='light'] button.sb-control{
+  background-color:#e5eee4!important;color:#304744!important;border-color:#bbcbbd!important;
+}
+.sb-v2-dialog[data-v2-theme='light'] button.sb-control.sb-control-primary{
+  background-color:#66885d!important;color:#fffdf5!important;
+}

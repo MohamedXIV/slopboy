@@ -11,36 +11,41 @@ const ROOT=resolve(import.meta.dirname,'..');
 const DEST=resolve(ROOT,'apps/web/public/cartridges');
 async function release(action:'build'|'verify'):Promise<void>{
   const ids=new Set<string>();
+  const gameIds=new Set<string>();
+  const revisionIds=new Set<string>();
   const known=new Set<string>();
   for (const entry of GAMES) {
-    if(ids.has(entry.id))throw Error('Duplicate catalog ID: '+entry.id);
-    ids.add(entry.id);
-    const expected='/cartridges/'+entry.id+'.slop';
-    if(entry.cartridge!==expected)throw Error('Invalid cartridge name for '+entry.id);
+    if(gameIds.has(entry.gameId)||revisionIds.has(entry.revisionId))throw Error('Duplicate immutable fixture UUID');
+    gameIds.add(entry.gameId);revisionIds.add(entry.revisionId);
+    if(ids.has(entry.legacySlug))throw Error('Duplicate catalog ID: '+entry.legacySlug);
+    ids.add(entry.legacySlug);
+    const expected='/cartridges/'+entry.legacySlug+'.slop';
+    if(entry.cartridge!==expected)throw Error('Invalid cartridge name for '+entry.legacySlug);
     const readSource=(relative:string)=>{
       if(!/^examples\/[a-z0-9-]+\/(?:src\/game\.ts|manifest\.json)$/.test(relative))throw Error('Untrusted source path');
-      if(!relative.startsWith('examples/'+entry.id+'/'))throw Error('Source path does not match catalog');
+      if(!relative.startsWith('examples/'+entry.legacySlug+'/'))throw Error('Source path does not match catalog');
       return readFile(resolve(ROOT,relative),'utf8');
     };
     const output=resolve(DEST,basename(entry.cartridge));
     known.add(basename(output));
     const declared=JSON.parse(await readSource(entry.source.manifest));
     const {manifest}=validateManifest(declared);
-    if(manifest.id!==entry.id||manifest.title!==entry.title||
+    // UI titles may be renamed without rebuilding immutable pixel-v1 cartridges.
+    if(manifest.id!==entry.legacySlug||
       manifest.hardware.id!==entry.hardware.id||manifest.hardware.version!==entry.hardware.version||
-      JSON.stringify(manifest.controls)!==JSON.stringify(entry.controls))throw Error('Catalog manifest mismatch: '+entry.id);
+      JSON.stringify(manifest.controls)!==JSON.stringify(entry.controls))throw Error('Catalog manifest mismatch: '+entry.legacySlug);
     const code=compileGameSource(await readSource(entry.source.game));
     const bytes=packCartridge({format:'slopboy-cartridge-v0',manifest,code,assets:[]});
     const decoded=unpackCartridge(bytes);
-    if(decoded.manifest.id!==entry.id)throw Error('Generated cartridge identity mismatch');
+    if(decoded.manifest.id!==entry.legacySlug)throw Error('Generated cartridge identity mismatch');
     if(action==='build'){
       await mkdir(dirname(output),{recursive:true});
       await writeFile(output,bytes);
     } else {
       const existing=await readFile(output);
-      if(!existing.equals(bytes))throw Error('Released cartridge bytes differ from source: '+entry.id);
+      if(!existing.equals(bytes))throw Error('Released cartridge bytes differ from source: '+entry.legacySlug);
     }
-    console.info(action+': '+entry.id+' ('+bytes.byteLength+' bytes)');
+    console.info(action+': '+entry.legacySlug+' ('+bytes.byteLength+' bytes)');
   }
   if(action==='verify'){
     const actual=(await readdir(DEST)).filter(f=>f.endsWith('.slop')).sort();

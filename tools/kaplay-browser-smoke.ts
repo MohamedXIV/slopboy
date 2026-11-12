@@ -1,0 +1,58 @@
+import {mkdtemp,rm} from "node:fs/promises";
+import {join} from "node:path";
+import {tmpdir} from "node:os";
+import {openChromePage} from "./chrome-cdp.ts";
+import {startNextTestServer} from "./next-test-server.ts";
+
+const sleep = (ms:number) => new Promise<void>(r=>setTimeout(r,ms));
+async function main() {
+  const profile = await mkdtemp(join(tmpdir(), "slopboy-kaplay-"));
+  const server=await startNextTestServer();
+  const port=server.port;
+  let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
+  try {
+    browser = await openChromePage("http://127.0.0.1:"+port+"/labs/kaplay",join(profile,"chrome"));
+    const evaluate=browser.evaluate;
+    let ready=false;
+    const deadline=Date.now()+20000;
+    while (Date.now()<deadline) {
+      const state=JSON.parse(String(await evaluate("JSON.stringify({status:document.querySelector('[data-testid=kaplay-status]')?.textContent,error:document.querySelector('[role=alert]')?.textContent,frames:Number(document.querySelector('[data-testid=kaplay-frames]')?.textContent||0)})")));
+      if (state.status==="error") throw Error("KAPLAY spike error: "+state.error);
+      if (state.status==="running" && state.frames >= 10) {ready=true;break;}
+      await sleep(200);
+    }
+    if (!ready) throw Error("KAPLAY sandbox failed to produce real frames");
+    const evidence=JSON.parse(String(await evaluate("JSON.stringify((()=>{const c=document.querySelector('.kaplay-display-wrap canvas');const f=document.querySelector('.kaplay-display-wrap iframe');const data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;const unique=new Set();for(let i=0;i<data.length;i+=4)unique.add(data[i]+','+data[i+1]+','+data[i+2]);return {width:c.width,height:c.height,colors:unique.size,sandbox:f.getAttribute('sandbox'),isolated:f.contentDocument===null,hasCsp:f.srcdoc.includes(\"connect-src 'none'\"),visibleRenderer:getComputedStyle(f).opacity==='1'&&f.getBoundingClientRect().width>=160}})())")));
+    if (evidence.width!==160 || evidence.height!==144 || evidence.colors<2 || evidence.colors>4) {
+      throw Error("Indexed framebuffer mismatch "+JSON.stringify(evidence));
+    }
+    if (evidence.sandbox!=="allow-scripts" || !evidence.isolated || !evidence.hasCsp || !evidence.visibleRenderer) {
+      throw Error("Opaque-origin/CSP gate failed "+JSON.stringify(evidence));
+    }
+    const initialX=Number(await evaluate("document.querySelector('[data-testid=kaplay-player-x]').textContent"));
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keydown',{code:'ArrowRight',bubbles:true}));true");
+    await sleep(2400);
+    const pressedEvidence = await evaluate("JSON.stringify({ticks:document.querySelector('[data-testid=kaplay-ticks]')?.textContent,inputs:document.querySelector('[data-testid=kaplay-input-count]')?.textContent,packets:document.querySelector('[data-testid=kaplay-input-packets]')?.textContent,active:document.querySelector('[data-testid=kaplay-active-input-ticks]')?.textContent})");
+    await evaluate("window.dispatchEvent(new KeyboardEvent('keyup',{code:'ArrowRight',bubbles:true}));true");
+    await sleep(250);
+    const finalX=Number(await evaluate("document.querySelector('[data-testid=kaplay-player-x]').textContent"));
+    if (finalX < initialX + 15) {
+      const debug = await evaluate("JSON.stringify({ticks:document.querySelector('[data-testid=kaplay-ticks]')?.textContent,inputs:document.querySelector('[data-testid=kaplay-input-count]')?.textContent,assets:document.querySelector('[data-testid=kaplay-asset-progress]')?.textContent})");
+      throw Error("Real KAPLAY game ignored keyboard input: "+initialX+" -> "+finalX+" / "+debug+" / during press "+pressedEvidence);
+    }
+    const screenshotBefore=String(await evaluate("document.querySelector('.kaplay-display-wrap canvas').toDataURL()"));
+    await evaluate("document.querySelector('#kaplay-palette').value='amber';document.querySelector('#kaplay-palette').dispatchEvent(new Event('change',{bubbles:true}));true");
+    await sleep(450);
+    const screenshotAfter=String(await evaluate("document.querySelector('.kaplay-display-wrap canvas').toDataURL()"));
+    if (screenshotBefore===screenshotAfter) throw Error("LCD display not repainted after palette selection");
+    const ms=Number(await evaluate("document.querySelector('[data-testid=kaplay-capture]').textContent.replace(' ms','')"));
+    if (!Number.isFinite(ms) || ms>150) throw Error("Per-frame readback exceeded generous spike diagnostic budget: "+ms);
+    console.log("KAPLAY real Chromium spike PASSED", {evidence,initialX,finalX,captureMs:ms});
+  } finally {
+    browser?.close();
+    await server.stop();
+    await sleep(400);
+    await rm(profile,{recursive:true,force:true,maxRetries:12,retryDelay:150}).catch(()=>{});
+  }
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});

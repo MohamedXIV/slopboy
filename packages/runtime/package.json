@@ -10,6 +10,9 @@
     "./sandbox-document": "./src/sandbox-document.ts",
     "./cartridge-browser": "./src/cartridge-browser.ts",
     "./protocol": "./src/protocol.ts",
-    "./save-store": "./src/save-store.ts"
+    "./save-store": "./src/save-store.ts",
+    "./host-api": "./src/host-api.ts",
+    "./kaplay-adapter": "./src/kaplay-adapter.ts",
+    ".": "./src/host-api.ts"
   }
 }
