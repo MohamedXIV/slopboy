@@ -3,7 +3,9 @@
  * attested, explicitly allowlisted pixel-v1 cartridges. Never opens a database
  * or executes SQL itself. Private drafts only; this is not publication approval.
  */
+import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {isDeepStrictEqual} from 'node:util';
 import {pathToFileURL} from 'node:url';
 import {GAMES} from '../packages/catalog/src/index.ts';
 import {SYSTEM_CURATOR_USER_ID} from '../packages/database/src/schema.ts';
@@ -88,12 +90,26 @@ export function buildCuratedDraftImportSql(plan:CuratedDraftImportPlan):string{
   if(plan.schemaVersion!==1||plan.requiredMigration!==CURATED_IMPORT_REQUIRED_MIGRATION||
     plan.publicationEligible!==false||plan.writesToDatabase!==false||
     plan.revisions.length!==GAMES.length)throw Error('Invalid private draft import plan');
+  const lock:unknown=JSON.parse(readFileSync(
+    resolve(ROOT,'packages/catalog/curated-revision-lock.json'),'utf8'));
+  if(!lock||typeof lock!=='object'||!('schemaVersion' in lock)||
+    lock.schemaVersion!==1||!('revisions' in lock)||
+    !Array.isArray(lock.revisions)||lock.revisions.length!==GAMES.length){
+    throw Error('Invalid independent curated revision lock');
+  }
+  const pinned=lock.revisions as {gameId:string;revisionId:string;sha256:string;byteSize:number}[];
   const games=new Set<string>();
   const revisions=new Set<string>();
   for(const row of plan.revisions){
     const fixture=GAMES.find(g=>g.gameId===row.game_id&&g.revisionId===row.revision_id&&
       g.legacySlug===row.legacy_slug);
-    if(!fixture||games.has(row.game_id)||revisions.has(row.revision_id)||
+    const expected=pinned.find(r=>r.gameId===row.game_id&&r.revisionId===row.revision_id);
+    const manifest=fixture?JSON.parse(readFileSync(
+      resolve(ROOT,fixture.source.manifest),'utf8')) as Record<string,unknown>:null;
+    if(!fixture||!expected||!manifest||
+      !isDeepStrictEqual(row.manifest,manifest)||
+      expected.sha256!==row.content_digest||expected.byteSize!==row.byte_size||
+      games.has(row.game_id)||revisions.has(row.revision_id)||
       row.revision_number!==1||row.engine_id!=='pixel-v1'||row.engine_version!=='0.1.0'||
       row.device_profile!==fixture.hardware.id||row.created_by!==SYSTEM_CURATOR_USER_ID||
       !/^[0-9a-f]{64}$/.test(row.content_digest)||
