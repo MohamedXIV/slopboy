@@ -12,7 +12,7 @@
 - Existing static `/cartridges/<legacy-slug>.slop` path, clearly labeled as **not** an object-storage key.
 - Intended initial revision status `draft` — the evidence is **not** independent publication approval.
 
-The CLI **requires an on-disk bundle to match a deterministic rebuild** from the approved source and manifest; it refuses substituted bytes. `pnpm build` now runs `pnpm cartridge:attest` immediately after `pnpm cartridge:build`, before building the PWA. `pnpm cartridge:verify` remains an independent release check.
+The CLI **requires an on-disk bundle to match a deterministic rebuild** from the approved source and manifest; it refuses substituted bytes. A second independent check locks each immutable revision UUID to the exact previously reviewed SHA-256 and byte size in `packages/catalog/curated-revision-lock.json`. A compiled-code change must introduce a new reviewed revision ID rather than silently replacing an old one. `pnpm build` now runs `pnpm cartridge:attest` immediately after `pnpm cartridge:build`, before building the PWA. `pnpm cartridge:verify` remains an independent release check.
 
 For machine-readable evidence after a successful cartridge build:
 
@@ -30,6 +30,6 @@ The current statically bundled paths are backwards-compatible but **not version-
 
 ## Verification and rollback
 
-- `tests/curated-revision-attestation.test.ts` covers deterministic SHA-256, UUIDs, display title independence, source path/manifest checks and substituted on-disk cartridge rejection.
+- `tests/curated-revision-attestation.test.ts` covers deterministic SHA-256, UUIDs, display title independence, source path/manifest checks, substituted on-disk cartridge rejection and refusal to mutate a pinned revision's compiled code.
 - Normal CI continues to cover offline/guest saves, playback, browser isolation and Auth/database regressions.
 - Rollback: revert only this branch; no Neon schema/data, guest saves, PWA storage or Production environment changed.
