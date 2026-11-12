@@ -197,12 +197,13 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
         current_published_revision_id='${CURATED_GAME_FIXTURES[0].revisionId}'
       WHERE id='${CURATED_GAME_FIXTURES[0].gameId}';
     `});
+    const pgQueryRows=(output:string)=>output.split(/\r?\n/).filter(line=>line.trim()&&line.trim()!=='PREPARE');
     const preparedPage=(extra:string)=>`
       PREPARE qa_catalog(timestamptz,uuid,int) AS ${LIST_PUBLIC_GAMES_SQL};
       EXECUTE qa_catalog(NULL,NULL,${extra});
     `;
     const unreleased=await executePsql(config,{sql:preparedPage('24')});
-    assert.equal(unreleased.stdout.trim(),'','Do not expose a public-labeled game before revision approval');
+    assert.equal(pgQueryRows(unreleased.stdout).length,0,'Do not expose a public-labeled game before revision approval');
 
     await executePsql(config,{sql:`
       UPDATE game_revisions SET status='published'
@@ -226,7 +227,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const full=await executePsql(config,{sql:preparedPage('24')});
     assert.ok(full.stdout.includes('Tiny Catcher Deluxe')&&full.stdout.includes('Star Patrol'));
     const single=await executePsql(config,{sql:preparedPage('1')});
-    assert.equal(single.stdout.trim().split('\\n').length,1,'Limit 1 returns one row');
+    assert.equal(pgQueryRows(single.stdout).length,1,'Limit 1 returns one row');
 
     // Owner-only metadata access to third, still-private curated draft.
     const privateId=CURATED_GAME_FIXTURES[2].gameId;
@@ -237,8 +238,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const guest=await executePsql(config,{sql:identitySql('NULL')});
     const stranger=await executePsql(config,{sql:identitySql("'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'")});
     const owner=await executePsql(config,{sql:identitySql("'"+SYSTEM_CURATOR_USER_ID+"'")});
-    assert.equal(guest.stdout.trim(),'','Guest must not read a private draft by UUID');
-    assert.equal(stranger.stdout.trim(),'','An arbitrary actor may not read another owner draft');
+    assert.equal(pgQueryRows(guest.stdout).length,0,'Guest must not read a private draft by UUID');
+    assert.equal(pgQueryRows(stranger.stdout).length,0,'An arbitrary actor may not read another owner draft');
     assert.ok(owner.stdout.includes('Circuit Slide'),'Only its database owner can read private draft metadata');
     // This test only touches the disposable local cluster; rollback below
     // removes these temporary reviewed revision statuses and fixture revisions.
