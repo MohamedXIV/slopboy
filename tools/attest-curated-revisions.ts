@@ -41,6 +41,38 @@ export interface CuratedRevisionEvidence {
   readonly intendedStatus:'draft';
 }
 
+interface PinnedRevision{
+  readonly gameId:string;
+  readonly revisionId:string;
+  readonly sha256:string;
+  readonly byteSize:number;
+}
+
+/** A revision's known-reviewed digest is pinned independently of rebuilt source. */
+async function pinnedRevisions():Promise<readonly PinnedRevision[]>{
+  const value:unknown=JSON.parse(await readFile(
+    resolve(ROOT,'packages/catalog/curated-revision-lock.json'),'utf8'));
+  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid revision lock');
+  const lock=value as Record<string,unknown>;
+  if(lock.schemaVersion!==1||!Array.isArray(lock.revisions)||
+      lock.revisions.length!==GAMES.length)throw Error('Incomplete revision lock');
+  const pinned:PinnedRevision[]=[];
+  for(const entry of lock.revisions){
+    if(!entry||typeof entry!=='object'||Array.isArray(entry))throw Error('Invalid revision lock entry');
+    const row=entry as Record<string,unknown>;
+    if(typeof row.gameId!=='string'||typeof row.revisionId!=='string'||
+        typeof row.sha256!=='string'||!HEX_SHA256.test(row.sha256)||
+        typeof row.byteSize!=='number'||!Number.isSafeInteger(row.byteSize)||row.byteSize<=0||
+        Object.keys(row).sort().join(',')!=='byteSize,gameId,revisionId,sha256'){
+      throw Error('Malformed revision lock entry');
+    }
+    const game=GAMES.find(g=>g.gameId===row.gameId&&g.revisionId===row.revisionId);
+    if(!game||pinned.some(p=>p.gameId===row.gameId))throw Error('Unknown or duplicate revision lock');
+    pinned.push(row as unknown as PinnedRevision);
+  }
+  return pinned;
+}
+
 interface AttestationOptions {
   readonly rootDir?:string;
   /** Require the deployed-build .slop to match freshly rebuilt source bytes. */
@@ -80,6 +112,10 @@ export async function attestCuratedRevision(
   }
   const digest=createHash('sha256').update(bytes).digest('hex');
   if(!HEX_SHA256.test(digest))throw Error('Invalid SHA-256 digest');
+  const pinned=(await pinnedRevisions()).find(p=>p.gameId===game.gameId&&p.revisionId===game.revisionId);
+  if(!pinned||pinned.sha256!==digest||pinned.byteSize!==bytes.byteLength){
+    throw Error('Immutable curated revision changed: '+slug+'; create and review a new revision ID');
+  }
   return {
     gameId:game.gameId,revisionId:game.revisionId,revisionNumber:1,
     legacySlug:slug,engineId:'pixel-v1',engineVersion:'0.1.0',
