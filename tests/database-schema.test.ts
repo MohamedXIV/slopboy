@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
+import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, readdir, writeFile, access } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -187,6 +188,82 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       sql: `SELECT id FROM game_revisions WHERE game_id = '${existingGameId}';`,
     });
     assert.ok(unchangedRevision.stdout.includes(CURATED_GAME_FIXTURES[0].revisionId));
+
+    // 7f. Keyset catalog queries must never leak private or unreviewed metadata.
+    // Create a reviewed release ONLY in the ephemeral PostgreSQL test cluster.
+    // Published visibility alone must not pass without a published revision.
+    await executePsql(config,{sql:`
+      UPDATE games SET visibility='public', status='published',
+        current_published_revision_id='${CURATED_GAME_FIXTURES[0].revisionId}'
+      WHERE id='${CURATED_GAME_FIXTURES[0].gameId}';
+    `});
+    const pgQueryRows=(output:string)=>output.split(/\r?\n/).filter(line=>line.trim()&&line.trim()!=='PREPARE');
+    const preparedPage=(extra:string)=>`
+      PREPARE qa_catalog(timestamptz,uuid,int) AS ${LIST_PUBLIC_GAMES_SQL};
+      EXECUTE qa_catalog(NULL,NULL,${extra});
+    `;
+    const unreleased=await executePsql(config,{sql:preparedPage('24')});
+    assert.equal(pgQueryRows(unreleased.stdout).length,0,'Do not expose a public-labeled game before revision approval');
+
+    await executePsql(config,{sql:`
+      UPDATE game_revisions SET status='published'
+      WHERE id='${CURATED_GAME_FIXTURES[0].revisionId}';
+    `});
+    const released=await executePsql(config,{sql:preparedPage('24')});
+    assert.ok(released.stdout.includes('Tiny Catcher Deluxe'));
+    assert.ok(!released.stdout.includes('Star Patrol'),'Private drafts must not appear in public discovery');
+
+    // A second independent published row proves limit/order and next cursor behavior.
+    await executePsql(config,{sql:`
+      INSERT INTO game_revisions(id,game_id,revision_number,engine_id,engine_version,
+       manifest,content_digest,storage_key,byte_size,created_by,status)
+      VALUES ('${CURATED_GAME_FIXTURES[1].revisionId}','${CURATED_GAME_FIXTURES[1].gameId}',
+        1,'pixel-v1','0.1.0','{}'::jsonb,
+        repeat('b',64),'qa-only/second.slop',22,'${SYSTEM_CURATOR_USER_ID}','published');
+      UPDATE games SET status='published',visibility='public',
+        current_published_revision_id='${CURATED_GAME_FIXTURES[1].revisionId}'
+      WHERE id='${CURATED_GAME_FIXTURES[1].gameId}';
+    `});
+    const full=await executePsql(config,{sql:preparedPage('24')});
+    assert.ok(full.stdout.includes('Tiny Catcher Deluxe')&&full.stdout.includes('Star Patrol'));
+    const single=await executePsql(config,{sql:preparedPage('1')});
+    const firstPage=pgQueryRows(single.stdout);
+    assert.equal(firstPage.length,1,'Limit 1 returns one row');
+    const firstCells=firstPage[0].split('|');
+    assert.equal(firstCells.length,13,'Public catalog exposes only approved metadata columns');
+    // Reuse the *exact* database timestamp, including microsecond precision,
+    // rather than rounding it through JavaScript Date and skipping tied rows.
+    const firstId=firstCells[0],firstTimestamp=firstCells[7];
+    const second=await executePsql(config,{sql:`
+      PREPARE qa_catalog(timestamptz,uuid,int) AS ${LIST_PUBLIC_GAMES_SQL};
+      EXECUTE qa_catalog('${firstTimestamp}','${firstId}',1);
+    `});
+    const secondPage=pgQueryRows(second.stdout);
+    assert.equal(secondPage.length,1,'Keyset cursor reaches the second reviewed game');
+    assert.notEqual(secondPage[0].split('|')[0],firstId,'Cursor pagination must not repeat first-page entries');
+    // Metadata edits are read on every request: the immutable UUID is stable,
+    // and no CDN or Next.js cache may pin an old title.
+    await executePsql(config,{sql:`
+      UPDATE games SET title='Star Patrol Retitled' WHERE id='${CURATED_GAME_FIXTURES[1].gameId}';
+    `});
+    const afterRename=await executePsql(config,{sql:preparedPage('24')});
+    assert.ok(afterRename.stdout.includes('Star Patrol Retitled'),'Renamed metadata is readable without a rebuild');
+    assert.ok(afterRename.stdout.includes(CURATED_GAME_FIXTURES[1].gameId),'Renaming must not change a game UUID');
+
+    // Owner-only metadata access to third, still-private curated draft.
+    const privateId=CURATED_GAME_FIXTURES[2].gameId;
+    const identitySql=(actor:string)=>`
+      PREPARE qa_detail(uuid,uuid) AS ${READ_VISIBLE_GAME_SQL};
+      EXECUTE qa_detail('${privateId}',${actor});
+    `;
+    const guest=await executePsql(config,{sql:identitySql('NULL')});
+    const stranger=await executePsql(config,{sql:identitySql("'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'")});
+    const owner=await executePsql(config,{sql:identitySql("'"+SYSTEM_CURATOR_USER_ID+"'")});
+    assert.equal(pgQueryRows(guest.stdout).length,0,'Guest must not read a private draft by UUID');
+    assert.equal(pgQueryRows(stranger.stdout).length,0,'An arbitrary actor may not read another owner draft');
+    assert.ok(owner.stdout.includes('Circuit Slide'),'Only its database owner can read private draft metadata');
+    // This test only touches the disposable local cluster; rollback below
+    // removes these temporary reviewed revision statuses and fixture revisions.
 
     // 8. Test Rollback DOWN:
 
