@@ -8,7 +8,7 @@ DROP FUNCTION public.slopboy_reject_revision_payload_change();
 
 DROP TABLE public.user_installations;
 ALTER TABLE public.cartridge_artifacts
-  DROP CONSTRAINT uq_cartridge_artifacts_id_revision;
+  DROP CONSTRAINT uq_cartridge_artifacts_bundle_identity;
 
 ALTER TABLE public.games
   DROP CONSTRAINT fk_games_current_revision_same_game;
