@@ -41,7 +41,12 @@ async function main(){
     await sleep(350);
     const sharedLight=await evalJs("document.querySelector('.sb-v2-shell').dataset.v2Theme==='light'&&document.querySelector('.v2-player').dataset.v2Theme==='light'");
     if(sharedLight!==true)throw Error('Shared theme did not propagate into player without duplicate controls');
-    const brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
+    let brandedButton='';
+    for(let i=0;i<30;i++){
+      brandedButton=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).backgroundColor"));
+      if(brandedButton==='rgb(240, 238, 228)')break;
+      await sleep(100);
+    }
     if(brandedButton!=='rgb(240, 238, 228)')
       throw Error('Approved HeroUI light secondary surface missing: '+brandedButton);
     const brandedText=String(await evalJs("getComputedStyle(document.querySelector('.sb-v2-theme-toggle')).color"));
