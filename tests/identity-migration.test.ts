@@ -127,3 +127,11 @@ test('interrupted backup copy falls back, and repeated migration preserves selec
   await readLocalSnapshot(driver,game.gameId,5);
   assert.equal(values.get(next),payload);
 });
+
+test('an unrecognized UUID never imports a similarly named legacy backup',async()=>{
+  const gameId='c260881a-647d-43c1-bf24-81e7a5902908';
+  const {driver,values}=makeDriver();
+  values.set('slopboy:local-backup:v1:slopboy-1000:'+gameId+':1',JSON.stringify({createdAt:123,save:'other game'}));
+  assert.equal(await readLocalSnapshot(driver,gameId,1),null);
+  assert.throws(()=>localSnapshotKey(gameId,1,true),/historical alias/);
+});

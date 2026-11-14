@@ -144,8 +144,9 @@ async function main(){
     if(!quickVisible)throw Error('Quick cartridge Drawer never opened');
     const simultaneous=await evalJs("!!document.querySelector('.v2-led.on')&&window.__frame===document.querySelector('.v2-isolated-frame')");
     if(simultaneous!==true)throw Error('Opening quick cartridge Drawer restarted or paused the active runtime');
-    const quickCount=Number(await evalJs("document.querySelectorAll('.v2-quick-cartridge-list .v2-quick-cartridge').length"));
-    if(quickCount!==3)throw Error('Quick cartridge shelf must show every curated title');
+    let quickCount=0;
+    for(let i=0;i<100;i++){quickCount=Number(await evalJs("document.querySelectorAll('.v2-quick-cartridge-list .v2-quick-cartridge').length"));if(quickCount===4)break;await sleep(100);}
+    if(quickCount!==4)throw Error('Quick cartridge shelf must show database-published titles: '+quickCount);
     await evalJs(`document.querySelector('.v2-quick-cartridge[href="/play/${STAR_GAME_ID}"]').click();true`);
     const swappedDeadline=Date.now()+15000;
     let swapped=false;
@@ -189,7 +190,8 @@ async function main(){
     }
     if(!libraryReady)throw Error('Library route failed to render');
     const libraryCount=Number(await evalJs("document.querySelectorAll('.v2-cart-grid .v2-library-game').length"));
-    if(libraryCount!==3)throw Error('Curated library cartridges missing: '+libraryCount);
+    if(libraryCount!==4)throw Error('Database-backed library cartridges missing: '+libraryCount);
+    if(await evalJs(`!!document.querySelector('.v2-cartridge-link[href="/play/${BROWSER_RUNTIME_FIXTURE.gameId}"]')`)!==true)throw Error('Runtime-added database game missing from discovery');
     const librarySharedChrome=await evalJs("document.querySelectorAll('.sb-v2-header').length===1&&document.querySelectorAll('.sb-v2-footer').length===1&&!document.querySelector('.v2-library-header,.v2-library-footer')");
     if(librarySharedChrome!==true)throw Error('Library incorrectly rendered a duplicated local header or footer');
     let lightPersisted=false;
@@ -242,13 +244,13 @@ async function main(){
     for(let i=0;i<120;i++){
       try{
         migratedHistory=await evalJs(`JSON.parse(localStorage.getItem(${JSON.stringify(newHistory)})||'{}').launches===7
-          && document.querySelectorAll('.v2-library-game').length===3`)===true;
+          && document.querySelectorAll('.v2-library-game').length===4`)===true;
         if(migratedHistory)break;
       }catch{}
       await sleep(80);
     }
     if(!migratedHistory)throw Error('Guest play history did not recover from legacy slug after reload');
-    await evalJs("document.querySelectorAll('.v2-library-actions button[aria-controls^=v2-save-]')[2].click();true");
+    await evalJs(`document.querySelector('.v2-library-actions button[aria-controls="v2-save-${circuit.gameId}"]').click();true`);
     let foundBackup=false;
     for(let i=0;i<80;i++){
       foundBackup=await evalJs("document.querySelectorAll('.v2-local-slot').length===1")===true;
@@ -308,31 +310,24 @@ async function main(){
     await navigate('/','/',"!!document.querySelector('.sb-v2-header')&&!!document.querySelector('.v2-hub')&&!document.querySelector('.hero')");
     const homeControls=JSON.parse(String(await evalJs(`(()=>{
       const hero=document.querySelector('.v2-hub-cta');
-      const cards=[...document.querySelectorAll('.v2-hub-card')];
-      const playLinks=[...document.querySelectorAll('.v2-hub-play')];
+      const discovery=document.querySelector('.v2-hub-library a[href="/library"]');
       const kaplay=document.querySelector('.v2-hub-concepts a[href="/labs/kaplay"]');
       const nav=[...document.querySelectorAll('.sb-v2-nav a')];
       const footer=[...document.querySelectorAll('.sb-v2-footer nav a')];
       return JSON.stringify({
         hero:!!hero&&hero.matches('a.button.button--primary[href="/library"]'),
-        cards:cards.length===3&&cards.every(c=>c.classList.contains('card')),
-        play:playLinks.length===3&&playLinks.every(a=>a.matches('a.button.button--secondary')),
+        discovery:!!discovery&&discovery.matches('a.button.button--secondary'),
         kaplay:!!kaplay&&kaplay.matches('a.button.button--secondary'),
         nav:nav.length===2&&nav.every(a=>a.classList.contains('button')),
         activeNav:nav.filter(a=>a.getAttribute('aria-current')==='page').length,
         footer:footer.length===3&&footer.every(a=>a.classList.contains('link')),
         heroRadius:hero?getComputedStyle(hero).borderRadius:'',
-        cardShadow:cards[0]?getComputedStyle(cards[0]).boxShadow:'',
       });
     })()`)));
-    if(!homeControls.hero||!homeControls.cards||!homeControls.play||!homeControls.kaplay||
+    if(!homeControls.hero||!homeControls.discovery||!homeControls.kaplay||
       !homeControls.nav||homeControls.activeNav!==1||!homeControls.footer||
-      homeControls.heroRadius!=='9999px'||homeControls.cardShadow!=='none')
+      homeControls.heroRadius!=='9999px')
       throw Error('Home still renders hand-styled controls instead of approved HeroUI: '+JSON.stringify(homeControls));
-    const homeLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.v2-hub-card a')].map(a=>a.getAttribute('href')))");
-    const actualLinks=JSON.parse(String(homeLinks)) as string[];
-    if(actualLinks.length!==3||actualLinks.some((url,i)=>url!=='/play/'+GAMES[i].gameId))
-      throw Error('Canonical home must link to UUID games, not /v2 slugs');
     await navigate('/v2','/',"!!document.querySelector('.sb-v2-header')");
     await navigate('/v2/library?source=bookmark#shelf','/library',
       "location.search==='?source=bookmark'&&location.hash==='#shelf'&&!!document.querySelector('.v2-cart-grid')");
@@ -351,11 +346,11 @@ async function main(){
       "!!document.querySelector('.player-root')&&!!document.querySelector('.isolated-game-frame')");
     await navigate('/create','/legacy/create',
       "!!document.querySelector('.creator-main')&&!document.querySelector('.sb-v2-header')");
-    await navigate('/play','/play/'+GAMES[0].gameId,
-      "!!document.querySelector('.v2-led.on')");
+    await navigate('/play','/library',
+      "!!document.querySelector('.v2-library')");
     // Verify the official library also works independently after returning from legacy.
     await navigate('/library','/library',
-      "!!document.querySelector('.sb-v2-header')&&document.querySelectorAll('.v2-library-game').length===3");
+      "!!document.querySelector('.sb-v2-header')&&document.querySelectorAll('.v2-library-game').length===4");
     // Route navigation can finish before the theme's saved preference is applied.
     // Guard the actual rehydrated light theme rather than racing its first dark frame.
     let liveTheme:{enabled:boolean;theme:string;headerShadow:string;primary:string}|null=null;
@@ -372,7 +367,7 @@ async function main(){
       "!!document.querySelector('.sb-design-lab')&&!!document.querySelector('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview')");
     const labIsolated=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell');return !s.classList.contains('sb-heroui-live')&&document.querySelectorAll('.sb-lab-frame.sb-lab-current').length>0&&document.querySelectorAll('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview').length>0})()");
     if(labIsolated!==true)throw Error('Original vs approved Design Lab comparison regressed');
-    await navigate('/library','/library',"document.querySelector('.sb-v2-shell.sb-heroui-live')&&document.querySelectorAll('.v2-library-game').length===3");
+    await navigate('/library','/library',"document.querySelector('.sb-v2-shell.sb-heroui-live')&&document.querySelectorAll('.v2-library-game').length===4");
     console.log('Canonical routes, offline guest continuity and approved HeroUI Lab smoke passed');
   }finally{
     browser?.close();

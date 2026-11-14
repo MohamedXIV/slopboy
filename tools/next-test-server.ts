@@ -6,11 +6,8 @@ import {createServer} from 'node:http';
 import {resolve} from 'node:path';
 
 const sleep=(duration:number)=>new Promise<void>(r=>setTimeout(r,duration));
-export const BROWSER_RUNTIME_FIXTURE={
-  gameId:'c260881a-647d-43c1-bf24-81e7a5902908',
-  revisionId:'7400f98c-e2f8-49a9-9c40-400923705580',
-  title:'Late-arriving approved fixture',reviewedCartridgeSlug:'tiny-catcher'
-};
+import {startTestDatabase,BROWSER_RUNTIME_FIXTURE} from './next-test-database.ts';
+export {BROWSER_RUNTIME_FIXTURE};
 async function freePort():Promise<number>{
   return new Promise((resolvePort,reject)=>{
     const server=createServer();
@@ -22,12 +19,14 @@ async function freePort():Promise<number>{
     });
   });
 }
-export async function startNextTestServer(requestedPort?:number){
+export async function startNextTestServer(requestedPort?:number,options:{database?:boolean}={}){
   const port=requestedPort??await freePort();
+  // Each cluster listens only on its private Unix socket, so no TCP port is bound.
+  const database=options.database===false?null:await startTestDatabase(5432);
   const executable=resolve('apps/web/node_modules/next/dist/bin/next');
   const child=spawn(process.execPath,[executable,'start','--hostname','127.0.0.1','--port',String(port)],
-    {cwd:resolve('apps/web'),env:{...process.env,
-      SLOPBOY_RUNTIME_FIXTURES_JSON:JSON.stringify([BROWSER_RUNTIME_FIXTURE])},stdio:['ignore','pipe','pipe']});
+    {cwd:resolve('apps/web'),env:{...process.env,NEON_AUTH_BASE_URL:'',NEON_AUTH_COOKIE_SECRET:'',
+      DATABASE_URL:'',...database?.env},stdio:['ignore','pipe','pipe']});
   let errors='';
   child.stdout?.on('data',chunk=>{errors=(errors+String(chunk)).slice(-6500);});
   child.stderr?.on('data',chunk=>{errors=(errors+String(chunk)).slice(-6500);});
@@ -39,12 +38,13 @@ export async function startNextTestServer(requestedPort?:number){
       try{
         const response=await fetch(url+'/',{signal:AbortSignal.timeout(2500)});
         if(response.ok&&response.headers.get('content-type')?.includes('text/html'))
-          return {port,url,stop:()=>stopNextServer(child)};
+          return {port,url,privateDigest:database?.privateDigest,setViewAccess:database?.setViewAccess,
+            setPrivatePublished:database?.setPrivatePublished,logs:()=>errors,stop:async()=>{await stopNextServer(child);await database?.stop();}};
       }catch{/* Service may still be booting. */}
       await sleep(180);
     }
     throw Error('Next production server did not respond: '+errors);
-  }catch(error){child.kill('SIGTERM');throw error;}
+  }catch(error){child.kill('SIGTERM');await database?.stop();throw error;}
 }
 async function stopNextServer(child:ChildProcess):Promise<void>{
   if(child.exitCode!==null)return;

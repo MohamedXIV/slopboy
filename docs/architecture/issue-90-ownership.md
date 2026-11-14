@@ -8,7 +8,7 @@ Public discovery reads reviewed publication metadata from PostgreSQL. A security
 
 ## Remaining acceptance gates
 
-- The current `security:runtime-routes` and several browser smoke tools still use the old hardcoded runtime fixture. They must be replaced with a genuine disposable database-backed published fixture and the entire browser/offline/KAPLAY suite rerun; do not suppress failures or reinstate static fixtures in production.
+- Runtime and browser smoke tests seed reviewed fixtures in a disposable local PostgreSQL cluster after the Next build. A test-only Neon HTTP transport forwards SELECT queries to that cluster; it is never loaded by the application outside the test process. Run the complete runtime, offline, KAPLAY and browser suite on the final commit.
 - Verify full authenticated HTTP flows with separately verified owner, stranger and administrator sessions. Anonymous HTTP checks and local SQL tests do not establish real authentication or Neon permissions.
 - Migration 004, game/source/library writes, audit inserts and the public view require narrowly scoped development database privileges. Existing Preview credentials are scoped to the upstream branch; do not copy secrets or change live grants without separate approval. Verify Vercel enforces the static-cartridge proxy for all deployment paths before any release.
 - Private source build, isolated execution, review and public release are not implemented. Do not execute draft source or mark draft games public as a shortcut.

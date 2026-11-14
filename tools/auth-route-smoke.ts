@@ -6,7 +6,7 @@ async function main(){
   // CI must never unintentionally send real auth credentials to this regression.
   if(process.env.NEON_AUTH_BASE_URL||process.env.NEON_AUTH_COOKIE_SECRET||process.env.DATABASE_URL)
     throw Error('Anonymous auth smoke must run with all real provider credentials absent');
-  const app=await startNextTestServer();
+  const app=await startNextTestServer(undefined,{database:false});
   try{
     const get=(path:string)=>fetch(app.url+path,{redirect:'manual',cache:'no-store'});
     const me=await get('/api/account/me');

@@ -13,11 +13,12 @@ type Snapshot={createdAt:number;save:string};
 function identity(gameId:string){
   const game=getCatalogGame(gameId);
   if(!isGameUuid(gameId))throw Error('Invalid game UUID');
-  return game??{gameId,legacySlug:gameId};
+  return game??{gameId,legacySlug:undefined};
 }
 export function localSnapshotKey(gameId:string,slot:number,legacy=false):string{
   if(!Number.isInteger(slot)||slot<1||slot>LOCAL_SNAPSHOT_SLOTS)throw Error('Invalid local backup slot');
   const game=identity(gameId);
+  if(legacy&&!game.legacySlug)throw Error('No historical alias for this game');
   return (legacy?OLD_PREFIX:NEW_PREFIX)+SLOPBOY_1000.id+':'+(legacy?game.legacySlug:game.gameId)+':'+slot;
 }
 function decode(raw:unknown):Snapshot|null{
@@ -37,6 +38,7 @@ export async function readLocalSnapshot(driver:SaveDriver,gameId:string,slot:num
   if(raw===DELETED)return null;
   const existing=decode(raw);
   if(existing)return existing;
+  if(!identity(gameId).legacySlug)return null;
   const previous=localSnapshotKey(gameId,slot,true);
   try{await copyIfAbsent(driver,previous,next,old=>decode(old)?old as string:undefined);}
   catch{/* Never prevent recovery from the untouched legacy snapshot. */}

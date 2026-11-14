@@ -22,7 +22,9 @@ async function main(){
     const data=await api.json();
     assert.equal(data.gameId,BROWSER_RUNTIME_FIXTURE.gameId);
     assert.equal(data.revisionId,BROWSER_RUNTIME_FIXTURE.revisionId);
-    assert.equal(data.cartridge,'/cartridges/tiny-catcher.slop');
+    const fixtureLock=index.revisions.find(r=>r.gameId===GAMES[0].gameId);
+    assert.ok(fixtureLock);
+    assert.equal(data.cartridge,'/cartridges/by-sha256/'+fixtureLock.sha256+'.slop');
     for(const path of ['/play/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       '/api/public-games/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       '/api/public-games/tiny-catcher']){
@@ -33,10 +35,10 @@ async function main(){
       assert.equal(play.status,200,game.title);
       const manifest=await get('/api/public-games/'+game.gameId);
       assert.equal(manifest.status,200,game.title);
-      assert.equal((await manifest.json()).cartridge,game.cartridge);
       // The reviewed legacy URL remains byte-identical to its immutable SHA path.
       const locked=index.revisions.find(r=>r.gameId===game.gameId&&r.revisionId===game.revisionId);
       assert.ok(locked,'Missing locked immutable revision');
+      assert.equal((await manifest.json()).cartridge,'/cartridges/by-sha256/'+locked.sha256+'.slop');
       const [alias,immutable]=await Promise.all([
         get(game.cartridge),get('/cartridges/by-sha256/'+locked.sha256+'.slop')
       ]);
@@ -48,6 +50,22 @@ async function main(){
       assert.equal(immutableBytes.byteLength,locked.byteSize);
       assert.equal(createHash('sha256').update(immutableBytes).digest('hex'),locked.sha256);
     }
+    assert.ok(server.privateDigest,'Missing private draft fixture');
+    assert.ok(server.setPrivatePublished,'Missing disposable database controls');
+    const privatePath='/cartridges/by-sha256/'+server.privateDigest+'.slop';
+    assert.equal((await get(privatePath)).status,404,
+      'A private draft bundle must not be downloadable, even by digest');
+    await server.setPrivatePublished(true);
+    const publishedAsset=await get(privatePath);
+    assert.equal(publishedAsset.status,200,'The same artifact must be routable after publication');
+    assert.equal(createHash('sha256').update(Buffer.from(await publishedAsset.arrayBuffer())).digest('hex'),server.privateDigest);
+    await server.setPrivatePublished(false);
+    assert.equal((await get(privatePath)).status,404,'Revoking publication must immediately block the artifact');
+    const catalog=await get('/api/games?limit=24');
+    assert.equal(catalog.status,200);
+    const listed=await catalog.json() as {games:{id:string}[]};
+    assert.ok(listed.games.some(game=>game.id===BROWSER_RUNTIME_FIXTURE.gameId),'New published game must appear without rebuilding');
+    assert.ok(!listed.games.some(game=>game.id==='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),'Private draft must not appear in discovery');
     const sw=await get('/sw.js');
     assert.equal(sw.status,200);
     assert.match(await sw.text(),/slopboy-installed-index-v3/);
