@@ -597,7 +597,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             </div>
           </div>
           <p className="v2-security">
-            First-party preview cartridge with isolated execution. Local saves work offline; cloud sync requires a future authenticated service.
+            Reviewed cartridge with isolated execution. Local saves work offline; cloud sync requires a future authenticated service.
           </p>
         </aside>
   );

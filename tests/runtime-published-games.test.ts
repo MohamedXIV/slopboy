@@ -13,6 +13,7 @@ const row={id:'c260881a-647d-43c1-bf24-81e7a5902908',revision_id:'7400f98c-e2f8-
 test('only validated immutable public artifact metadata is exposed',()=>{
   const game=mapPlayableCatalogRow(row);assert.ok(game);
   assert.equal(game.cartridge,'/cartridges/by-sha256/'+digest+'.slop');
+  assert.equal(game.status,'published');
   assert.equal(game.gameId,row.id);assert.equal(game.revisionId,row.revision_id);
   assert.equal('manifest' in game,false);assert.equal('storage_key' in game,false);
 });

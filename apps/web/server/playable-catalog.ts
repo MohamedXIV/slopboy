@@ -29,5 +29,5 @@ export function mapPlayableCatalogRow(row:Record<string,unknown>):PlayableGame|n
       ?{legacySaveSlug:row.legacy_slug}:{}),
     tagline:typeof row.tagline==='string'?row.tagline:'',description:typeof row.description==='string'?row.description:'',
     genre:row.genre,hardware:{id:manifest.hardware.id,version:manifest.hardware.version},controls:manifest.controls,
-    cartridge:path as `/cartridges/${string}.slop`,artwork:{background:'#dce9a3',foreground:'#254637',emblem:'◆'},status:'curated'};
+    cartridge:path as `/cartridges/${string}.slop`,artwork:{background:'#dce9a3',foreground:'#254637',emblem:'◆'},status:'published'};
 }
