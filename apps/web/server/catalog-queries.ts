@@ -1,8 +1,11 @@
+import {PLATFORM_OWNER_ID} from './game-ownership.ts';
+
 /** Fixed, parameterized SQL. Review/visibility predicates are part of the query,
  * not post-processing of rows that might contain private game metadata. */
 export const LIST_PUBLIC_GAMES_SQL=[
   "SELECT g.id::text AS id, g.title,g.tagline,g.description,g.genre,",
   "g.visibility,g.status,g.created_at::text AS cursor_created_at,",
+  `CASE WHEN g.owner_id='${PLATFORM_OWNER_ID}'::uuid THEN 'platform' ELSE 'user' END AS owner_kind,`,
   "g.updated_at::text AS updated_at,r.id::text AS revision_id,",
   "r.engine_id,r.engine_version,r.device_profile",
   "FROM public.games g",
@@ -21,6 +24,7 @@ export const LIST_PUBLIC_GAMES_SQL=[
 export const READ_VISIBLE_GAME_SQL=[
   "SELECT g.id::text AS id,g.title,g.tagline,g.description,g.genre,",
   "g.visibility,g.status,g.created_at::text AS cursor_created_at,",
+  `CASE WHEN g.owner_id='${PLATFORM_OWNER_ID}'::uuid THEN 'platform' ELSE 'user' END AS owner_kind,`,
   "g.updated_at::text AS updated_at,",
   "COALESCE(d.id,p.id)::text AS revision_id,",
   "COALESCE(d.engine_id,p.engine_id) AS engine_id,",

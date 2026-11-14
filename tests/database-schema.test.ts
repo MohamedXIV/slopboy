@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { resolve,dirname } from 'node:path';
 import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
 import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/owner-revision-queries.ts';
+import {CREATE_GAME_SQL,UPDATE_GAME_SQL} from '../apps/web/server/game-management-queries.ts';
+import {READ_PLAYABLE_GAME_SQL} from '../apps/web/server/playable-catalog-query.ts';
+import {READ_SOURCE_DRAFT_SQL,CREATE_SOURCE_DRAFT_SQL} from '../apps/web/server/source-draft-queries.ts';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, readdir, writeFile, access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -41,8 +44,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 3);
-  assert.equal(down.length, 3);
+  assert.equal(up.length, 4);
+  assert.equal(down.length, 4);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -52,9 +55,12 @@ test('migration files load cleanly with matching checksums', async () => {
   assert.equal(up[2].version, 3);
   assert.equal(up[2].name, 'versioned_installations');
 
-  assert.equal(down[0].version, 3);
-  assert.equal(down[1].version, 2);
-  assert.equal(down[2].version, 1);
+  assert.equal(up[3].version, 4);
+  assert.equal(up[3].name, 'source_drafts');
+  assert.equal(down[0].version, 4);
+  assert.equal(down[1].version, 3);
+  assert.equal(down[2].version, 2);
+  assert.equal(down[3].version, 1);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -101,8 +107,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 3);
-    assert.deepEqual(upResult.versions, [1, 2, 3]);
+    assert.equal(upResult.applied, 4);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -241,7 +247,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const firstPage=pgQueryRows(single.stdout);
     assert.equal(firstPage.length,1,'Limit 1 returns one row');
     const firstCells=firstPage[0].split('|');
-    assert.equal(firstCells.length,13,'Public catalog exposes only approved metadata columns');
+    assert.equal(firstCells.length,14,'Public catalog exposes only approved metadata columns including owner kind');
+    assert.equal(firstCells[8],'platform');
     // Reuse the *exact* database timestamp, including microsecond precision,
     // rather than rounding it through JavaScript Date and skipping tied rows.
     const firstId=firstCells[0],firstTimestamp=firstCells[7];
@@ -419,8 +426,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 1);
-    assert.deepEqual(rollback3.versions, [3]);
+    assert.equal(rollback3.rolledBack, 2);
+    assert.deepEqual(rollback3.versions, [4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -452,8 +459,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 3);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3]);
+    assert.equal(reMigrate.applied, 4);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -673,6 +680,86 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
         has_column_privilege('slopboy_test_web','public.users','role','INSERT');
     `});
     assert.equal(grants.stdout.trim(),'f|f|t|f');
+
+    // Exercise the same parameterized mutation statements used by the API.
+    const admin='cccccccc-cccc-4ccc-accc-cccccccccccc';
+    const created='33333333-3333-4333-8333-333333333333';
+    const platformGame='44444444-4444-4444-8444-444444444444';
+    await executePsql(config,{sql:`INSERT INTO public.users(id,display_name,role) VALUES ('${admin}','Admin','admin');`});
+    const create=(actor:string,id:string,platform:boolean)=>
+      `PREPARE manage_create(uuid,uuid,uuid,boolean,text,text,text,text) AS ${CREATE_GAME_SQL};`+
+      `EXECUTE manage_create('${actor}','${curator}','${id}',${platform},'Created',NULL,NULL,'Puzzle');`;
+    const update=(actor:string,id:string)=>
+      `PREPARE manage_update(uuid,uuid,uuid,text,text,text,text) AS ${UPDATE_GAME_SQL};`+
+      `EXECUTE manage_update('${actor}','${curator}','${id}','Edited',NULL,NULL,'Puzzle');`;
+    assert.ok((await executePsql(config,{sql:create(alice,created,false)})).stdout.includes(created));
+    assert.ok(!(await executePsql(config,{sql:create(alice,platformGame,true)})).stdout.includes(platformGame));
+    assert.ok((await executePsql(config,{sql:create(admin,platformGame,true)})).stdout.includes(platformGame));
+    assert.ok(!(await executePsql(config,{sql:update(bob,created)})).stdout.includes(created));
+    assert.ok(!(await executePsql(config,{sql:update(admin,created)})).stdout.includes(created));
+    assert.ok((await executePsql(config,{sql:update(alice,created)})).stdout.includes(created));
+    assert.ok((await executePsql(config,{sql:update(admin,platformGame)})).stdout.includes(platformGame));
+    const beforeRevision=(await executePsql(config,{sql:`SELECT row_to_json(r)::text FROM game_revisions r WHERE r.id='${GAMES[0].revisionId}';`})).stdout;
+    assert.ok((await executePsql(config,{sql:update(admin,GAMES[0].gameId)})).stdout.includes(GAMES[0].gameId));
+    const afterRevision=(await executePsql(config,{sql:`SELECT row_to_json(r)::text FROM game_revisions r WHERE r.id='${GAMES[0].revisionId}';`})).stdout;
+    assert.equal(afterRevision,beforeRevision,'Metadata changes cannot rewrite an immutable revision');
+    const audit=await executePsql(config,{sql:`SELECT count(*) FROM audit_events WHERE target_id IN ('${created}','${platformGame}');`});
+    assert.equal(audit.stdout.trim(),'4');
+
+    // An imported draft is not playable until both the game and its own
+    // immutable revision are explicitly published (in this disposable DB).
+    const playable=(id:string)=>`PREPARE qa_playable(text,boolean) AS ${READ_PLAYABLE_GAME_SQL}; EXECUTE qa_playable('${id}',${/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)});`;
+    const reviewed=GAMES[1];
+    assert.equal(pgQueryRows((await executePsql(config,{sql:playable(reviewed.gameId)})).stdout).length,0);
+    await executePsql(config,{sql:`UPDATE game_revisions SET status='published' WHERE id='${reviewed.revisionId}';
+      UPDATE games SET visibility='public',status='published',current_published_revision_id='${reviewed.revisionId}' WHERE id='${reviewed.gameId}';`});
+    assert.equal(pgQueryRows((await executePsql(config,{sql:playable(reviewed.gameId)})).stdout).length,1);
+    assert.equal(pgQueryRows((await executePsql(config,{sql:playable(reviewed.legacySlug)})).stdout).length,1);
+    assert.equal(pgQueryRows((await executePsql(config,{sql:playable(created)})).stdout).length,0);
+    const collisionGame='77777777-7777-4777-8777-777777777777';
+    const collisionRevision='88888888-8888-4888-8888-888888888888';
+    await executePsql(config,{sql:`
+      INSERT INTO games(id,owner_id,title,genre,legacy_slug) VALUES ('${collisionGame}','${curator}','Collision','Puzzle','${reviewed.gameId}');
+      INSERT INTO game_revisions(id,game_id,revision_number,engine_id,engine_version,device_profile,manifest,content_digest,storage_key,byte_size,status,created_by)
+      SELECT '${collisionRevision}','${collisionGame}',1,engine_id,engine_version,device_profile,manifest,content_digest,storage_key,byte_size,'published','${admin}'
+      FROM game_revisions WHERE id='${reviewed.revisionId}';
+      INSERT INTO cartridge_artifacts(revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)
+      SELECT '${collisionRevision}',artifact_type,path,sha256,byte_size,mime_type,storage_key FROM cartridge_artifacts WHERE revision_id='${reviewed.revisionId}';
+      UPDATE games SET visibility='public',status='published',current_published_revision_id='${collisionRevision}' WHERE id='${collisionGame}';
+    `});
+    assert.equal(pgQueryRows((await executePsql(config,{sql:playable(reviewed.gameId)})).stdout)[0].split('|')[0],reviewed.gameId,
+      'A UUID-shaped legacy slug cannot shadow the canonical game UUID');
+    assert.equal(pgQueryRows((await executePsql(config,{sql:update(admin,reviewed.gameId)})).stdout).length,0,
+      'Published metadata cannot bypass review through the management endpoint');
+    await executePsql(config,{sql:'GRANT SELECT ON public.published_playable_games TO slopboy_test_web;'});
+    const viewAccess=await executePsql(config,{sql:`SET ROLE slopboy_test_web;
+      SELECT count(*) FROM public.published_playable_games WHERE id='${reviewed.gameId}';`});
+    assert.equal(viewAccess.stdout.trim().split('\n').at(-1),'1','A role granted the view can read reviewed releases');
+    const privateViewAccess=await executePsql(config,{sql:`SET ROLE slopboy_test_web;
+      SELECT count(*) FROM public.published_playable_games WHERE id='${created}';`});
+    assert.equal(privateViewAccess.stdout.trim().split('\n').at(-1),'0','The public view excludes private games');
+
+    // Upgrade 003 -> 004 preserves imported games and revisions.
+    const downgrade4=await migrateDown(config,migrationsDir,3);
+    assert.deepEqual(downgrade4.versions,[4]);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,1);
+    assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
+    const sourceId='55555555-5555-4555-8555-555555555555';
+    const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
+      `EXECUTE source_write('${actor}','${game}','${curator}','${sourceId}','typescript','private source');`;
+    const readSource=(actor:string,game:string)=>`PREPARE source_read(uuid,uuid,uuid) AS ${READ_SOURCE_DRAFT_SQL};`+
+      `EXECUTE source_read('${actor}','${game}','${curator}');`;
+    assert.equal(pgQueryRows((await executePsql(config,{sql:writeSource(bob,created)})).stdout).length,0);
+    assert.ok((await executePsql(config,{sql:writeSource(alice,created)})).stdout.includes(sourceId));
+    assert.ok((await executePsql(config,{sql:readSource(alice,created)})).stdout.includes('private source'));
+    assert.equal(pgQueryRows((await executePsql(config,{sql:readSource(bob,created)})).stdout).length,0);
+    assert.equal(pgQueryRows((await executePsql(config,{sql:readSource(admin,created)})).stdout).length,0);
+    await assert.rejects(()=>executePsql(config,{sql:`UPDATE game_source_drafts SET source_text='modified' WHERE id='${sourceId}';`}));
+    const platformSourceId='66666666-6666-4666-8666-666666666666';
+    const platformWrite=writeSource(admin,platformGame).replace(sourceId,platformSourceId);
+    assert.ok((await executePsql(config,{sql:platformWrite})).stdout.includes(platformSourceId));
+    assert.ok((await executePsql(config,{sql:readSource(admin,platformGame)})).stdout.includes('private source'));
+    assert.equal(pgQueryRows((await executePsql(config,{sql:readSource(alice,platformGame)})).stdout).length,0);
 
   } finally {
     // Stop server and clean up temporary cluster

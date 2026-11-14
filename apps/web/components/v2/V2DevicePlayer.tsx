@@ -5,9 +5,8 @@ import Link from 'next/link';
 import {Button,Drawer} from '@heroui/react';
 import {trackBrowserLaunch,trackBrowserPlaytime} from './library-history';
 import {makeCartridgeAppearance} from './cartridge-cover';
-import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
-import {GAMES,type PlayableGame} from '@slopboy/catalog';
+import {type PlayableGame} from '@slopboy/catalog';
 import {SLOPBOY_1000,type InputName} from '@slopboy/hardware';
 import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId} from '@slopboy/hardware/v2';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
@@ -858,24 +857,6 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
               </Drawer.Header>
               <Drawer.Body>
                 <p className="v2-quick-library-description">Select a cartridge to insert into this Slopboy. Your current game remains running until you choose another.</p>
-                <div className="v2-quick-cartridge-list" role="list">
-                  {GAMES.map((item,index)=><div role="listitem" key={item.gameId}>
-                    <Link href={'/play/'+item.gameId} scroll={false}
-                      className={'v2-quick-cartridge'+(item.gameId===game.gameId?' is-current':'')}
-                      aria-current={item.gameId===game.gameId?'page':undefined}
-                      onClick={event=>{
-                        if(item.gameId===game.gameId)event.preventDefault();
-                        setLibraryOpen(false);
-                      }}>
-                      <V2CartridgeArt id={item.legacySlug} title={item.title} emblem={item.artwork.emblem} index={index} compact/>
-                      <span className="v2-quick-cartridge-copy">
-                        <strong>{item.title}</strong>
-                        <small>{item.genre} · Slopboy 1000</small>
-                        <span>{item.gameId===game.gameId?'● Currently inserted':'↧ Insert cartridge'}</span>
-                      </span>
-                    </Link>
-                  </div>)}
-                </div>
                 <Link className="v2-quick-library-all" href="/library">Browse your full library ↗</Link>
               </Drawer.Body>
               <Drawer.Footer>

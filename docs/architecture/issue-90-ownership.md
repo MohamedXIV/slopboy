@@ -1,0 +1,16 @@
+# Issue 90: ownership and private game management (work in progress)
+
+Platform games use the existing non-login Slopboy Curators principal. Human admins act on its behalf; they do not become owners or gain access to other users' private games. Game mutations authorize against the persisted actor and create an audit event in the same SQL statement. Presentation updates leave revisions and artifacts unchanged. New games start private and draft.
+
+Migration 004 adds private source-only drafts. Source is untrusted data; it is not a build, revision, artifact, or permission to execute. Only the owner or an administrator managing a platform-owned game can read or append source. The database rejects updates to existing source drafts. Rolling back migration 004 deletes private source drafts; export and verify any needed data before rollback. No live migration is authorized by this work.
+
+Public discovery reads reviewed publication metadata from PostgreSQL. A security-barrier view exposes only published revisions and matching artifacts; deployments must explicitly grant the application role access to that view after review. The player currently supports reviewed pixel-v1 static artifacts, validates the digest-addressed storage key, and verifies bundle bytes in the browser. Static cartridge requests go through a publication check. Public API results and private management responses use no-store. A public game lacking an eligible immutable bundle is discoverable but not playable. Local installations are listed from the service worker; account library membership is separate from device installation. Guest save keys are retained, including legacy migration paths. Published metadata cannot be changed through management until a reviewed metadata workflow exists.
+
+## Remaining acceptance gates
+
+- The current `security:runtime-routes` and several browser smoke tools still use the old hardcoded runtime fixture. They must be replaced with a genuine disposable database-backed published fixture and the entire browser/offline/KAPLAY suite rerun; do not suppress failures or reinstate static fixtures in production.
+- Verify full authenticated HTTP flows with separately verified owner, stranger and administrator sessions. Anonymous HTTP checks and local SQL tests do not establish real authentication or Neon permissions.
+- Migration 004, game/source/library writes, audit inserts and the public view require narrowly scoped development database privileges. Existing Preview credentials are scoped to the upstream branch; do not copy secrets or change live grants without separate approval. Verify Vercel enforces the static-cartridge proxy for all deployment paths before any release.
+- Private source build, isolated execution, review and public release are not implemented. Do not execute draft source or mark draft games public as a shortcut.
+- Browser policy in this environment blocked file-based Chromium tests. Re-run in a permitted CI/browser environment and verify existing installations, legacy aliases, UUID saves and offline play.
+- Run all acceptance checks on the exact final commit, with fresh build output. Current checks are development evidence, not a release or production approval.

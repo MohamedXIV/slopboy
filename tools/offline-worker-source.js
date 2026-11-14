@@ -11,6 +11,7 @@ const ASSETS='slopboy-hashed-assets-v3-'+RELEASE;
 const SHELL_URLS=['/','/library','/manifest.webmanifest','/icons/slopboy-192.png','/icons/slopboy-512.png'];
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CARTRIDGE=/^\/cartridges\/[a-z0-9]+(?:-[a-z0-9]+)*\.slop$/;
+const HASHED_CARTRIDGE=/^\/cartridges\/by-sha256\/([0-9a-f]{64})\.slop$/;
 const STATIC=/^\/_next\/static\/[a-zA-Z0-9_/.%-]+\.(?:js|css|woff2?)$/;
 const MAX_CARTRIDGE_BYTES=1024*1024; // network/cache safety guard; NOT simulated ROM capacity
 const PUBLIC_META='/__offline_game_index__/';
@@ -21,7 +22,7 @@ function validMetadata(data,id){
     data.gameId===id&&UUID.test(id)&&UUID.test(data.revisionId)&&
     typeof data.title==='string'&&data.title.length>0&&data.title.length<=90&&
     typeof data.manifestId==='string'&&
-    data.cartridge==='/cartridges/'+data.manifestId+'.slop'&&CARTRIDGE.test(data.cartridge);
+    ((data.cartridge==='/cartridges/'+data.manifestId+'.slop'&&CARTRIDGE.test(data.cartridge))||HASHED_CARTRIDGE.test(data.cartridge));
 }
 function pathsFromHtml(html){
   return [...new Set((html.match(/\/_next\/static\/[a-zA-Z0-9_/.%-]+\.(?:js|css|woff2?)/g)||[])
@@ -133,6 +134,11 @@ async function installGame(id){
   const bytes=new Uint8Array(payload);
   if(bytes.byteLength<2||bytes.byteLength>MAX_CARTRIDGE_BYTES||
     bytes[0]!==0x1f||bytes[1]!==0x8b)throw Error('Cartridge download is invalid');
+  const match=HASHED_CARTRIDGE.exec(meta.cartridge);
+  if(match){
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',payload)),byte=>byte.toString(16).padStart(2,'0')).join('');
+    if(hash!==match[1])throw Error('Cartridge digest mismatch');
+  }
   const page=await publicPage('/play/'+id);
   const html=await page.clone().text();
   const games=await caches.open(INSTALLED);
@@ -197,7 +203,12 @@ self.addEventListener('fetch',event=>{
   const path=url.pathname;
   if(request.mode==='navigate'&&(safePage(path)||installedRoute(path))){
     event.respondWith((async()=>{
-      try{return await fetch(request);}catch{
+      try{
+        const response=await fetch(request);
+        if(!installedRoute(path)||response.ok)return response;
+        if(await gameMetadata(path.slice(6)))return (await caches.open(INSTALLED)).match(path)||response;
+        return response;
+      }catch{
         if(safePage(path))return (await caches.open(SHELL)).match(path)||
           new Response('Offline shell unavailable',{status:503});
         if(await gameMetadata(path.slice(6)))return (await caches.open(INSTALLED)).match(path)||
@@ -220,7 +231,7 @@ self.addEventListener('fetch',event=>{
     })());
     return;
   }
-  if(CARTRIDGE.test(path)){
+  if(CARTRIDGE.test(path)||HASHED_CARTRIDGE.test(path)){
     event.respondWith((async()=>{
       const saved=await (await caches.open(INSTALLED)).match(path);
       if(saved)return saved;

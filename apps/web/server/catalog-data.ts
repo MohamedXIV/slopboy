@@ -10,6 +10,7 @@ export interface CatalogGameMetadata{
   readonly engineId:string|null;readonly engineVersion:string|null;
   readonly deviceProfile:string|null;readonly revisionStatus:string|null;readonly updatedAt:string;
   readonly isOwner:boolean;
+  readonly ownerKind:'platform'|'user';
 }
 type CatalogRow=Record<string,unknown>;
 
@@ -36,7 +37,8 @@ function mapRow(row:CatalogRow):CatalogGameMetadata{
     visibility:String(row.visibility),status:String(row.status),
     revisionId:nullable(row.revision_id),engineId:nullable(row.engine_id),
     engineVersion:nullable(row.engine_version),deviceProfile:nullable(row.device_profile),revisionStatus:nullable(row.revision_status),
-    updatedAt:row.updated_at,isOwner:row.is_owner===true};
+    updatedAt:row.updated_at,isOwner:row.is_owner===true,
+    ownerKind:row.owner_kind==='platform'?'platform':'user'};
 }
 export async function listPublicCatalog(page:CatalogPage){
   const db=catalogDatabase();if(!db)throw new CatalogUnavailableError();

@@ -1,6 +1,5 @@
 import {notFound} from 'next/navigation';
-import {getLegacyCatalogGame} from '@slopboy/catalog';
-import {resolvePublishedGame} from '../../../../server/published-games';
+import {readPlayableGame} from '../../../../server/playable-catalog';
 import V2DevicePlayer from '../../../../components/v2/V2DevicePlayer';
 import CompatibilityRedirect from '../../../../components/CompatibilityRedirect';
 
@@ -10,9 +9,8 @@ export const runtime='nodejs';
 
 export default async function PlayGamePage({params}:{params:Promise<{gameId:string}>}){
   const {gameId}=await params;
-  const game=resolvePublishedGame(gameId);
+  const game=await readPlayableGame(gameId);
+  if(game&&game.gameId!==gameId)return <CompatibilityRedirect to={`/play/${game.gameId}`}/>;
   if(game)return <V2DevicePlayer key={game.gameId} game={game}/>;
-  const old=getLegacyCatalogGame(gameId);
-  if(old)return <CompatibilityRedirect to={`/play/${old.gameId}`}/>;
   notFound();
 }

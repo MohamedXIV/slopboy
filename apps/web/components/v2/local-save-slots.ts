@@ -1,5 +1,5 @@
 import {SLOPBOY_1000} from '@slopboy/hardware';
-import {getCatalogGame} from '@slopboy/catalog';
+import {getCatalogGame,isGameUuid} from '@slopboy/catalog';
 import {browserSaveDriver,copyIfAbsent,createGameSaveService,validSave,type SaveDriver}
   from '@slopboy/runtime/save-store';
 
@@ -12,8 +12,8 @@ const DELETED='slopboy-local-backup-deleted-v2';
 type Snapshot={createdAt:number;save:string};
 function identity(gameId:string){
   const game=getCatalogGame(gameId);
-  if(!game)throw Error('Unknown curated game UUID');
-  return game;
+  if(!isGameUuid(gameId))throw Error('Invalid game UUID');
+  return game??{gameId,legacySlug:gameId};
 }
 export function localSnapshotKey(gameId:string,slot:number,legacy=false):string{
   if(!Number.isInteger(slot)||slot<1||slot>LOCAL_SNAPSHOT_SLOTS)throw Error('Invalid local backup slot');

@@ -8,7 +8,8 @@ export interface BrowserCartridge {
 
 /** Downloads only a known first-party public cartridge path; limits gzip inflation. */
 export async function loadBundledCartridge(path: string, hardware: HardwareProfile): Promise<BrowserCartridge> {
-  if (!/^\/cartridges\/[a-z0-9-]+\.slop$/.test(path)) throw Error('Invalid cartridge path');
+  const digestPath = /^\/cartridges\/by-sha256\/([0-9a-f]{64})\.slop$/.exec(path);
+  if (!digestPath && !/^\/cartridges\/[a-z0-9-]+\.slop$/.test(path)) throw Error('Invalid cartridge path');
   // Explicitly installed reviewed bundles remain readable when the browser is
   // offline, including browsers that stall network Fetch under CDP/offline mode.
   // This is *not* arbitrary offline JS: the exact path, hardware, gzip and
@@ -28,6 +29,11 @@ export async function loadBundledCartridge(path: string, hardware: HardwareProfi
   if(!response?.ok || !response.body) throw Error('Cartridge unavailable');
   const compressed = new Uint8Array(await response.arrayBuffer());
   if (compressed.byteLength < 2 || compressed.byteLength > hardware.budgets.compressedBytes) throw Error('Cartridge too large');
+  if (digestPath) {
+    const digest = await crypto.subtle.digest('SHA-256', Uint8Array.from(compressed));
+    const actual = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    if (actual !== digestPath[1]) throw Error('Cartridge digest mismatch');
+  }
   if (typeof DecompressionStream === 'undefined') throw Error('This browser does not support cartridge decompression');
   const byteCopy = Uint8Array.from(compressed);
   const stream = new Blob([byteCopy]).stream().pipeThrough(new DecompressionStream('gzip'));

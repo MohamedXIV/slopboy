@@ -1,3 +1,3 @@
-import {GAMES} from '@slopboy/catalog';
 import CompatibilityRedirect from '../../components/CompatibilityRedirect';
-export default function DefaultGamePage(){return <CompatibilityRedirect to={`/play/${GAMES[0].gameId}`}/>;}
+/** Discovery is database-backed; there is no hardcoded default game. */
+export default function DefaultGamePage(){return <CompatibilityRedirect to="/library"/>;}

@@ -122,6 +122,8 @@ export default function AccountDashboard(){
             </Card.Description>
           </Card.Header>
           <Card.Content className="flex flex-col gap-3">
+            <Link className="link" href="/manage/new">Create a private game</Link>
+            {profile.role==='admin'&&<Link className="link" href="/admin">Manage platform games</Link>}
             {error&&<Alert status="danger">
               <Alert.Indicator/>
               <Alert.Content>
@@ -134,6 +136,7 @@ export default function AccountDashboard(){
                 {games.map(game=><li key={game.id} className="flex flex-col gap-1 text-sm">
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={`/games/${game.id}`} className="link font-semibold">{game.title}</Link>
+                    <Link href={`/manage/${game.id}`} className="link">Manage</Link>
                     <span className="text-muted">{game.status} · {game.visibility}</span>
                   </div>
                   <p className="text-xs text-muted">
@@ -146,7 +149,7 @@ export default function AccountDashboard(){
                 </li>)}
               </ul>}
             <p className="text-xs text-muted">
-              New game creation and untrusted game previews are not enabled yet.
+              New games are private drafts; untrusted game previews are not enabled yet.
             </p>
           </Card.Content>
         </Card>}
