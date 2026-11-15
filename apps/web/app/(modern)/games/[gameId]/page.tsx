@@ -31,7 +31,7 @@ export default async function GameDetails({params}:{params:Promise<{gameId:strin
       <Card.Content>
         <p>{game.description??'No description yet.'}</p>
         <p className="text-sm text-muted">{game.genre} · {game.isOwner?'Your game · ':''}{game.status} · {game.visibility}</p>
-        <p className="text-sm text-muted">{game.revisionId?'Revision metadata available':'No published revision available'}</p>
+        <p className="text-sm text-muted">{game.revisionId?(game.isOwner?'Latest revision: ':'Published revision: ')+game.revisionId+(game.revisionStatus?' · '+game.revisionStatus:''):'No revision available'}</p>
         <p className="text-xs text-muted">No executable draft or unreviewed cartridge is loaded on this page.</p>
       </Card.Content>
       <Card.Footer><V2ActionLink href="/library" variant="secondary">Back to cartridges</V2ActionLink></Card.Footer>

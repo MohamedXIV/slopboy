@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve,dirname } from 'node:path';
 import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
+import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/owner-revision-queries.ts';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, readdir, writeFile, access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -548,6 +549,85 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.equal((await executePsql(config,{sql:
       "SELECT count(*) FROM games WHERE visibility='public' OR status='published';"
     })).stdout.trim(),'0');
+
+
+    // 8f. An imported, still-private revision is visible to the database owner
+    // but NEVER a guest, a random UUID, or any ordinary other owner. The
+    // internet-facing route separately requires a Neon-verified session.
+    const privateGameId=GAMES[0].gameId;
+    const curator=SYSTEM_CURATOR_USER_ID;
+    const unknownSubject='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+    const detailFor=(actor:string)=>'PREPARE owner_detail(uuid,uuid) AS '+READ_VISIBLE_GAME_SQL+
+      "; EXECUTE owner_detail('"+privateGameId+"',"+actor+');';
+    const ownerDetail=await executePsql(config,{sql:detailFor("'"+curator+"'")});
+    assert.ok(ownerDetail.stdout.includes(GAMES[0].revisionId),
+      'Private game owner detail includes imported, unpublished revision');
+    assert.ok(ownerDetail.stdout.includes('draft'));
+    const guestDetail=await executePsql(config,{sql:detailFor('NULL')});
+    assert.equal(pgQueryRows(guestDetail.stdout).length,0,
+      'Guest cannot learn private draft revision metadata');
+    const strangerDetail=await executePsql(config,{sql:detailFor("'"+unknownSubject+"'")});
+    assert.equal(pgQueryRows(strangerDetail.stdout).length,0,
+      'Unregistered stranger cannot learn private game metadata');
+
+    const publicAfterImport=await executePsql(config,{sql:preparedPage('24')});
+    assert.equal(pgQueryRows(publicAfterImport.stdout).length,0,
+      'Import alone never makes any game public/discoverable');
+
+    const owned=(actor:string)=>'PREPARE owner_listing(uuid,int) AS '+LIST_OWNED_GAMES_SQL+
+      '; EXECUTE owner_listing('+"'"+actor+"'"+',50);';
+    const curatorList=await executePsql(config,{sql:owned(curator)});
+    assert.equal(pgQueryRows(curatorList.stdout).length,3);
+    for(const game of GAMES){
+      assert.ok(curatorList.stdout.includes(game.gameId));
+      assert.ok(curatorList.stdout.includes(game.revisionId),
+        'Owner list includes matching latest revision ID');
+    }
+    const foreignList=await executePsql(config,{sql:owned(unknownSubject)});
+    assert.equal(pgQueryRows(foreignList.stdout).length,0);
+
+    const revisionHistory=(id:string,subject:string)=>'PREPARE owned_history(uuid,uuid,int) AS '+
+      READ_OWNED_REVISIONS_SQL+"; EXECUTE owned_history('"+id+"','"+subject+"',50);";
+    const ownerHistory=await executePsql(config,{
+      sql:revisionHistory(privateGameId,curator)
+    });
+    assert.equal(pgQueryRows(ownerHistory.stdout).length,1);
+    assert.ok(ownerHistory.stdout.includes(GAMES[0].revisionId));
+    assert.ok(!ownerHistory.stdout.includes('static-public-v1:'),
+      'Owner metadata route cannot expose artifact storage keys');
+    const foreignHistory=await executePsql(config,{
+      sql:revisionHistory(privateGameId,unknownSubject)
+    });
+    assert.equal(pgQueryRows(foreignHistory.stdout).length,0,
+      'The same UUID cannot disclose revision history to another owner');
+
+
+    // 8g. A second immutable draft supersedes the first in owner-visible
+    // metadata without changing the game's UUID or making either public.
+    const nextRevision='44444444-4444-4444-8444-444444444444';
+    await executePsql(config,{sql:
+      "INSERT INTO game_revisions(id,game_id,revision_number,release_version,"+
+      "engine_id,engine_version,device_profile,manifest,content_digest,"+
+      "storage_key,byte_size,status,created_by) VALUES ('"+nextRevision+"','"+
+      privateGameId+"',2,'1.1.0','pixel-v1','0.1.0','slopboy-1000',"+
+      "'{}'::jsonb,repeat('f',64),'qa/revision-2.slop',22,'review_pending','"+
+      curator+"');"
+    });
+    const newestDetail=await executePsql(config,{sql:detailFor("'"+curator+"'")});
+    assert.ok(newestDetail.stdout.includes(nextRevision),
+      'Owner metadata resolves the newest revision without a publish pointer');
+    const refreshedList=await executePsql(config,{sql:owned(curator)});
+    assert.ok(refreshedList.stdout.includes(nextRevision),
+      'Owner Dashboard gets most recent revision from database');
+    const newestHistory=await executePsql(config,{sql:revisionHistory(privateGameId,curator)});
+    const historyRows=pgQueryRows(newestHistory.stdout);
+    assert.equal(historyRows.length,2);
+    assert.ok(historyRows[0].includes(nextRevision),
+      'Revision history is sorted newest first');
+    assert.ok(historyRows[1].includes(GAMES[0].revisionId));
+    assert.equal(pgQueryRows((await executePsql(config,{
+      sql:detailFor('NULL')
+    })).stdout).length,0,'Second private revision is still invisible to guests');
 
     // 9. Two independent owners: the same SQL predicate used by the account
     // data access layer MUST never return another owner's private game.

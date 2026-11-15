@@ -9,7 +9,11 @@ import ActivateProfileButton from './ActivateProfileButton';
 
 type User={id:string;email:string;displayName:string;emailVerified:boolean};
 type Profile={id:string;displayName:string;role:'player'|'creator'|'admin'|'system'};
-type Game={id:string;title:string;status:string;visibility:string};
+type Revision={
+  id:string;revisionNumber:number;releaseVersion:string|null;
+  status:string;engineId:string;engineVersion:string;
+};
+type Game={id:string;title:string;status:string;visibility:string;latestRevision:Revision|null};
 type Account={user:User;profile:Profile|null};
 
 export default function AccountDashboard(){
@@ -127,9 +131,18 @@ export default function AccountDashboard(){
             </Alert>}
             {games.length===0?<p className="text-sm text-muted">No games have been created for this account yet.</p>:
               <ul className="flex flex-col gap-2">
-                {games.map(game=><li key={game.id} className="flex flex-wrap items-center gap-2 text-sm">
-                  <strong>{game.title}</strong>
-                  <span className="text-muted">{game.status} · {game.visibility}</span>
+                {games.map(game=><li key={game.id} className="flex flex-col gap-1 text-sm">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link href={`/games/${game.id}`} className="link font-semibold">{game.title}</Link>
+                    <span className="text-muted">{game.status} · {game.visibility}</span>
+                  </div>
+                  <p className="text-xs text-muted">
+                    {game.latestRevision
+                      ? `Revision ${game.latestRevision.revisionNumber}${game.latestRevision.releaseVersion
+                        ? ' · '+game.latestRevision.releaseVersion : ''} · ${game.latestRevision.status}
+                        · ${game.latestRevision.engineId} ${game.latestRevision.engineVersion}`
+                      : 'No uploaded revisions yet'}
+                  </p>
                 </li>)}
               </ul>}
             <p className="text-xs text-muted">

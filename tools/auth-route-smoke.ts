@@ -17,6 +17,11 @@ async function main(){
     assert.equal((await get('/api/admin/overview')).status,401,'Admin endpoint requires a session');
     assert.equal((await get('/api/account/games?ownerId=00000000-0000-4000-a000-000000000001')).status,401,
       'Client-supplied owner ID must never enable reads');
+    assert.equal((await get('/api/account/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3/revisions')).status,401,
+      'Curated system-owned draft revision metadata must not be exposed anonymously');
+    assert.equal((await get('/api/account/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3/revisions?ownerId=00000000-0000-4000-a000-000000000001')).status,401,
+      'Spoofed owner query parameter cannot grant private revision access');
+
     const mutation=(origin?:string)=>fetch(app.url+'/api/account/bootstrap',{
       method:'POST',redirect:'manual',
       headers:origin?{'Origin':origin,'Content-Type':'application/json',

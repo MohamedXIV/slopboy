@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {CATALOG_DEFAULT_PAGE_SIZE,CATALOG_MAX_PAGE_SIZE,decodeCatalogCursor,
   encodeCatalogCursor,parseCatalogPage} from '../apps/web/server/catalog-contract.ts';
 import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
+import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL,OWNER_GAMES_PAGE_SIZE,
+  OWNER_REVISION_HISTORY_LIMIT} from '../apps/web/server/owner-revision-queries.ts';
 
 const id='5b0edbf4-644d-43f4-9ad3-5506eacd05d3';
 const other='f8067e25-7c16-4e9d-b496-69b1b8fe7ccc';
@@ -40,4 +42,24 @@ test('all database catalog queries enforce server-side access checks',()=>{
   assert.match(READ_VISIBLE_GAME_SQL,/g\.owner_id=\$2::uuid/);
   assert.match(READ_VISIBLE_GAME_SQL,/EXISTS \(SELECT 1 FROM public\.users/);
   assert.doesNotMatch(READ_VISIBLE_GAME_SQL,/game_access/,'grants are not implemented or auto-trusted');
+});
+
+test('owner revision metadata is identity-scoped in SQL and never returns artifact locators',()=>{
+  assert.match(READ_VISIBLE_GAME_SQL,/g\.owner_id=\$2::uuid/);
+  assert.match(READ_VISIBLE_GAME_SQL,/r\.game_id=g\.id AND g\.owner_id=\$2::uuid/);
+  assert.match(READ_VISIBLE_GAME_SQL,/p\.status='published'/);
+  assert.match(READ_VISIBLE_GAME_SQL,/ORDER BY r\.revision_number DESC/);
+  assert.match(READ_VISIBLE_GAME_SQL,/EXISTS \(SELECT 1 FROM public\.users/);
+
+  assert.match(LIST_OWNED_GAMES_SQL,/g\.owner_id=\$1::uuid/);
+  assert.match(LIST_OWNED_GAMES_SQL,/FROM public\.game_revisions WHERE game_id=g\.id/);
+  assert.match(LIST_OWNED_GAMES_SQL,/ORDER BY revision_number DESC,id DESC LIMIT 1/);
+  assert.match(READ_OWNED_REVISIONS_SQL,/g\.id=\$1::uuid AND g\.owner_id=\$2::uuid/);
+  assert.match(READ_OWNED_REVISIONS_SQL,/EXISTS \(SELECT 1 FROM public\.users u WHERE u\.id=\$2::uuid\)/);
+  assert.match(READ_OWNED_REVISIONS_SQL,/ORDER BY r\.revision_number DESC NULLS LAST/);
+  assert.equal(OWNER_GAMES_PAGE_SIZE,50);
+  assert.equal(OWNER_REVISION_HISTORY_LIMIT,50);
+  for(const sql of [READ_VISIBLE_GAME_SQL,LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL]){
+    assert.doesNotMatch(sql,/storage_key|artifact|entrypoint|source|game_access/i);
+  }
 });
