@@ -318,7 +318,8 @@ async function main(){
         cards:cards.length===3&&cards.every(c=>c.classList.contains('card')),
         play:playLinks.length===3&&playLinks.every(a=>a.matches('a.button.button--secondary')),
         kaplay:!!kaplay&&kaplay.matches('a.button.button--secondary'),
-        nav:nav.length===2&&nav.every(a=>a.classList.contains('button')),
+        nav:nav.length===3&&nav.every(a=>a.classList.contains('button')),
+        account:nav.some(a=>a.getAttribute('href')==='/dashboard'&&a.textContent?.trim()==='Account'),
         activeNav:nav.filter(a=>a.getAttribute('aria-current')==='page').length,
         footer:footer.length===3&&footer.every(a=>a.classList.contains('link')),
         heroRadius:hero?getComputedStyle(hero).borderRadius:'',
@@ -326,7 +327,7 @@ async function main(){
       });
     })()`)));
     if(!homeControls.hero||!homeControls.cards||!homeControls.play||!homeControls.kaplay||
-      !homeControls.nav||homeControls.activeNav!==1||!homeControls.footer||
+      !homeControls.nav||!homeControls.account||homeControls.activeNav!==1||!homeControls.footer||
       homeControls.heroRadius!=='9999px'||homeControls.cardShadow!=='none')
       throw Error('Home still renders hand-styled controls instead of approved HeroUI: '+JSON.stringify(homeControls));
     const homeLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.v2-hub-card a')].map(a=>a.getAttribute('href')))");
