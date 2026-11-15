@@ -1,0 +1,193 @@
+/* Production composition of the approved BatchTwoLab auth panel.
+ * HeroUI owns controls, accessibility and state; these rules only compose the shell. */
+.sb-auth-page {
+  display: grid;
+  place-items: center;
+  min-height: 72vh;
+  padding: clamp(30px, 7vw, 76px) 16px;
+  background: var(--background);
+}
+
+.sb-auth-stage { width: 100%; max-width: 540px; min-width: 0; }
+.sb-auth-ribbon,
+.sb-auth-base {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  color: var(--muted);
+  font: 700 9px/1.5 ui-monospace, monospace;
+  letter-spacing: .07em;
+}
+.sb-auth-ribbon { padding: 0 4px; margin-bottom: 9px; }
+.sb-auth-base { padding: 16px 8px 0; }
+
+.sb-auth-card.card {
+  width: 100%;
+  min-width: 0;
+  background: var(--sb-ui-surface);
+  color: var(--sb-ui-ink);
+  border: 1px solid var(--sb-ui-line);
+  border-radius: 44px;
+  box-shadow: 0 20px 45px rgb(0 0 0 / .06);
+}
+.sb-auth-inner.card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: clamp(25px, 4vw, 40px) !important;
+}
+.sb-auth-hardware {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--sb-ui-ink);
+  font: 700 9px ui-monospace, monospace;
+  letter-spacing: .08em;
+}
+.sb-auth-vents {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--sb-ui-soft);
+  border-radius: 9999px;
+  padding: 6px 11px;
+}
+.sb-auth-vents i {
+  height: 12px;
+  width: 3px;
+  background: var(--sb-ui-line);
+  border-radius: 2px;
+}
+.sb-auth-vents i:last-of-type { margin-right: 7px; }
+.sb-auth-power {
+  white-space: nowrap;
+  background: var(--sb-ui-soft);
+  border-radius: 9999px;
+  padding: 7px 11px;
+}
+
+.sb-auth-tabs { width: 100%; min-width: 0; }
+.sb-auth-tabs .tabs__list-container,
+.sb-auth-tabs .tabs__list-container__scroller { width: 100%; min-width: 0; }
+.sb-auth-tabs .tabs__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+  background: var(--sb-ui-field);
+  border-radius: 9999px;
+  padding: 4px;
+}
+.sb-auth-tabs .tabs__tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
+  text-align: center;
+  font-size: 11px;
+}
+.sb-auth-tabs .tabs__tab[aria-disabled='true'] { opacity: .6; cursor: not-allowed; }
+.sb-auth-tabs .tabs__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+  padding: 28px 0 0;
+  margin: 0;
+}
+.sb-auth-heading h1 {
+  margin: 12px 0 4px;
+  color: var(--sb-ui-ink);
+  font-size: clamp(27px, 3vw, 34px);
+  font-weight: 650;
+  line-height: 1.17;
+  letter-spacing: -.045em;
+}
+.sb-auth-heading p {
+  margin: 0;
+  color: var(--sb-ui-ink);
+  opacity: .8;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.sb-auth-fields,
+.sb-auth-form { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+.sb-auth-fields { gap: 16px; }
+.sb-auth-form { gap: 18px; }
+.sb-auth-form .textfield,
+.sb-auth-form .input { min-width: 0; width: 100%; }
+.sb-auth-form .input { min-height: 46px; }
+.sb-auth-form .textfield .label,
+.sb-auth-field-head a {
+  font: 700 10px/1.5 ui-monospace, monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.sb-auth-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+.sb-auth-field-head a { color: var(--sb-ui-ink); text-decoration: underline; text-underline-offset: 3px; }
+.sb-auth-password { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.sb-auth-password .input { min-width: 0; flex: 1; }
+.sb-auth-password .button { flex: none; }
+.sb-auth-submit.button { min-height: 49px; margin-top: 4px; }
+.sb-auth-fields .alert { font-size: 12px; }
+.sb-auth-guest.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 45px;
+  width: 100%;
+  text-align: center;
+}
+.sb-auth-guest-caption {
+  font: 700 9px ui-monospace, monospace;
+  letter-spacing: .05em;
+  opacity: .7;
+}
+.sb-auth-secondary { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+.sb-auth-rule {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  color: var(--muted);
+  font: 700 9px/1.4 ui-monospace, monospace;
+  letter-spacing: .13em;
+  white-space: nowrap;
+}
+.sb-auth-rule::before,
+.sb-auth-rule::after { content: ''; flex: 1; border-top: 1px solid var(--sb-ui-line); }
+.sb-auth-secondary a { font-size: 13px; color: var(--sb-ui-ink); }
+.sb-auth-secondary a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.sb-auth-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--sb-ui-line);
+  color: var(--sb-ui-ink);
+  font: 700 9px/1.5 ui-monospace, monospace;
+  letter-spacing: .04em;
+  opacity: .55;
+}
+
+@media (max-width: 440px) {
+  .sb-auth-page { padding: 30px 12px; }
+  .sb-auth-card.card { border-radius: 32px; }
+  .sb-auth-inner.card__content { padding: 24px 20px !important; gap: 23px; }
+  .sb-auth-tabs .tabs__tab { font-size: 10px; }
+  .sb-auth-footnote, .sb-auth-base { font-size: 8px; }
+}
