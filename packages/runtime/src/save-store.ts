@@ -10,6 +10,15 @@ export const SAVE_DB_NAME='slopboy-local-saves';
 export const SAVE_STORE_NAME='cartridges';
 const LEGACY_FORMAT_VERSION=1;
 export const SAVE_FORMAT_VERSION=2;
+/** Saved gameplay state format, independent of cartridge revision and engine version. */
+export const LEGACY_SAVE_SCHEMA_VERSION=1;
+export const MAX_SAVE_SCHEMA_VERSION=9999;
+function checkedSaveSchemaVersion(value:number):number{
+  if(!Number.isSafeInteger(value)||value<LEGACY_SAVE_SCHEMA_VERSION||value>MAX_SAVE_SCHEMA_VERSION){
+    throw Error('Invalid save schema version');
+  }
+  return value;
+}
 const SLUG_PATTERN=/^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -18,9 +27,13 @@ export function slotKey(gameId:string,hardware:HardwareProfile):string{
   if(!SLUG_PATTERN.test(gameId))throw Error('Invalid cartridge identity');
   return `save-v${LEGACY_FORMAT_VERSION}:${hardware.id}@${hardware.version}:${gameId}`;
 }
-export function gameSlotKey(gameId:string,hardware:HardwareProfile):string{
+export function gameSlotKey(gameId:string,hardware:HardwareProfile,saveSchemaVersion=LEGACY_SAVE_SCHEMA_VERSION):string{
   if(!UUID_PATTERN.test(gameId))throw Error('Invalid game UUID');
-  return `save-v${SAVE_FORMAT_VERSION}:${hardware.id}@${hardware.version}:${gameId}`;
+  const schema=checkedSaveSchemaVersion(saveSchemaVersion);
+  const base=`save-v${SAVE_FORMAT_VERSION}:${hardware.id}@${hardware.version}:${gameId}`;
+  // Historical V2 key is unchanged. Incompatible new formats use a NEW lane
+  // without overwriting the old save, so the old revision remains restorable.
+  return schema===LEGACY_SAVE_SCHEMA_VERSION?base:base+`:schema-${schema}`;
 }
 export function validSave(value:unknown,hardware:HardwareProfile):value is string|null{
   // This limit belongs to the retained pixel-v1 compatibility adapter only.
@@ -60,41 +73,50 @@ export function createSaveService(driver:SaveDriver,hardware:HardwareProfile,gam
 interface SaveEnvelope{
   readonly format:'slopboy-save-v2';
   readonly gameId:string;
+  /** Undefined only for original V2 saves, which are schema 1. */
+  readonly saveSchemaVersion?:number;
   readonly state:'saved'|'deleted';
   readonly data?:string;
 }
-function encodeEnvelope(gameId:string,value:string|null):string{
+function encodeEnvelope(gameId:string,value:string|null,saveSchemaVersion:number):string{
+  const schema=saveSchemaVersion===LEGACY_SAVE_SCHEMA_VERSION?{}:{saveSchemaVersion};
   const entry:SaveEnvelope=value===null
-    ?{format:'slopboy-save-v2',gameId,state:'deleted'}
-    :{format:'slopboy-save-v2',gameId,state:'saved',data:value};
+    ?{format:'slopboy-save-v2',gameId,...schema,state:'deleted'}
+    :{format:'slopboy-save-v2',gameId,...schema,state:'saved',data:value};
   return JSON.stringify(entry);
 }
-function decodeEnvelope(raw:unknown,gameId:string,hardware:HardwareProfile):{state:'saved'|'deleted';data:string|null}|null{
+function decodeEnvelope(raw:unknown,gameId:string,hardware:HardwareProfile,
+  saveSchemaVersion:number):{state:'saved'|'deleted';data:string|null}|null{
   if(typeof raw!=='string')return null;
   try{
     const parsed:unknown=JSON.parse(raw);
     if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return null;
     const r=parsed as Record<string,unknown>;
-    if(r.format!=='slopboy-save-v2'||r.gameId!==gameId)return null;
+    if(r.format!=='slopboy-save-v2'||r.gameId!==gameId||
+      (r.saveSchemaVersion??LEGACY_SAVE_SCHEMA_VERSION)!==saveSchemaVersion)return null;
     if(r.state==='deleted'&&r.data===undefined)return {state:'deleted',data:null};
     if(r.state==='saved'&&typeof r.data==='string'&&validSave(r.data,hardware))return {state:'saved',data:r.data};
   }catch{/* Corrupt keys fall back to the untouched legacy record. */}
   return null;
 }
-export function createGameSaveService(driver:SaveDriver,hardware:HardwareProfile,identity:{gameId:string;legacySlug?:string}){
+export function createGameSaveService(driver:SaveDriver,hardware:HardwareProfile,
+  identity:{gameId:string;legacySlug?:string;saveSchemaVersion?:number}){
   const {gameId,legacySlug}=identity;
-  const key=gameSlotKey(gameId,hardware);
-  const previous=legacySlug?slotKey(legacySlug,hardware):null;
+  const saveSchemaVersion=checkedSaveSchemaVersion(identity.saveSchemaVersion??LEGACY_SAVE_SCHEMA_VERSION);
+  const key=gameSlotKey(gameId,hardware,saveSchemaVersion);
+  // NEVER import schema-1 data into incompatible schemas. A future explicit
+  // reviewed migration may copy saves while preserving the old lane.
+  const previous=saveSchemaVersion===LEGACY_SAVE_SCHEMA_VERSION&&legacySlug?slotKey(legacySlug,hardware):null;
   return {
     async read():Promise<string|null>{
-      const current=decodeEnvelope(await driver.get(key),gameId,hardware);
+      const current=decodeEnvelope(await driver.get(key),gameId,hardware,saveSchemaVersion);
       if(current)return current.data;
       if(!previous)return null;
       try{
         await copyIfAbsent(driver,previous,key,raw=>
-          typeof raw==='string'&&validSave(raw,hardware)?encodeEnvelope(gameId,raw):undefined);
+          typeof raw==='string'&&validSave(raw,hardware)?encodeEnvelope(gameId,raw,saveSchemaVersion):undefined);
       }catch{/* A failed copy must never make a valid legacy save unplayable. */}
-      const copied=decodeEnvelope(await driver.get(key),gameId,hardware);
+      const copied=decodeEnvelope(await driver.get(key),gameId,hardware,saveSchemaVersion);
       if(copied)return copied.data;
       const original=await driver.get(previous);
       return typeof original==='string'&&validSave(original,hardware)?original:null;
@@ -102,7 +124,7 @@ export function createGameSaveService(driver:SaveDriver,hardware:HardwareProfile
     async write(value:string|null):Promise<void>{
       if(!validSave(value,hardware))throw Error('Game save exceeds hardware budget');
       // Deletions are tombstones so the old legacy save cannot reappear.
-      await driver.put(key,encodeEnvelope(gameId,value));
+      await driver.put(key,encodeEnvelope(gameId,value,saveSchemaVersion));
     }
   };
 }

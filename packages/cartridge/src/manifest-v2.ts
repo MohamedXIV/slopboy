@@ -50,6 +50,8 @@ export interface CartridgeManifestV2 {
   readonly deviceProfile: string;
   readonly engine: ManifestEngineDeclaration;
   readonly entrypoint: string;
+  /** Save payload compatibility lane; unspecified preserves original schema-1 saves. */
+  readonly saveSchemaVersion?: number;
   readonly assets: readonly ManifestAssetDeclaration[];
   readonly controls?: readonly V2Button[];
   readonly achievements?: readonly ManifestAchievementDeclaration[];
@@ -99,7 +101,7 @@ export function validateManifestV2(value: unknown): {
   check(isRecord(value), 'SCHEMA', 'Cartridge manifest must be a JSON object');
   onlyKeys(value, [
     'schemaVersion', 'gameId', 'revisionId', 'title', 'deviceProfile',
-    'engine', 'entrypoint', 'assets', 'controls', 'achievements'
+    'engine', 'entrypoint', 'saveSchemaVersion', 'assets', 'controls', 'achievements'
   ], 'Cartridge manifest');
 
   // Schema version
@@ -150,6 +152,14 @@ export function validateManifestV2(value: unknown): {
   const ext = extensionMatch ? extensionMatch[0] : '';
   check(engine.entrypointExtensions.includes(ext), 'ENTRYPOINT',
     `Engine "${engine.id}" does not accept entrypoint extension "${ext}". Allowed: ${engine.entrypointExtensions.join(', ')}`);
+
+  // A new incompatible save schema must explicitly create a new local lane;
+  // no automatic rewriting or deletion of saves from earlier revisions.
+  if(value.saveSchemaVersion!==undefined){
+    check(typeof value.saveSchemaVersion==='number'&&Number.isSafeInteger(value.saveSchemaVersion)&&
+      value.saveSchemaVersion>=1&&value.saveSchemaVersion<=9999,'SAVE_SCHEMA',
+      'saveSchemaVersion must be an integer from 1 to 9999');
+  }
 
   // Assets
   check(Array.isArray(value.assets), 'ASSETS', 'assets must be an array');
@@ -242,6 +252,7 @@ export function validateManifestV2(value: unknown): {
       adapterProtocol: engine.adapterProtocol,
     },
     entrypoint: value.entrypoint,
+    saveSchemaVersion: value.saveSchemaVersion as number | undefined,
     assets: Object.freeze(validatedAssets),
     controls: controls ? Object.freeze(controls) : undefined,
     achievements: achievements ? Object.freeze(achievements) : undefined,
