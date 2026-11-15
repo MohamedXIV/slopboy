@@ -28,6 +28,14 @@ async function main(){
     const sameOrigin=await mutation(app.url);
     assert.equal(sameOrigin.status,401,
       'Same-origin mutation should pass CSRF guard then reject missing session: '+await sameOrigin.text());
+    // Catalog must fail closed when no private database is configured.
+    assert.equal((await get('/api/games')).status,503);
+    assert.equal((await get('/api/games?limit=0')).status,400);
+    assert.equal((await get('/api/games?limit=25')).status,400);
+    assert.equal((await get('/api/games?cursor=malformed')).status,400);
+    assert.equal((await get('/api/games/not-a-uuid')).status,404);
+    assert.equal((await get('/api/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3')).status,503);
+    assert.equal((await get('/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3')).status,200);
     const login=await get('/auth/sign-in');
     assert.equal(login.status,200);
     assert.match(await login.text(),/Authentication is not configured in this deployment/);

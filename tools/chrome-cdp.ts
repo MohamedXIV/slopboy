@@ -8,6 +8,10 @@ import {readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 
 const sleep=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));
+// GitHub-hosted runners can take longer than nine seconds to start a fresh
+// headless browser under load. This bounds startup without altering test gates.
+const CHROME_STARTUP_TIMEOUT_MS=30_000;
+const CHROME_STARTUP_POLL_INTERVAL_MS=100;
 function chromeBinary():string{
   for(const bin of ['google-chrome','chromium','chromium-browser']){
     if(spawnSync('which',[bin],{encoding:'utf8'}).status===0)return bin;
@@ -25,17 +29,20 @@ export async function openChromePage(url:string,profile:string){
   let socket:WebSocket|undefined;
   try{
     let endpoint:string|undefined;
-    for(let i=0;i<180;i++){
-      if(process.exitCode!==null)throw Error('Chrome exited before DevTools opened');
+    const startupDeadline=Date.now()+CHROME_STARTUP_TIMEOUT_MS;
+    while(Date.now()<startupDeadline){
+      if(process.exitCode!==null||process.signalCode!==null)
+        throw Error('Chrome exited before DevTools opened (code='+String(process.exitCode)+
+          ', signal='+String(process.signalCode)+')');
       try{
         const lines=(await readFile(join(profile,'DevToolsActivePort'),'utf8')).split(/\r?\n/);
         if(/^\d+$/.test(lines[0]) && lines[1]?.startsWith('/devtools/browser/')){
           endpoint='ws://127.0.0.1:'+lines[0]+lines[1];break;
         }
       }catch{}
-      await sleep(50);
+      await sleep(CHROME_STARTUP_POLL_INTERVAL_MS);
     }
-    if(!endpoint)throw Error('Chrome DevTools socket did not become ready');
+    if(!endpoint)throw Error('Chrome DevTools socket did not become ready within '+CHROME_STARTUP_TIMEOUT_MS+'ms');
     socket=new WebSocket(endpoint);
     await new Promise<void>((resolve,reject)=>{
       socket!.addEventListener('open',()=>resolve(),{once:true});
