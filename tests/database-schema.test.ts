@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve } from 'node:path';
+import { resolve,dirname } from 'node:path';
 import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm, readdir, writeFile, access } from 'node:fs/promises';
+import { mkdtemp, rm, readdir, writeFile, access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import {
   loadMigrationFiles,
@@ -13,6 +13,12 @@ import {
   type DatabaseConnectionConfig,
   MigrationError,
 } from '../packages/database/src/migrator.ts';
+import {GAMES} from '../packages/catalog/src/index.ts';
+import {compileGameSource,packCartridge,validateManifest}
+  from '../packages/cartridge/src/index.ts';
+import {prepareImmutableCuratedAssets} from '../tools/build-curated-immutable.ts';
+import {buildCuratedDraftImportSql,planCuratedDraftImport}
+  from '../tools/curated-draft-import.ts';
 import {
   CURATED_GAME_FIXTURES,
   SYSTEM_CURATOR_USER_ID,
@@ -447,6 +453,101 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const reMigrate = await migrateUp(config, migrationsDir);
     assert.equal(reMigrate.applied, 3);
     assert.deepEqual(reMigrate.versions, [1, 2, 3]);
+
+
+    // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
+    // ephemeral PostgreSQL schema. Real Neon Development remains untouched.
+    const importRoot=resolve(tempDir,'verified-curated-import');
+    for(const game of GAMES){
+      for(const name of [game.source.manifest,game.source.game]){
+        const destination=resolve(importRoot,name);
+        await mkdir(dirname(destination),{recursive:true});
+        await copyFile(resolve(root,name),destination);
+      }
+      const manifest=validateManifest(JSON.parse(
+        await readFile(resolve(importRoot,game.source.manifest),'utf8'))).manifest;
+      const code=compileGameSource(await readFile(resolve(importRoot,game.source.game),'utf8'));
+      const bytes=packCartridge({format:'slopboy-cartridge-v0',manifest,code,assets:[]});
+      const destination=resolve(importRoot,'apps/web/public'+game.cartridge);
+      await mkdir(dirname(destination),{recursive:true});
+      await writeFile(destination,bytes);
+    }
+    await prepareImmutableCuratedAssets({rootDir:importRoot,mode:'build'});
+    const privatePlan=await planCuratedDraftImport(importRoot);
+    const importSql=buildCuratedDraftImportSql(privatePlan);
+    assert.equal(privatePlan.revisions.length,GAMES.length);
+    assert.ok(privatePlan.revisions.every(r=>r.storage_key.startsWith(
+      'static-public-v1:/cartridges/by-sha256/')));
+
+    // The first row might insert before an invalid second row; the SINGLE SQL
+    // transaction must still leave no partial imported revision or artifact.
+    await executePsql(config,{sql:
+      "UPDATE games SET status='archived' WHERE id='"+GAMES[1].gameId+"';"
+    });
+    await assert.rejects(()=>executePsql(config,{sql:importSql}),
+      (err:unknown)=>err instanceof MigrationError&&
+        err.message.includes('Curated game changed owner or release state'));
+    const emptyAfterFailure=await executePsql(config,{sql:
+      'SELECT (SELECT count(*) FROM game_revisions),'+
+             '(SELECT count(*) FROM cartridge_artifacts);'
+    });
+    assert.equal(emptyAfterFailure.stdout.trim(),'0|0','A failed import is all-or-nothing');
+    await executePsql(config,{sql:
+      "UPDATE games SET status='draft' WHERE id='"+GAMES[1].gameId+"';"
+    });
+
+    await executePsql(config,{sql:importSql});
+    const imported=await executePsql(config,{sql:
+      "SELECT (SELECT count(*) FROM game_revisions),"+
+             "(SELECT count(*) FROM cartridge_artifacts),"+
+             "(SELECT count(*) FROM game_revisions"+
+             " WHERE status='draft' AND release_version IS NULL),"+
+             "(SELECT count(*) FROM games WHERE visibility='private'"+
+             " AND status='draft' AND current_published_revision_id IS NULL),"+
+             "(SELECT count(*) FROM user_library);"
+    });
+    assert.equal(imported.stdout.trim(),'3|3|3|3|0',
+      'Exactly three immutable private drafts and artifacts; no publication/memberships');
+    const artifactIds=(await executePsql(config,{sql:
+      'SELECT id,revision_id,sha256,storage_key FROM cartridge_artifacts ORDER BY revision_id;'
+    })).stdout.trim();
+    for(const item of privatePlan.revisions){
+      const record=await executePsql(config,{sql:
+        "SELECT game_id,revision_number,content_digest,byte_size,engine_id,"+
+        "engine_version,device_profile,storage_key FROM game_revisions WHERE id='"+
+        item.revision_id+"';"
+      });
+      assert.equal(record.stdout.trim(),[
+        item.game_id,'1',item.content_digest,String(item.byte_size),
+        item.engine_id,item.engine_version,item.device_profile,item.storage_key
+      ].join('|'));
+    }
+    await executePsql(config,{sql:importSql});
+    assert.equal((await executePsql(config,{sql:
+      'SELECT id,revision_id,sha256,storage_key FROM cartridge_artifacts ORDER BY revision_id;'
+    })).stdout.trim(),artifactIds,
+      'Idempotent import preserves all actual artifact UUIDs and digests');
+
+    // A competing extra artifact must not silently get blessed as reviewed.
+    await executePsql(config,{sql:
+      "INSERT INTO cartridge_artifacts"+
+      " (revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)"+
+      " VALUES ('"+GAMES[1].revisionId+"','asset','assets/rogue.txt',repeat('e',64),"+
+      " 12,'text/plain','qa/rogue.txt');"
+    });
+    await assert.rejects(()=>executePsql(config,{sql:importSql}),
+      (err:unknown)=>err instanceof MigrationError&&
+        err.message.includes('Conflicting or extra curated cartridge artifacts'));
+    await executePsql(config,{sql:
+      "DELETE FROM cartridge_artifacts WHERE revision_id='"+
+      GAMES[1].revisionId+"' AND path='assets/rogue.txt';"
+    });
+    await executePsql(config,{sql:importSql});
+
+    // Neither draft visibility nor status can be switched to public by import.
+    assert.equal((await executePsql(config,{sql:
+      "SELECT count(*) FROM games WHERE visibility='public' OR status='published';"
+    })).stdout.trim(),'0');
 
     // 9. Two independent owners: the same SQL predicate used by the account
     // data access layer MUST never return another owner's private game.
