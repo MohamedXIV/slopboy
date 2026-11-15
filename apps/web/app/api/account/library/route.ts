@@ -32,11 +32,15 @@ export async function POST(request:NextRequest){
   const gameId=(body as {gameId:string}).gameId;
   try{
     const sql=database();
-    const rows=await sql`INSERT INTO public.user_library(user_id,game_id)
-      SELECT u.id,g.id FROM public.users u JOIN public.games g ON g.id=${gameId}::uuid
+    const rows=await sql`WITH eligible AS MATERIALIZED (
+      SELECT u.id AS user_id,g.id AS game_id FROM public.users u JOIN public.games g ON g.id=${gameId}::uuid
       JOIN public.game_revisions r ON r.id=g.current_published_revision_id AND r.game_id=g.id
       WHERE u.id=${subject.id}::uuid AND u.role<>'system' AND g.visibility='public' AND g.status='published' AND r.status='published'
-      ON CONFLICT(user_id,game_id) DO UPDATE SET game_id=EXCLUDED.game_id RETURNING game_id::text AS id`;
+    ), inserted AS (
+      INSERT INTO public.user_library(user_id,game_id)
+      SELECT user_id,game_id FROM eligible ON CONFLICT(user_id,game_id) DO NOTHING RETURNING game_id
+    ) SELECT eligible.game_id::text AS id FROM eligible
+      LEFT JOIN inserted ON inserted.game_id=eligible.game_id LIMIT 1`;
     return rows.length?NextResponse.json({gameId},{headers}):result('NOT_FOUND',404);
   }catch{return result('DATABASE_UNAVAILABLE',503);}
 }

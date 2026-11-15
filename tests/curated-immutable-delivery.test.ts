@@ -23,7 +23,7 @@ async function fixtureDirectory():Promise<string>{
     const manifest=validateManifest(JSON.parse(await readFile(resolve(root,game.source.manifest),'utf8'))).manifest;
     const compiled=compileGameSource(await readFile(resolve(root,game.source.game),'utf8'));
     const bundle=packCartridge({format:'slopboy-cartridge-v0',manifest,code:compiled,assets:[]});
-    const path=resolve(sandbox,'apps/web/public'+game.cartridge);
+    const path=resolve(sandbox,'apps/web/private'+game.cartridge);
     await mkdir(dirname(path),{recursive:true});
     await writeFile(path,bundle);
   }
@@ -44,8 +44,8 @@ test('build delivers only pinned curated cartridges and verify is idempotent',as
     assert.equal(results.length,GAMES.length);
     assert.equal(new Set(results.map(a=>a.path)).size,GAMES.length);
     for(const [i,item] of results.entries()){
-      const source=await readFile(resolve(sandbox,'apps/web/public'+GAMES[i].cartridge));
-      const delivered=await readFile(resolve(sandbox,'apps/web/public'+item.path));
+      const source=await readFile(resolve(sandbox,'apps/web/private'+GAMES[i].cartridge));
+      const delivered=await readFile(resolve(sandbox,'apps/web/private'+item.path));
       assert.deepEqual(delivered,source);
       assert.equal(item.gameId,GAMES[i].gameId);
       assert.equal(item.revisionId,GAMES[i].revisionId);
@@ -69,7 +69,7 @@ test('verification fails closed for missing or altered immutable payload',async(
       /Immutable cartridge missing/
     );
     const [first]=await prepareImmutableCuratedAssets({rootDir:sandbox,mode:'build'});
-    const target=resolve(sandbox,'apps/web/public'+first.path);
+    const target=resolve(sandbox,'apps/web/private'+first.path);
     await writeFile(target,Buffer.from('substituted data'));
     await assert.rejects(
       ()=>prepareImmutableCuratedAssets({rootDir:sandbox,mode:'build'}),

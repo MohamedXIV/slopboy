@@ -11,6 +11,7 @@ import {GAMES} from '../packages/catalog/src/index.ts';
 
 const ROOT=resolve(import.meta.dirname,'..');
 const PUBLIC=resolve(ROOT,'apps/web/public');
+const PRIVATE=resolve(ROOT,'apps/web/private');
 const SOURCE=resolve(import.meta.dirname,'offline-worker-source.js');
 export const OFFLINE_SHELL_PATHS=['/','/library','/manifest.webmanifest',
   '/icons/slopboy-192.png','/icons/slopboy-512.png'] as const;
@@ -31,12 +32,12 @@ export async function buildOffline():Promise<{revision:string;bytes:number;games
     const data=await readFile(resolve(PUBLIC,path.slice(1)));
     bytes+=data.byteLength;hash.update(path);hash.update(data);
   }
-  const releases=await readdir(resolve(PUBLIC,'cartridges'));
+  const releases=await readdir(resolve(PRIVATE,'cartridges'));
   const expected=GAMES.map(game=>game.cartridge.slice('/cartridges/'.length)).sort();
   const actual=releases.filter(path=>path.endsWith('.slop')).sort();
   if(JSON.stringify(actual)!==JSON.stringify(expected))throw Error('Offline review list does not match built cartridges');
   for(const game of GAMES){
-    const data=await readFile(resolve(PUBLIC,game.cartridge.slice(1)));
+    const data=await readFile(resolve(PRIVATE,game.cartridge.slice(1)));
     bytes+=data.byteLength;hash.update(game.gameId);hash.update(game.revisionId);hash.update(data);
   }
   const revision=hash.digest('hex').slice(0,16);

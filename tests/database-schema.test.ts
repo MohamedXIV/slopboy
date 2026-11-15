@@ -476,7 +476,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
         await readFile(resolve(importRoot,game.source.manifest),'utf8'))).manifest;
       const code=compileGameSource(await readFile(resolve(importRoot,game.source.game),'utf8'));
       const bytes=packCartridge({format:'slopboy-cartridge-v0',manifest,code,assets:[]});
-      const destination=resolve(importRoot,'apps/web/public'+game.cartridge);
+      const destination=resolve(importRoot,'apps/web/private'+game.cartridge);
       await mkdir(dirname(destination),{recursive:true});
       await writeFile(destination,bytes);
     }

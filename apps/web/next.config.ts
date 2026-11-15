@@ -1,5 +1,8 @@
 import type {NextConfig} from 'next';
 const config:NextConfig={
+  // Build-produced bundles live outside public/, and must be traced into the
+  // cartridge Route Handler's serverless function (never CDN static assets).
+  outputFileTracingIncludes:{'/cartridges/[...parts]':['./private/cartridges/**/*.slop']},
   async headers(){return [
     {source:'/',headers:[{key:'X-Slopboy-Offline-Public',value:'1'}]},
     {source:'/library',headers:[{key:'X-Slopboy-Offline-Public',value:'1'}]},

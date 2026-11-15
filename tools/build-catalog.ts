@@ -8,8 +8,21 @@ import {GAMES} from '../packages/catalog/src/index.ts';
 import {compileGameSource,packCartridge,unpackCartridge,validateManifest} from '../packages/cartridge/src/index.ts';
 
 const ROOT=resolve(import.meta.dirname,'..');
-const DEST=resolve(ROOT,'apps/web/public/cartridges');
+const DEST=resolve(ROOT,'apps/web/private/cartridges');
+async function rejectPublicCartridges():Promise<void>{
+  const oldPublic=resolve(ROOT,'apps/web/public/cartridges');
+  let files:string[];
+  try{files=await readdir(oldPublic,{recursive:true});}
+  catch(error){
+    if((error as NodeJS.ErrnoException).code==='ENOENT')return;
+    throw error;
+  }
+  if(files.some(file=>file.endsWith('.slop'))){
+    throw Error('Unsafe old public .slop artifacts detected. Remove generated files from apps/web/public/cartridges before building.');
+  }
+}
 async function release(action:'build'|'verify'):Promise<void>{
+  await rejectPublicCartridges();
   const ids=new Set<string>();
   const gameIds=new Set<string>();
   const revisionIds=new Set<string>();

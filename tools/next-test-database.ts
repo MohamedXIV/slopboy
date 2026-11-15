@@ -21,7 +21,7 @@ export async function startTestDatabase(port:number){
   if(!bin)throw Error('PostgreSQL binaries required for database-backed runtime tests');
   const directory=await mkdtemp(join(tmpdir(),'slopboy-runtime-db-')),data=join(directory,'data');
   const privateBytes=gzipSync(randomBytes(96)),privateDigest=createHash('sha256').update(privateBytes).digest('hex');
-  const privateFile=resolve('apps/web/public/cartridges/by-sha256',privateDigest+'.slop');
+  const privateFile=resolve('apps/web/private/cartridges/by-sha256',privateDigest+'.slop');
   const env={...process.env,PATH:bin+':'+process.env.PATH};
   const config={host:directory,port,user:'slopboy_test',database:'postgres'};
   let started=false,privateFileCreated=false;

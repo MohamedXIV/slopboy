@@ -79,9 +79,13 @@ jobs:
         run: |
           pnpm cartridge:verify
           test -f apps/web/.next/BUILD_ID
-          test -f apps/web/public/cartridges/tiny-catcher.slop
-          test -f apps/web/public/cartridges/star-patrol.slop
-          test -f apps/web/public/cartridges/circuit-slide.slop
+          test -f apps/web/private/cartridges/tiny-catcher.slop
+          test -f apps/web/private/cartridges/star-patrol.slop
+          test -f apps/web/private/cartridges/circuit-slide.slop
+          test ! -e apps/web/public/cartridges/tiny-catcher.slop
+          test ! -e apps/web/public/cartridges/by-sha256
+          test -z "$(find apps/web/public -type f -name '*.slop' -print -quit)"
+          node -e 'const f=require("./apps/web/.next/server/app/cartridges/[...parts]/route.js.nft.json");if(f.files.filter(p=>p.endsWith(".slop")).length!==6)process.exit(1)'
           test -f apps/web/public/sw.js
           node --check apps/web/public/sw.js
           test -f apps/web/public/offline-build.json

@@ -24,7 +24,7 @@ async function fixture():Promise<string>{
       await readFile(resolve(root,game.source.manifest),'utf8'))).manifest;
     const code=compileGameSource(await readFile(resolve(root,game.source.game),'utf8'));
     const bytes=packCartridge({format:'slopboy-cartridge-v0',manifest,code,assets:[]});
-    const dest=resolve(root,'apps/web/public'+game.cartridge);
+    const dest=resolve(root,'apps/web/private'+game.cartridge);
     await mkdir(dirname(dest),{recursive:true});
     await writeFile(dest,bytes);
   }
@@ -51,7 +51,7 @@ test('generates private draft import only after every reviewed SHA address exist
       assert.equal(row.byte_size,row.artifact_byte_size);
       assert.ok(row.storage_key.startsWith(CURATED_STATIC_STORAGE_SCHEME+'/cartridges/by-sha256/'));
       const name=row.storage_key.slice(CURATED_STATIC_STORAGE_SCHEME.length);
-      const bytes=await readFile(resolve(root,'apps/web/public'+name));
+      const bytes=await readFile(resolve(root,'apps/web/private'+name));
       assert.equal(bytes.byteLength,row.byte_size);
     }
     assert.deepEqual(await planCuratedDraftImport(root),plan);
@@ -74,7 +74,7 @@ test('missing or tampered SHA-addressed copies fail before any import plan is em
   try{
     const plan=await planCuratedDraftImport(root);
     const first=plan.revisions[0];
-    const path=resolve(root,'apps/web/public'+first.storage_key.slice(CURATED_STATIC_STORAGE_SCHEME.length));
+    const path=resolve(root,'apps/web/private'+first.storage_key.slice(CURATED_STATIC_STORAGE_SCHEME.length));
     await rm(path);
     await assert.rejects(()=>planCuratedDraftImport(root),/Immutable cartridge missing/);
     await writeFile(path,Buffer.from('different cartridge'));

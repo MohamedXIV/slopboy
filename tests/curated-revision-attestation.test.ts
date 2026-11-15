@@ -71,7 +71,7 @@ test('on-disk attestation rejects substituted bundles, even if source manifests 
       await mkdir(dirname(target),{recursive:true});
       await copyFile(resolve(import.meta.dirname,'..',source),target);
     }
-    const dest=resolve(root,'apps/web/public'+game.cartridge);
+    const dest=resolve(root,'apps/web/private'+game.cartridge);
     await mkdir(dirname(dest),{recursive:true});
     await writeFile(dest,Buffer.from('not a cartridge'));
     await assert.rejects(

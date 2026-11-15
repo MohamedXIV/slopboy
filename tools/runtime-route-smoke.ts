@@ -44,6 +44,11 @@ async function main(){
       ]);
       assert.equal(alias.status,200,'Legacy cartridge remains accessible');
       assert.equal(immutable.status,200,'Immutable cartridge must resolve in real Next HTTP');
+      const privateHead=await fetch(server.url+'/cartridges/by-sha256/'+locked.sha256+'.slop',{method:'HEAD'});
+      assert.equal(privateHead.status,200,'HEAD must use the same publication gate');
+      assert.equal(privateHead.headers.get('cache-control'),'no-store, max-age=0');
+      assert.equal(privateHead.headers.get('content-type'),'application/octet-stream');
+      assert.equal((await privateHead.arrayBuffer()).byteLength,0,'HEAD must never stream bytes');
       const aliasBytes=Buffer.from(await alias.arrayBuffer());
       const immutableBytes=Buffer.from(await immutable.arrayBuffer());
       assert.deepEqual(immutableBytes,aliasBytes,'Static SHA artifact must preserve reviewed bytes');
@@ -55,12 +60,15 @@ async function main(){
     const privatePath='/cartridges/by-sha256/'+server.privateDigest+'.slop';
     assert.equal((await get(privatePath)).status,404,
       'A private draft bundle must not be downloadable, even by digest');
+    assert.equal((await fetch(server.url+privatePath,{method:'HEAD'})).status,404,
+      'HEAD must not reveal a private bundle');
     await server.setPrivatePublished(true);
     const publishedAsset=await get(privatePath);
     assert.equal(publishedAsset.status,200,'The same artifact must be routable after publication');
     assert.equal(createHash('sha256').update(Buffer.from(await publishedAsset.arrayBuffer())).digest('hex'),server.privateDigest);
     await server.setPrivatePublished(false);
     assert.equal((await get(privatePath)).status,404,'Revoking publication must immediately block the artifact');
+    assert.equal((await fetch(server.url+privatePath,{method:'HEAD'})).status,404,'HEAD revocation must be immediate');
     const catalog=await get('/api/games?limit=24');
     assert.equal(catalog.status,200);
     const listed=await catalog.json() as {games:{id:string}[]};

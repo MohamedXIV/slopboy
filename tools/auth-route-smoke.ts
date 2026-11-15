@@ -56,6 +56,8 @@ async function main(){
       const asset=await get(path);
       assert.equal(asset.status,503,'Static cartridge must fail closed when publication cannot be verified');
       assert.match(String(asset.headers.get('cache-control')),/no-store/);
+      assert.equal((await fetch(app.url+path,{method:'HEAD'})).status,503,
+        'HEAD must also fail closed without publication authority');
     }
     assert.equal((await get('/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3')).status,200);
     const login=await get('/auth/sign-in');
