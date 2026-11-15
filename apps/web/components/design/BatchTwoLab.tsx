@@ -5,8 +5,9 @@ import type {FormEvent} from 'react';
 import {
   Alert,Button,Card,Chip,Description,Dropdown,FieldError,Form,Input,
   Label,ListBox,Modal,Popover,Radio,RadioGroup,Select,Switch,TextArea,
-  Tabs,TextField,Tooltip,
+  TextField,Tooltip,
 } from '@heroui/react';
+import SlopboyAuthPanel from '../ui/SlopboyAuthPanel';
 import './batch-two.css';
 
 type Flavor='current'|'proposed';
@@ -144,23 +145,25 @@ function AuthFields({flavor,showPassword,onVisibilityChange,onSubmit,onStatus}:{
   onSubmit:(event:FormEvent<HTMLFormElement>)=>void;
   onStatus:(value:string)=>void;
 }){
-  return <div className="sb-b2-auth-fields">
-    <Form aria-label={flavor+' authentication layout demo'} className="sb-b2-auth-form" onSubmit={onSubmit}>
+  const proposed=flavor==='proposed';
+  return <div className={proposed?'sb-auth-preview-fields':'sb-b2-auth-fields'}>
+    <Form aria-label={flavor+' authentication layout demo'}
+      className={proposed?'sb-auth-form':'sb-b2-auth-form'} onSubmit={onSubmit}>
       <TextField name={flavor+'-preview-email'} type="email" isRequired>
         <Label>Email</Label>
         <Input variant="secondary" type="email" placeholder="alex@slopboy.pocket" autoComplete="off"/>
         <FieldError>Enter a valid email address.</FieldError>
       </TextField>
       <TextField name={flavor+'-preview-password'} isRequired>
-        <div className="sb-b2-auth-field-head"><Label>Password</Label><span>PRIVATE</span></div>
-        <div className="sb-b2-auth-password">
+        <div className={proposed?'sb-auth-field-head':'sb-b2-auth-field-head'}><Label>Password</Label><span>PRIVATE</span></div>
+        <div className={proposed?'sb-auth-password':'sb-b2-auth-password'}>
           <Input variant="secondary" type={showPassword?'text':'password'} placeholder="Password" autoComplete="off"/>
           <Button variant="ghost" type="button" size="sm" aria-label={showPassword?'Hide password':'Show password'}
             onPress={onVisibilityChange}>{showPassword?'Hide':'Show'}</Button>
         </div>
         <FieldError>Password is required.</FieldError>
       </TextField>
-      <Button type="submit" variant="primary" fullWidth>Sign in to Slopboy ↗</Button>
+      <Button type="submit" className={proposed?'sb-auth-submit':undefined} variant="primary" fullWidth>Sign in to Slopboy ↗</Button>
     </Form>
     <Alert status="default">
       <Alert.Indicator/>
@@ -169,7 +172,7 @@ function AuthFields({flavor,showPassword,onVisibilityChange,onSubmit,onStatus}:{
         <Alert.Description>New account registration is currently closed.</Alert.Description>
       </Alert.Content>
     </Alert>
-    <Button variant="secondary" fullWidth type="button"
+    <Button variant="secondary" className={proposed?'sb-auth-guest':undefined} fullWidth type="button"
       onPress={()=>onStatus('Guest action preview only — no navigation.')}>Continue as guest</Button>
   </div>;
 }
@@ -182,38 +185,16 @@ function AuthPanel({flavor}:{flavor:Flavor}){
     event.preventDefault();
     setStatus('Visual preview only — no credentials submitted or stored.');
   };
-  return <article className={'sb-b2-auth-sample'+(proposed?' sb-lab-proposed sb-heroui-preview sb-b2-auth-proposed':' sb-b2-auth-current')}
+  return <article className={'sb-b2-auth-sample'+(proposed?' sb-b2-auth-proposed':' sb-b2-auth-current')}
     data-auth-variant={flavor} data-preview-only="true">
-    <div className="sb-b2-auth-ribbon" aria-hidden="true">
-      <span>● {proposed?'SYS.LINK // ACCOUNT':'CURRENT / ACCOUNT'}</span>
-      <span>{proposed?'PWR · READY':'SLOPBOY · 2.0'}</span>
-    </div>
-    <Card className="sb-b2-auth-card">
-      {proposed?<Card.Content className="sb-b2-auth-inner">
-        <div className="sb-b2-auth-hardware" aria-hidden="true">
-          <span className="sb-b2-auth-vents"><i/><i/><i/><i/> MIC/SLOT</span>
-          <span className="sb-b2-auth-power">● &nbsp; READY</span>
-        </div>
-        <Tabs className="sb-b2-auth-tabs" defaultSelectedKey="sign-in">
-          <Tabs.ListContainer>
-            <Tabs.List aria-label="Account options (preview only)">
-              <Tabs.Tab id="sign-in"><Tabs.Indicator/>Sign in</Tabs.Tab>
-              <Tabs.Tab id="create-account" isDisabled>Create account · closed</Tabs.Tab>
-            </Tabs.List>
-          </Tabs.ListContainer>
-          <Tabs.Panel id="sign-in">
-            <div className="sb-b2-auth-heading">
-              <Chip variant="soft" color="accent">SLOPBOY · ACCOUNT</Chip>
-              <h3>Welcome back</h3>
-              <p>Sign in to access your private creator dashboard. Guest games remain available without an account.</p>
-            </div>
-            <AuthFields flavor={flavor} showPassword={showPassword} onVisibilityChange={()=>setShowPassword(v=>!v)}
-              onSubmit={onSubmit} onStatus={setStatus}/>
-          </Tabs.Panel>
-        </Tabs>
-        <div className="sb-b2-auth-footnote" aria-hidden="true"><span>INDEXED · 4 SHADES</span><span>VIRTUAL HANDHELD</span></div>
-      </Card.Content>:
-      <>
+    {proposed?
+      <SlopboyAuthPanel titleId="sb-b2-auth-preview-title" headingLevel="h3" className="sb-heroui-preview"
+        secondary={<span className="sb-b2-auth-demo-caption">Invited-account activation · preview only</span>}>
+        <AuthFields flavor={flavor} showPassword={showPassword} onVisibilityChange={()=>setShowPassword(v=>!v)}
+          onSubmit={onSubmit} onStatus={setStatus}/>
+      </SlopboyAuthPanel>
+      :<Card className="sb-b2-auth-card">
+        <div className="sb-b2-auth-ribbon" aria-hidden="true"><span>● CURRENT / ACCOUNT</span><span>SLOPBOY · 2.0</span></div>
         <Card.Header>
           <p className="sb-b2-baseline-eyebrow">Slopboy · Account</p>
           <Card.Title>Welcome back</Card.Title>
@@ -223,8 +204,7 @@ function AuthPanel({flavor}:{flavor:Flavor}){
           <AuthFields flavor={flavor} showPassword={showPassword} onVisibilityChange={()=>setShowPassword(v=>!v)}
             onSubmit={onSubmit} onStatus={setStatus}/>
         </Card.Content>
-      </>}
-    </Card>
+      </Card>}
     <p className="sb-b2-auth-status" role="status">{status||'Preview only · authentication is not connected'}</p>
   </article>;
 }
@@ -254,7 +234,7 @@ function AuthPreview(){
         <AuthPanel flavor="proposed"/>
       </div>
     </div>
-    <p className="sb-b2-review-note">The preview inherits the actual site Light/Dark preference. Mobile mode constrains each composition to a 375px viewport. No product route uses these examples.</p>
+    <p className="sb-b2-review-note">The proposed panel uses the same HeroUI composition and styles as the live sign-in route. Mobile mode constrains each composition to a 375px viewport; the preview never sends credentials.</p>
   </section>;
 }
 

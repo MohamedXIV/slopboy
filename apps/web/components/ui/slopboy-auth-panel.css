@@ -1,5 +1,5 @@
-/* Production composition of the approved BatchTwoLab auth panel.
- * HeroUI owns controls, accessibility and state; these rules only compose the shell. */
+/* Shared live + Design Lab composition of the approved handheld-style auth panel.
+ * HeroUI still owns the controls, accessibility, focus and state. */
 .sb-auth-page {
   display: grid;
   place-items: center;
@@ -100,7 +100,7 @@
   padding: 28px 0 0;
   margin: 0;
 }
-.sb-auth-heading h1 {
+.sb-auth-heading :is(h1,h3) {
   margin: 12px 0 4px;
   color: var(--sb-ui-ink);
   font-size: clamp(27px, 3vw, 34px);
@@ -124,7 +124,8 @@
 .sb-auth-form .input { min-width: 0; width: 100%; }
 .sb-auth-form .input { min-height: 46px; }
 .sb-auth-form .textfield .label,
-.sb-auth-field-head a {
+.sb-auth-field-head a,
+.sb-auth-field-head span {
   font: 700 10px/1.5 ui-monospace, monospace;
   letter-spacing: .08em;
   text-transform: uppercase;
