@@ -30,6 +30,14 @@ export default function AccountDashboard(){
       const me=await fetch('/api/account/me',{credentials:'same-origin',cache:'no-store'});
       if(current!==generation.current)return;
       if(me.status===401){router.replace('/auth/sign-in');return;}
+      if(me.status===503){
+        const problem=await me.json().catch(()=>null) as {error?:string}|null;
+        if(current!==generation.current)return;
+        if(problem?.error==='AUTH_NOT_CONFIGURED'){
+          router.replace('/auth/sign-in');
+          return;
+        }
+      }
       if(!me.ok){setStatus('unavailable');return;}
       const data=await me.json() as Account;
       if(current!==generation.current)return;

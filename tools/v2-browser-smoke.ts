@@ -323,14 +323,15 @@ async function main(){
         hero:!!hero&&hero.matches('a.button.button--primary[href="/library"]'),
         discovery:!!discovery&&discovery.matches('a.button.button--secondary'),
         kaplay:!!kaplay&&kaplay.matches('a.button.button--secondary'),
-        nav:nav.length===2&&nav.every(a=>a.classList.contains('button')),
+        nav:nav.length===3&&nav.every(a=>a.classList.contains('button')),
+        account:nav.some(a=>a.getAttribute('href')==='/dashboard'&&a.textContent?.trim()==='Account'),
         activeNav:nav.filter(a=>a.getAttribute('aria-current')==='page').length,
         footer:footer.length===3&&footer.every(a=>a.classList.contains('link')),
         heroRadius:hero?getComputedStyle(hero).borderRadius:'',
       });
     })()`)));
     if(!homeControls.hero||!homeControls.discovery||!homeControls.kaplay||
-      !homeControls.nav||homeControls.activeNav!==1||!homeControls.footer||
+      !homeControls.nav||!homeControls.account||homeControls.activeNav!==1||!homeControls.footer||
       homeControls.heroRadius!=='9999px')
       throw Error('Home still renders hand-styled controls instead of approved HeroUI: '+JSON.stringify(homeControls));
     await navigate('/v2','/',"!!document.querySelector('.sb-v2-header')");
@@ -338,6 +339,19 @@ async function main(){
       "location.search==='?source=bookmark'&&location.hash==='#shelf'&&!!document.querySelector('.v2-cart-grid')");
     await navigate('/v2/play/star-patrol','/play/'+STAR_GAME_ID,
       "!!document.querySelector('.v2-led.on')");
+    await navigate('/auth/sign-in','/auth/sign-in',
+      "!!document.querySelector('.sb-auth-hardware')&&!!document.querySelector('.sb-auth-card')");
+    const authPanel=await evalJs(`(()=>{const form=document.querySelector('.sb-auth-card');
+      const email=form?.querySelector('input[type="email"]');
+      const password=form?.querySelector('input[type="password"]');
+      const guest=form?.querySelector('a[href="/library"]');
+      return !!email?.disabled&&!!password?.disabled&&!!guest&&form.textContent.includes('Authentication is not configured');})()`);
+    if(authPanel!==true)throw Error('Unconfigured auth panel must retain disabled credentials and guest navigation');
+    await browser.setViewport(390,844);
+    await sleep(200);
+    const mobileAuth=await evalJs("document.documentElement.scrollWidth<=window.innerWidth&&!!document.querySelector('.sb-auth-card')");
+    if(mobileAuth!==true)throw Error('Auth panel overflows the mobile viewport');
+    await browser.setViewport(1280,900);
     await navigate('/legacy','/legacy',"!!document.querySelector('.hero')&&!document.querySelector('.sb-v2-header')");
     const legacyHubLinks=await evalJs("JSON.stringify([...document.querySelectorAll('.links a')].map(a=>a.getAttribute('href')))");
     if(!String(legacyHubLinks).includes('/legacy/library'))throw Error('Legacy home links to canonical rather than legacy library');

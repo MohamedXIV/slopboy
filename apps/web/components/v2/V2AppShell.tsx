@@ -50,6 +50,11 @@ export default function V2AppShell({children}:{children:ReactNode}){
               ariaCurrent={pathname==='/'?'page':undefined}>Devices</V2ActionLink>
             <V2ActionLink href="/library" size="sm" variant={pathname==='/library'?'secondary':'ghost'}
               ariaCurrent={pathname==='/library'?'page':undefined}>My library</V2ActionLink>
+            <V2ActionLink href="/dashboard" size="sm"
+              variant={pathname==='/dashboard'||pathname.startsWith('/auth/')?'secondary':'ghost'}
+              ariaCurrent={pathname==='/dashboard'||pathname.startsWith('/auth/')?'page':undefined}>
+              Account
+            </V2ActionLink>
             <Button size="sm" variant="secondary" className="sb-control sb-v2-theme-toggle"
               onPress={toggleTheme} aria-label={theme==='dark'?'Switch to light theme':'Switch to dark theme'}
 >

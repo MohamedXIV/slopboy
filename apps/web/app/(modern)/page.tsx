@@ -10,7 +10,7 @@ export default function V2LabHome(){
         <h1>A pocket full<br/>of <em>possibility.</em></h1>
         <p>We are rebuilding Slopboy with original collectible handhelds, visual display limits, and a game-making platform for humans and AI.</p>
         <V2ActionLink className="v2-hub-cta" variant="primary" size="lg" href="/library">Open my game library <span aria-hidden="true">↗</span></V2ActionLink>
-        <div className="v2-hub-status"><span className="v2-dot"/> REAL PLAYABLE SLICE · NO FAKE ACCOUNT OR ONLINE FEATURES</div>
+        <div className="v2-hub-status"><span className="v2-dot"/> PLAY AS A GUEST · NO ACCOUNT REQUIRED</div>
       </div>
       <div className="v2-hub-product" aria-label="Original slab-shaped handheld concept">
         <span className="v2-product-caption">CONCEPT 001 / VERTICAL SLAB</span>
