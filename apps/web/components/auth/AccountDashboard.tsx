@@ -86,7 +86,7 @@ export default function AccountDashboard(){
         <Alert status="warning">
           <Alert.Indicator/>
           <Alert.Content>
-            <Alert.Title>Guest games remain available</Alert.Title>
+            <Alert.Title>Guest saves stay local</Alert.Title>
             <Alert.Description>Your local saves are still on this device.</Alert.Description>
           </Alert.Content>
         </Alert>

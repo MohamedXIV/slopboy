@@ -35,7 +35,7 @@ export default function SlopboyAuthPanel({children,titleId,headingLevel='h1',sec
             <div className="sb-auth-heading">
               <Chip variant="soft" color="accent">SLOPBOY · ACCOUNT</Chip>
               <Heading id={titleId}>Welcome back</Heading>
-              <p>Sign in to access your private creator dashboard. You can still play every guest game without an account.</p>
+              <p>Sign in to access your private creator dashboard. Your local saves stay on this device.</p>
             </div>
             <div className="sb-auth-fields">{children}</div>
           </Tabs.Panel>

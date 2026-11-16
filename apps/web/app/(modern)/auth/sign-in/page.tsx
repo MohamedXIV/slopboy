@@ -22,7 +22,7 @@ export default function SignInPage(){
         <Alert.Indicator/>
         <Alert.Content>
           <Alert.Title>Sign-in unavailable</Alert.Title>
-          <Alert.Description>Authentication is not configured in this deployment. Guest games and local saves remain available.</Alert.Description>
+          <Alert.Description>Authentication is not configured in this deployment. Local saves stay on this device; previously installed games may be playable offline.</Alert.Description>
         </Alert.Content>
       </Alert>}
       <Alert status="default">

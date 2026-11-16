@@ -64,6 +64,8 @@ async function main(){
     assert.equal(login.status,200);
     const loginHtml=await login.text();
     assert.match(loginHtml,/Authentication is not configured in this deployment/);
+    assert.doesNotMatch(loginHtml,/play every guest game|Guest games and local saves remain available/,
+      'The unavailable-auth page must not promise unpublished games are playable');
     assert.match(loginHtml,/sb-auth-hardware/,'The approved device-style auth panel must render');
     assert.match(loginHtml,/disabled=""/,'Unconfigured sign-in inputs must not accept credentials');
     assert.match(loginHtml,/href="\/auth\/reset-password"/,
