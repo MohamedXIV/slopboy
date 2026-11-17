@@ -62,9 +62,15 @@ async function main(){
     assert.equal((await get('/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3')).status,200);
     const login=await get('/auth/sign-in');
     assert.equal(login.status,200);
-    assert.match(await login.text(),/Authentication is not configured in this deployment/);
-    assert.match(await (await get('/auth/sign-in')).text(),/Reset password/,
+    const loginHtml=await login.text();
+    assert.match(loginHtml,/Authentication is not configured in this deployment/);
+    assert.doesNotMatch(loginHtml,/play every guest game|Guest games and local saves remain available/,
+      'The unavailable-auth page must not promise unpublished games are playable');
+    assert.match(loginHtml,/sb-auth-hardware/,'The approved device-style auth panel must render');
+    assert.match(loginHtml,/disabled=""/,'Unconfigured sign-in inputs must not accept credentials');
+    assert.match(loginHtml,/href="\/auth\/reset-password"/,
       'Sign-in must link to recovery for existing accounts');
+    assert.match(loginHtml,/Continue as guest/,'Guest access remains prominent');
     const recovery=await get('/auth/reset-password');
     assert.equal(recovery.status,200,'Recovery must be routed in modern UI');
     assert.match(await recovery.text(),/Authentication is not configured in this deployment/,
@@ -73,7 +79,9 @@ async function main(){
     assert.equal(activation.status,200,'Invited-account activation page remains reachable');
     assert.match(await activation.text(),/Authentication is not configured in this deployment/,
       'Unconfigured account activation must fail closed');
-    assert.equal((await get('/dashboard')).status,200,'Static dashboard shell contains no private identity');
+    const dashboard=await get('/dashboard');
+    assert.equal(dashboard.status,307,'Unconfigured dashboard routes to the honest sign-in panel');
+    assert.equal(dashboard.headers.get('location'),'/auth/sign-in');
     assert.equal((await get('/library')).status,200,'Guest cartridge library remains public');
     console.log('Anonymous auth HTTP regression PASS: fail-closed proxy/session, CSRF, owner ID, admin, guest library');
   }finally{await app.stop();}
