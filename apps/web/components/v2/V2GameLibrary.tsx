@@ -3,7 +3,9 @@
 import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import {Button} from '@heroui/react';
-import {GAMES} from '@slopboy/catalog';
+import {listOfflineGames,type InstalledGame} from './offline-install';
+import {listLocalSaveGameIds} from './local-save-discovery';
+import LocalGameSaves from './LocalGameSaves';
 import {getBrowserHistory,formatActiveTime,type GameHistory} from './library-history';
 import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
@@ -12,21 +14,63 @@ import {listLocalSnapshots,saveLocalSnapshot,restoreLocalSnapshot,deleteLocalSna
 import OfflineInstallControl from './OfflineInstallControl';
 import './v2-library.css';
 
+type PublicGame={gameId:string;title:string;genre:string;description:string;playable:boolean};
+type CatalogRow={id:string;title:string;genre:string;description:string|null};
 export default function V2GameLibrary(){
+  const [games,setGames]=useState<PublicGame[]>([]),[offline,setOffline]=useState<InstalledGame[]>([]);
+  const [savedIds,setSavedIds]=useState<string[]>([]),[myGames,setMyGames]=useState<CatalogRow[]|null|undefined>(undefined);
+  const [offlineState,setOfflineState]=useState('Checking installed games…');
+  const [saveState,setSaveState]=useState('Checking local saves…');
+  const [catalogState,setCatalogState]=useState('Loading public games…'),[libraryError,setLibraryError]=useState('');
+  const [cursor,setCursor]=useState<string|null>(null);
   const [history,setHistory]=useState<Record<string,GameHistory>>({});
   const [snapshots,setSnapshots]=useState<Record<string,LocalSnapshot[]>>({});
   const [openSaves,setOpenSaves]=useState<string|null>(null);
   const [pending,setPending]=useState<string|null>(null);
   const [notice,setNotice]=useState('');
   const {theme}=useV2Theme();
+  async function loadCatalog(next?:string){
+    try{
+      const response=await fetch('/api/games?limit=24'+(next?'&cursor='+encodeURIComponent(next):''),{cache:'no-store'});
+      if(!response.ok)throw Error();
+      const data=await response.json() as {games:CatalogRow[];nextCursor:string|null};
+      const results=await Promise.all(data.games.map(async item=>{
+        let playable=false;try{playable=(await fetch('/api/public-games/'+item.id,{cache:'no-store'})).ok;}catch{}
+        return {gameId:item.id,title:item.title,genre:item.genre,description:item.description??'',playable};
+      }));
+      setGames(previous=>next?[...previous,...results]:results);setCursor(data.nextCursor);setCatalogState('');
+    }catch{setCatalogState('Public catalog is unavailable. Please try again later.');}
+  }
+  async function refreshLibrary(){
+    try{const response=await fetch('/api/account/library',{cache:'no-store'});
+      if(response.status===401){setMyGames(null);return;}
+      if(!response.ok)throw Error();const data=await response.json();setMyGames(data.games);setLibraryError('');
+    }catch{setLibraryError('Account library unavailable.');}
+  }
+  async function addGame(gameId:string){
+    try{const response=await fetch('/api/account/library',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({gameId})});
+      if(response.status===401){setLibraryError('Sign in to add games to your library.');return;}
+      if(!response.ok)throw Error();await refreshLibrary();
+    }catch{setLibraryError('Could not add game to your library.');}
+  }
+  async function refreshOffline(){
+    try{setOffline(await listOfflineGames());setOfflineState('');}
+    catch{setOfflineState('Offline installation status is unavailable.');}
+  }
+  useEffect(()=>{let active=true;queueMicrotask(()=>{if(!active)return;void loadCatalog();void refreshLibrary();
+    listLocalSaveGameIds().then(ids=>{if(active){setSavedIds(ids);setSaveState('');}})
+      .catch(()=>{if(active)setSaveState('Local save status is unavailable.');});
+    listOfflineGames().then(items=>{if(active){setOffline(items);setOfflineState('');}})
+      .catch(()=>{if(active)setOfflineState('Offline installation status is unavailable.');});
+  });return()=>{active=false;};},[]);
   useEffect(()=>{
     const handle=requestAnimationFrame(()=>{
       const records:Record<string,GameHistory>={};
-      for(const game of GAMES)records[game.gameId]=getBrowserHistory(game.gameId);
+      for(const game of games)records[game.gameId]=getBrowserHistory(game.gameId);
       setHistory(records);
     });
     return()=>cancelAnimationFrame(handle);
-  },[]);
+  },[games]);
   async function expandSaves(gameId:string){
     if(openSaves===gameId){setOpenSaves(null);return;}
     setOpenSaves(gameId);setNotice('');
@@ -50,31 +94,32 @@ export default function V2GameLibrary(){
       <div className="v2-library-intro">
         <div><p className="v2-library-eyebrow">YOUR CARTRIDGE SHELF / FIRST COLLECTION</p>
         <h1>Pick a world.<br/><em>Insert a cartridge.</em></h1>
-        <p>Three curated games are playable offline in the current experimental player. Your play history and game backups stay on this device.</p></div>
+        <p>Discover reviewed public games. Your play history and game backups stay on this device.</p></div>
         <div className="v2-cloud-state"><strong>Cloud saves</strong><span>Not connected</span>
           <p>Account sync is planned with a small per-player quota. Nothing uploads without sign-in and your permission.</p>
           <small>Proposed allowance: 10 MiB / account</small>
         </div>
       </div>
       <section aria-labelledby="shelf-heading" className="v2-shelf">
-        <div className="v2-shelf-heading"><h2 id="shelf-heading">Available cartridges <span>{GAMES.length} games</span></h2><span>Click any cartridge to insert &amp; play</span></div>
-        <div className="v2-cart-grid">{GAMES.map((game,index)=>{
+        <div className="v2-shelf-heading"><h2 id="shelf-heading">Available cartridges <span>{games.length} games</span></h2><span>Click any cartridge to insert &amp; play</span></div>
+        {catalogState&&<p role="status">{catalogState}</p>}
+        {!catalogState&&games.length===0&&<p>No public games are available yet.</p>}
+        <div className="v2-cart-grid">{games.map((game,index)=>{
           const record=history[game.gameId];const active=record&&record.launches>0;
           return <article key={game.gameId} className="v2-library-game">
-            <Link className="v2-cartridge-link" href={'/play/'+game.gameId} aria-label={'Insert '+game.title+' cartridge'}>
-              <V2CartridgeArt id={game.legacySlug} title={game.title} emblem={game.artwork.emblem} index={index}/>
+            <Link className="v2-cartridge-link" href={(game.playable?'/play/':'/games/')+game.gameId} aria-label={(game.playable?'Insert ':'View ')+game.title+' cartridge'}>
+              <V2CartridgeArt id={game.gameId} title={game.title} emblem={'◆'} index={index}/>
             </Link>
             <div className="v2-library-card-details"><div className="v2-library-title"><h3>{game.title}</h3><span>{game.genre}</span></div>
               <p>{game.description}</p>
               <div className="v2-library-history">
                 <div><span>Played</span><strong>{active?formatActiveTime(record.activeMs):'Not yet'}</strong></div>
                 <div><span>Last played</span><strong>{active&&record.lastPlayedAt?new Date(record.lastPlayedAt).toLocaleDateString():'Never'}</strong></div>
-                <div><span>Main story</span><strong>{game.mainStory&&record?.story&&record.story.total===game.mainStory.milestoneCount
-                    ?`${record.story.completed} / ${record.story.total} milestones`:'Not tracked'}</strong></div>
+                <div><span>Main story</span><strong>Not tracked</strong></div>
               </div>
               <div className="v2-library-actions">
-                <Link className="v2-library-play" href={'/play/'+game.gameId}>↧ Insert &amp; play</Link>
-                <OfflineInstallControl gameId={game.gameId}/>
+                {game.playable?<><Link className="v2-library-play" href={'/play/'+game.gameId}>↧ Insert &amp; play</Link><OfflineInstallControl gameId={game.gameId} onChanged={()=>void refreshOffline()}/></>:<Link href={'/games/'+game.gameId}>Game details</Link>}
+                <Button size="sm" variant="secondary" onPress={()=>void addGame(game.gameId)}>Add to My Library</Button>
                 <Button className="sb-control" size="sm" variant="secondary" onPress={()=>void expandSaves(game.gameId)}
                   aria-expanded={openSaves===game.gameId} aria-controls={'v2-save-'+game.gameId}>Local saves</Button>
               </div>
@@ -102,6 +147,23 @@ export default function V2GameLibrary(){
             </div>
           </article>;
         })}</div>
+        {cursor&&<Button variant="secondary" onPress={()=>void loadCatalog(cursor)}>Load more</Button>}
+      </section>
+      <section aria-labelledby="account-library"><h2 id="account-library">My Library</h2>
+        {libraryError&&<p role="status">{libraryError}</p>}
+        {myGames===undefined?(!libraryError&&<p>Loading your account library…</p>):
+          myGames===null?<p><Link href="/auth/sign-in">Sign in</Link> to view your account library.</p>:
+          myGames.length===0?<p>Your library is empty.</p>:<ul>{myGames.map(game=><li key={game.id}><Link href={'/games/'+game.id}>{game.title}</Link></li>)}</ul>}
+      </section>
+      <section aria-labelledby="device-library"><h2 id="device-library">Installed on this device</h2>
+        {offlineState&&<p role="status">{offlineState}</p>}
+        {!offlineState&&offline.length===0&&<p>No games are installed on this device.</p>}
+        <ul>{offline.map(item=><li key={item.gameId}>
+          <a href={'/play/'+item.gameId} data-testid={'installed-link-'+item.gameId}>{item.title}</a>
+          <LocalGameSaves gameId={item.gameId} showInstall={!games.some(game=>game.gameId===item.gameId&&game.playable)} onInstallChanged={()=>void refreshOffline()}/></li>)}</ul>
+        {saveState&&<p role="status">{saveState}</p>}
+        {savedIds.filter(id=>!offline.some(item=>item.gameId===id)&&!games.some(game=>game.gameId===id)).map(id=><div key={id}>
+          <p>Local save · {id}</p><LocalGameSaves gameId={id} onInstallChanged={()=>void refreshOffline()}/></div>)}
       </section>
       {notice&&<p role="status" className="v2-library-notice">{notice}</p>}
     </div>

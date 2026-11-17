@@ -1,6 +1,7 @@
 import {NextResponse} from 'next/server';
 import {currentSubject} from '../../../../lib/auth/server';
 import {databaseConfigured,readProfile} from '../../../../lib/auth/database';
+import {canManagePlatformGames} from '../../../../server/game-ownership';
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
 const headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'};
@@ -11,7 +12,7 @@ export async function GET(){
   if(!databaseConfigured())return NextResponse.json({error:'DATABASE_UNAVAILABLE'},{status:503,headers});
   try{
     const profile=await readProfile(subject);
-    if(profile?.role!=='admin')return NextResponse.json({error:'FORBIDDEN'},{status:403,headers});
+    if(!canManagePlatformGames(profile))return NextResponse.json({error:'FORBIDDEN'},{status:403,headers});
     return NextResponse.json({status:'authorized',adminId:subject.id},{headers});
   }catch{return NextResponse.json({error:'DATABASE_UNAVAILABLE'},{status:503,headers});}
 }

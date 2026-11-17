@@ -1,6 +1,4 @@
-import {Card} from '@heroui/react';
 import {V2ActionLink} from '../../components/v2/V2RouteControls';
-import {GAMES} from '@slopboy/catalog';
 import {V2_DEVICE_1000,V2_DEVICE_FAMILIES} from '@slopboy/hardware/v2';
 import '../v2/v2-hub.css';
 
@@ -27,22 +25,9 @@ export default function V2LabHome(){
       </div>
     </section>
     <section className="v2-hub-library">
-      <p className="v2-hub-kicker">CURRENTLY PLAYABLE / PIXEL V1 COMPATIBILITY</p>
-      <h2>Three small worlds. One fresh shell.</h2>
-      <div className="v2-hub-games">{GAMES.map((game,index)=><Card key={game.gameId} className="v2-hub-card">
-        <div className="v2-hub-art" style={{background:game.artwork.background,color:game.artwork.foreground}}>
-          <span className="v2-hub-card-id">0{index+1} / GAME CARD</span><strong aria-hidden="true">{game.artwork.emblem}</strong><span>{game.genre.toUpperCase()}</span>
-        </div>
-        <Card.Header className="v2-hub-card-header">
-          <Card.Title>{game.title}</Card.Title>
-          <Card.Description>{game.description}</Card.Description>
-        </Card.Header>
-        <Card.Footer className="v2-hub-card-footer">
-          <V2ActionLink className="v2-hub-play" variant="secondary" size="sm" href={'/play/'+game.gameId}>
-            Insert &amp; play <span aria-hidden="true">↗</span>
-          </V2ActionLink>
-        </Card.Footer>
-      </Card>)}</div>
+      <p className="v2-hub-kicker">DISCOVER GAMES</p>
+      <h2>Find your next world.</h2>
+      <V2ActionLink variant="secondary" href="/library">Browse the library</V2ActionLink>
     </section>
     <section className="v2-hub-concepts"><div><p className="v2-hub-kicker">ENGINE FEASIBILITY / REAL WEBGL</p><h2>Try a KAPLAY cartridge</h2><p>A separate test game with four-color WebGL capture, an opaque sandbox and instrumentation. Not a public cartridge uploader.</p><V2ActionLink variant="secondary" size="sm" href="/labs/kaplay">
         Open KAPLAY spike <span aria-hidden="true">↗</span>

@@ -6,7 +6,7 @@ async function main(){
   // CI must never unintentionally send real auth credentials to this regression.
   if(process.env.NEON_AUTH_BASE_URL||process.env.NEON_AUTH_COOKIE_SECRET||process.env.DATABASE_URL)
     throw Error('Anonymous auth smoke must run with all real provider credentials absent');
-  const app=await startNextTestServer();
+  const app=await startNextTestServer(undefined,{database:false});
   try{
     const get=(path:string)=>fetch(app.url+path,{redirect:'manual',cache:'no-store'});
     const me=await get('/api/account/me');
@@ -15,6 +15,18 @@ async function main(){
     assert.equal((await get('/api/auth/get-session')).status,503,'No proxy without provider');
     assert.equal((await get('/api/account/games')).status,401,'Private game listing requires a session');
     assert.equal((await get('/api/admin/overview')).status,401,'Admin endpoint requires a session');
+    assert.equal((await get('/api/manage/games')).status,401,'Platform management requires a session');
+    assert.equal((await get('/api/account/library')).status,401,'Account library requires a session');
+    const managed='/api/manage/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3';
+    assert.equal((await get(managed)).status,401,'Private management requires a session');
+    assert.equal((await get(managed+'/source')).status,401,'Private source requires a session');
+    for(const [path,method] of [['/api/manage/games','POST'],[managed,'PATCH'],
+      [managed+'/source','POST'],['/api/account/library','POST']] as const){
+      const response=await fetch(app.url+path,{method,headers:{'Origin':app.url,
+        'Sec-Fetch-Site':'same-origin','Content-Type':'application/json'},body:'{}'});
+      assert.equal(response.status,401,`${path} must reject anonymous mutations`);
+      assert.match(String(response.headers.get('cache-control')),/no-store/);
+    }
     assert.equal((await get('/api/account/games?ownerId=00000000-0000-4000-a000-000000000001')).status,401,
       'Client-supplied owner ID must never enable reads');
     assert.equal((await get('/api/account/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3/revisions')).status,401,
@@ -40,11 +52,20 @@ async function main(){
     assert.equal((await get('/api/games?cursor=malformed')).status,400);
     assert.equal((await get('/api/games/not-a-uuid')).status,404);
     assert.equal((await get('/api/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3')).status,503);
+    for(const path of ['/cartridges/tiny-catcher.slop','/cartridges/by-sha256/'+('a'.repeat(64))+'.slop']){
+      const asset=await get(path);
+      assert.equal(asset.status,503,'Static cartridge must fail closed when publication cannot be verified');
+      assert.match(String(asset.headers.get('cache-control')),/no-store/);
+      assert.equal((await fetch(app.url+path,{method:'HEAD'})).status,503,
+        'HEAD must also fail closed without publication authority');
+    }
     assert.equal((await get('/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3')).status,200);
     const login=await get('/auth/sign-in');
     assert.equal(login.status,200);
     const loginHtml=await login.text();
     assert.match(loginHtml,/Authentication is not configured in this deployment/);
+    assert.doesNotMatch(loginHtml,/play every guest game|Guest games and local saves remain available/,
+      'The unavailable-auth page must not promise unpublished games are playable');
     assert.match(loginHtml,/sb-auth-hardware/,'The approved device-style auth panel must render');
     assert.match(loginHtml,/disabled=""/,'Unconfigured sign-in inputs must not accept credentials');
     assert.match(loginHtml,/href="\/auth\/reset-password"/,

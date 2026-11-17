@@ -39,13 +39,13 @@ export async function prepareImmutableCuratedAssets(options:{
   const evidence=await attestCuratedRelease({rootDir:root,verifyBundled:true});
   const result:ImmutableCuratedArtifact[]=[];
   for(const item of evidence){
-    const source=await readFile(resolve(root,'apps/web/public'+item.bundledPath));
+    const source=await readFile(resolve(root,'apps/web/private'+item.bundledPath));
     const digest=createHash('sha256').update(source).digest('hex');
     if(digest!==item.contentDigest||source.byteLength!==item.byteSize){
       throw Error('Curated cartridge hash changed during immutable delivery: '+item.legacySlug);
     }
     const path=immutableCuratedPath(digest);
-    const target=resolve(root,'apps/web/public'+path);
+    const target=resolve(root,'apps/web/private'+path);
     let existing:Buffer|null=null;
     try{existing=await readFile(target);}catch(e){
       if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;

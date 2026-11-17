@@ -6,7 +6,7 @@ import {installOfflineGame,listOfflineGames,removeOfflineGame} from './offline-i
 import './offline-install.css';
 
 /** Explicit per-game install/remove. Never deletes guest progress, backup or history. */
-export default function OfflineInstallControl({gameId}:{gameId:string}){
+export default function OfflineInstallControl({gameId,onChanged}:{gameId:string;onChanged?:()=>void}){
   const [installed,setInstalled]=useState(false);
   const [busy,setBusy]=useState(true);
   const [notice,setNotice]=useState('');
@@ -24,6 +24,7 @@ export default function OfflineInstallControl({gameId}:{gameId:string}){
     try{
       if(installed){await removeOfflineGame(gameId);setInstalled(false);setNotice('Offline copy removed. Local saves kept.');}
       else{await installOfflineGame(gameId);setInstalled(true);setNotice('Installed for offline play.');}
+      onChanged?.();
     }catch(error){setNotice(error instanceof Error?error.message:'Offline operation failed.');}
     finally{setBusy(false);}
   };

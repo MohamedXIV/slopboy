@@ -103,7 +103,7 @@ export async function attestCuratedRevision(
   const code=compileGameSource(await readFile(resolve(root,game.source.game),'utf8'));
   const rebuilt=packCartridge({format:'slopboy-cartridge-v0',manifest,code,assets:[]});
   const bytes=options.verifyBundled?
-    await readFile(resolve(root,'apps/web/public'+game.cartridge)):rebuilt;
+    await readFile(resolve(root,'apps/web/private'+game.cartridge)):rebuilt;
   if(!bytes.equals(rebuilt))throw Error('Bundled cartridge differs from reviewed source: '+slug);
   const decoded=unpackCartridge(bytes);
   if(decoded.manifest.id!==slug||

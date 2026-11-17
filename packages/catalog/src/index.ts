@@ -20,8 +20,11 @@ export interface CatalogGame {
   readonly status:'curated';
 }
 /** Browser-safe reviewed game metadata; runtime fixtures never bring arbitrary code URLs. */
-export type PlayableGame=Omit<CatalogGame,'source'|'status'> & {
-  readonly status:'curated'|'runtime-fixture';
+export type PlayableGame=Omit<CatalogGame,'source'|'status'|'genre'> & {
+  readonly genre:string;
+  /** Database-assigned historical game alias, used only for guest-save migration. */
+  readonly legacySaveSlug?:string;
+  readonly status:'curated'|'runtime-fixture'|'published';
 };
 export const UUID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export function isGameUuid(value:string):boolean{return UUID_PATTERN.test(value);}

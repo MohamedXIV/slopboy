@@ -1,6 +1,6 @@
 /** Real service worker, real IndexedDB, real Next server, no fake cache driver. */
-import {mkdtemp,rm} from 'node:fs/promises';
-import {join} from 'node:path';
+import {mkdtemp,rm,readFile} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openChromePage} from './chrome-cdp.ts';
 import {startNextTestServer,BROWSER_RUNTIME_FIXTURE} from './next-test-server.ts';
@@ -13,6 +13,10 @@ async function main(){
   let browser:Awaited<ReturnType<typeof openChromePage>>|undefined;
   let resumed:Awaited<ReturnType<typeof startNextTestServer>>|undefined;
   const game=GAMES[0];
+  const lock=JSON.parse(await readFile(resolve('packages/catalog/curated-revision-lock.json'),'utf8')) as {revisions:{gameId:string;sha256:string}[]};
+  const record=lock.revisions.find(item=>item.gameId===game.gameId);
+  if(!record)throw Error('Missing immutable cartridge lock');
+  const cartridge='/cartridges/by-sha256/'+record.sha256+'.slop';
   const btn='[data-testid="offline-game-'+game.gameId+'"]';
   const key='save-v2:slopboy-1000@0.1.0:'+game.gameId;
   const value=JSON.stringify({format:'slopboy-save-v2',gameId:game.gameId,
@@ -37,7 +41,7 @@ async function main(){
     // The CDP runner doesn't await Promise-returning expressions.
     // Publish async CacheStorage diagnostics on window before offline navigation.
     await evalJs(`(async()=>{const c=await caches.open('slopboy-games-v3');
-      window.__offlineCached=!!(await c.match('/play/${game.gameId}'))&&!!(await c.match('${game.cartridge}'));})();true`);
+      window.__offlineCached=!!(await c.match('/play/${game.gameId}'))&&!!(await c.match('${cartridge}'));})();true`);
     await wait('installed page and bundle in CacheStorage',"window.__offlineCached===true");
     await evalJs(`(async()=>{const c=await caches.open('slopboy-games-v3');
       const assets=await caches.open('slopboy-installed-assets-v3');
@@ -49,12 +53,28 @@ async function main(){
     })();true`);
     await wait('installed asset report',"!!window.__assetReport");
     console.log('Offline prefetch evidence',String(await evalJs('window.__assetReport')));
+    if(!server.setViewAccess)throw Error('Missing disposable database controls');
+    await server.setViewAccess(false);
+    await evalJs("window.location.reload();true");
+    await wait('public catalog with unavailable play service',
+      `!!document.querySelector('.v2-cartridge-link[href="/games/${game.gameId}"]')&&!!document.querySelector('[data-testid="installed-link-${game.gameId}"]')`,20000);
+    const installedLink=String(await evalJs(`document.querySelector('[data-testid="installed-link-${game.gameId}"]').getAttribute('href')`));
+    if(installedLink!=='/play/'+game.gameId)throw Error('Installed game must retain a document-navigation play link');
+    await evalJs(`document.querySelector('[data-testid="installed-link-${game.gameId}"]').click();true`);
+    await wait('cached installed game works while online play service fails',
+      `location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')`,25000);
+    await server.setViewAccess(true);
+    await evalJs("window.location.assign('/library');true");
+    await wait('library restored after publication service recovers',"location.pathname==='/library'&&!!document.querySelector('"+btn+"')",20000);
+    await wait('installed game is ready',"!document.querySelector('"+btn+"').disabled");
     await evalJs(`(function(){
       window.__saved='pending';const req=indexedDB.open('slopboy-local-saves',1);
       req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains('cartridges'))req.result.createObjectStore('cartridges');};
       req.onerror=()=>window.__saved='error';
       req.onsuccess=()=>{const db=req.result,tx=db.transaction('cartridges','readwrite');
         tx.objectStore('cartridges').put(${JSON.stringify(value)},${JSON.stringify(key)});
+        tx.objectStore('cartridges').put(${JSON.stringify(JSON.stringify({format:'slopboy-save-v2',gameId:GAMES[1].gameId,state:'saved',data:'{"score":42}'}))},${JSON.stringify('save-v2:slopboy-1000@0.1.0:'+GAMES[1].gameId)});
+        tx.objectStore('cartridges').put('{"private":"legacy-original"}','save-v1:slopboy-1000@0.1.0:tiny-catcher');
         tx.oncomplete=()=>{db.close();window.__saved='done';};
         tx.onerror=()=>window.__saved='error';
       };
@@ -73,7 +93,7 @@ async function main(){
       await wait('installed game boots offline',`location.pathname==='/play/${game.gameId}'&&!!document.querySelector('.v2-led.on')`,26000);
     }catch(error){
       await evalJs(`(async()=>{window.__offlineProbe='pending';
-        try{const r=await fetch('${game.cartridge}',{credentials:'omit',cache:'no-store'});
+        try{const r=await fetch('${cartridge}',{credentials:'omit',cache:'no-store'});
           const bytes=await r.arrayBuffer();
           const source=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
           const reader=source.getReader();const result=await reader.read();
@@ -104,6 +124,7 @@ async function main(){
       throw Error('Offline game overwrote its guest IndexedDB record');
     await evalJs("window.location.assign('/library');true");
     await wait('offline library boots',"location.pathname==='/library'&&!!document.querySelector('"+btn+"')",22000);
+    await wait('non-installed guest save remains manageable',`!!document.querySelector('[data-testid="local-save-${GAMES[1].gameId}"]')`,15000);
     await wait('offline button status',"!document.querySelector('"+btn+"').disabled");
     if(!String(await evalJs("document.querySelector('"+btn+"').textContent")).includes('Remove offline'))
       throw Error('Installed-game status lost during offline navigation');
@@ -132,6 +153,13 @@ async function main(){
       `location.pathname==='/play/${BROWSER_RUNTIME_FIXTURE.gameId}'&&!!document.querySelector('.v2-led.on')`,24000);
     const rendered=String(await evalJs("document.querySelector('.v2-session-id strong').textContent"));
     if(rendered!==BROWSER_RUNTIME_FIXTURE.title)throw Error('Runtime game did not have server metadata: '+rendered);
+    await evalJs(`(function(){const request=indexedDB.open('slopboy-local-saves',1);
+      request.onsuccess=()=>{const db=request.result,tx=db.transaction('cartridges','readonly');
+        tx.objectStore('cartridges').get('save-v2:slopboy-1000@0.1.0:${BROWSER_RUNTIME_FIXTURE.gameId}').onsuccess=e=>{
+          window.__fixtureSave=e.target.result??'missing';};tx.oncomplete=()=>db.close();};})();true`);
+    await wait('new game save isolation check',"typeof window.__fixtureSave==='string'");
+    if(String(await evalJs('window.__fixtureSave')).includes('legacy-original'))
+      throw Error('A different game UUID imported a legacy save from its shared manifest ID');
     console.log('Next PWA Chromium smoke PASS: opt-in installed cartridge offline boot, shell reload, guest IDB persistence, uninstall, fresh runtime UUID play');
   }finally{
     if(browser){try{await browser.setOffline(false);}catch{}browser.close();}

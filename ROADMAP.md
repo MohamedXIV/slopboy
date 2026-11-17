@@ -1,6 +1,6 @@
 # Slopboy — Agent-Native Platform Roadmap
 
-**Updated:** 2026-11-09 · **Status:** Sprint 2 integration ([Issue #77](https://github.com/MohamedXIV/slopboy/issues/77)) underway; V2 and backend PRs remain unmerged. No production cutover has been merged.
+**Updated:** 2026-11-16 · **Status:** Sprint 2 integration gate [#77](https://github.com/MohamedXIV/slopboy/issues/77) is complete; its integration PR and ownership work in [Draft PR #91](https://github.com/MohamedXIV/slopboy/pull/91) remain unmerged. No production cutover has been merged.
 
 **GitHub Project:** [Slopboy — Agent-Native Platform Roadmap](https://github.com/users/MohamedXIV/projects/7)  
 **Long-term product register:** [Long-Term Vision](docs/product/long-term-vision.md) · [Agents' entrypoint](AGENTS.md)
@@ -49,16 +49,16 @@ The MVP roadmap above is **not** the full planned platform. The persistent futur
 
 ## Active Sprint 2 — Integration and account-backed platform
 
-**Coordination/claim source:** [Issue #77](https://github.com/MohamedXIV/slopboy/issues/77). The agent owning integration works on `integrate/sprint-2-baseline`; other agents must not commit there or work concurrently on its CI/workspace scope.
+**Coordination:** Issue #77 is closed after its integration acceptance. Its branch is historical; inspect current issue and PR claims before working on shared files. PR #91 carries the game ownership/catalog work and is being integrated with the newer main-branch auth UI.
 
-1. **Integration gate #77:** start from the verified PR #76 KAPLAY HostSession head and integrate the independent PR #73 PostgreSQL schema as an explicit second merge parent. Run frozen-install, live PostgreSQL migrations, typecheck, Chromium, sandbox and offline PWA tests **on the combined SHA**. Verify real Vercel Preview READY. Do not merge to `main` until the owner approves.
-2. **Real dev/backend #25 → #26:** Neon provisioning is still a separate operation. Verify isolated, Slopboy-only $0 resources and actual auth/OAuth provider capability; only then implement genuine sessions, server-derived roles and two-account access denial. Never treat the MCP JWT test spike as production authentication.
+1. **Integration gate #77:** completed on PR #78, which remains unmerged. The current PR #91 integration requires its own repository tests on the combined SHA; previous CI or Preview evidence does not prove that combined result.
+2. **Real dev/backend #25 → #26:** PR #91 records an existing isolated Neon Development setup, migration 004, scoped Preview grants and anonymous Preview checks. Those are historical external observations, not verification of this repository integration. Verified owner/stranger/admin sessions and safe publication/revocation checks remain open; never treat the MCP JWT test spike as production authentication.
 3. **Catalog #27 → My Games #34 → Paste Code #49:** real UUID ownership, reviewed public revisions and private drafts from verified identities. Storage of private source must not execute it; game preview awaits #31/#32/#33/#4.
 4. **Parallel agent lanes:** #29 provider-neutral MCP schemas/validation *only*, and #33/#4 hostile iframe browser fixtures *only*, with separate branch/file claims. Both are allowed to progress before Neon, but neither may enable unauthorized writes, weaken sandbox security or edit the integration branch.
 
-**Single-writer rule:** claim the Issue and base SHA/files in a GitHub Issue comment before coding. One agent per Issue/branch; submit focused PRs. Every agent must reread #77 and the relevant Issue before touching shared files. Passing an isolated PR's CI does **not** prove combined integration or live account authorization.
+**Single-writer rule:** claim the Issue and base SHA/files in a GitHub Issue comment before coding. One agent per Issue/branch; submit focused PRs. Check current issue and PR claims before touching shared files. Passing an isolated PR's CI does **not** prove combined integration or live account authorization.
 
-**Exit criterion:** integrated branch and PR, real PostgreSQL + browser/security/offline checks passing on the same exact commit, READY Vercel Preview, and no cutover to production. All subsequent database/auth writes must target this integrated baseline rather than diverging PR #73/#76.
+**Exit criterion:** integrated branch and PR, disposable PostgreSQL + browser/security/offline checks on the same exact commit, and separately verified live owner/stranger/admin authorization and publication/revocation behavior before release. Repository-only validation does not establish live Preview or production readiness; production cutover requires owner approval.
 
 ## Sprint 1 — historical starting plan (completed on review branches)
 

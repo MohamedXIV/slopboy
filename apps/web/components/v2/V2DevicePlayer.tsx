@@ -5,9 +5,10 @@ import Link from 'next/link';
 import {Button,Drawer} from '@heroui/react';
 import {trackBrowserLaunch,trackBrowserPlaytime} from './library-history';
 import {makeCartridgeAppearance} from './cartridge-cover';
+import {gameSaveIdentity} from './game-save-identity';
 import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
-import {GAMES,type PlayableGame} from '@slopboy/catalog';
+import {type PlayableGame} from '@slopboy/catalog';
 import {SLOPBOY_1000,type InputName} from '@slopboy/hardware';
 import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId} from '@slopboy/hardware/v2';
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
@@ -75,6 +76,19 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
   const [mobileSettingsOpen,setMobileSettingsOpen]=useState(false);
   const {theme}=useV2Theme();
   const [libraryOpen,setLibraryOpen]=useState(false);
+  const [quickGames,setQuickGames]=useState<{id:string;title:string;genre:string}[]>([]);
+  const [quickError,setQuickError]=useState('');
+  useEffect(()=>{
+    if(!libraryOpen)return;
+    const controller=new AbortController();
+    fetch('/api/games?limit=24',{cache:'no-store',signal:controller.signal})
+      .then(async response=>{if(!response.ok)throw Error();return response.json() as Promise<{games:{id:string;title:string;genre:string}[]}>;})
+      .then(async data=>{
+        const results=await Promise.all(data.games.map(async item=>({item,playable:(await fetch('/api/public-games/'+item.id,{cache:'no-store',signal:controller.signal})).ok})));
+        setQuickGames(results.filter(result=>result.playable).map(result=>result.item));setQuickError('');
+      }).catch(()=>{if(!controller.signal.aborted)setQuickError('Public games are unavailable.');});
+    return()=>controller.abort();
+  },[libraryOpen]);
   const [bootComplete,setBootComplete]=useState(false);
   const [fullscreen,setFullscreen]=useState(false);
   const [keyHeld,setKeyHeld]=useState<ReadonlyArray<InputName>>([]);
@@ -193,7 +207,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
     if(!cartridge)return;
     let active=true;
     setSaved(null);
-    const store=createGameSaveService(browserSaveDriver,DEVICE,game);
+    const store=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
     writeChain.current.then(()=>store.read()).catch(()=>null).then(value=>{
       if(active)setSaved({epoch,value});
     });
@@ -236,7 +250,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         if(now-lastSave.current<250)return;
         lastSave.current=now;
         const value=msg.value as string|null;
-        const store=createGameSaveService(browserSaveDriver,DEVICE,game);
+        const store=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
         writeChain.current=writeChain.current.catch(()=>{}).then(()=>store.write(value)).catch(err=>console.warn('V2 local save error',err));
       }
     };
@@ -583,7 +597,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             </div>
           </div>
           <p className="v2-security">
-            First-party preview cartridge with isolated execution. Local saves work offline; cloud sync requires a future authenticated service.
+            Reviewed cartridge with isolated execution. Local saves work offline; cloud sync requires a future authenticated service.
           </p>
         </aside>
   );
@@ -858,21 +872,17 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
               </Drawer.Header>
               <Drawer.Body>
                 <p className="v2-quick-library-description">Select a cartridge to insert into this Slopboy. Your current game remains running until you choose another.</p>
+                {quickError&&<p role="status">{quickError}</p>}
                 <div className="v2-quick-cartridge-list" role="list">
-                  {GAMES.map((item,index)=><div role="listitem" key={item.gameId}>
-                    <Link href={'/play/'+item.gameId} scroll={false}
-                      className={'v2-quick-cartridge'+(item.gameId===game.gameId?' is-current':'')}
-                      aria-current={item.gameId===game.gameId?'page':undefined}
-                      onClick={event=>{
-                        if(item.gameId===game.gameId)event.preventDefault();
-                        setLibraryOpen(false);
-                      }}>
-                      <V2CartridgeArt id={item.legacySlug} title={item.title} emblem={item.artwork.emblem} index={index} compact/>
-                      <span className="v2-quick-cartridge-copy">
-                        <strong>{item.title}</strong>
+                  {quickGames.map((item,index)=><div role="listitem" key={item.id}>
+                    <Link href={'/play/'+item.id} scroll={false}
+                      className={'v2-quick-cartridge'+(item.id===game.gameId?' is-current':'')}
+                      aria-current={item.id===game.gameId?'page':undefined}
+                      onClick={event=>{if(item.id===game.gameId)event.preventDefault();setLibraryOpen(false);}}>
+                      <V2CartridgeArt id={item.id} title={item.title} emblem="◆" index={index} compact/>
+                      <span className="v2-quick-cartridge-copy"><strong>{item.title}</strong>
                         <small>{item.genre} · Slopboy 1000</small>
-                        <span>{item.gameId===game.gameId?'● Currently inserted':'↧ Insert cartridge'}</span>
-                      </span>
+                        <span>{item.id===game.gameId?'● Currently inserted':'↧ Insert cartridge'}</span></span>
                     </Link>
                   </div>)}
                 </div>
