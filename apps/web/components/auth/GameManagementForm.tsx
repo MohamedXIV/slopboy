@@ -2,7 +2,7 @@
 import {useEffect,useState,type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {Button,Card,Input,Label,TextField} from '@heroui/react';
-import SourceDraftEditor from './SourceDraftEditor';
+import PrivateSourceForm from './PrivateSourceForm';
 
 type Metadata={title:string;tagline:string;description:string;genre:string};
 const initial:Metadata={title:'',tagline:'',description:'',genre:'Other'};
@@ -48,5 +48,5 @@ export default function GameManagementForm({gameId,platform=false,existing}:{gam
       <Button type="submit" variant="primary" isPending={busy} isDisabled={busy}>{gameId?'Save changes':'Create game'}</Button>
     </form>{gameId&&<section><h2>Revisions</h2>{revisions.length===0?<p>No revisions yet.</p>:
       <ul>{revisions.map(revision=><li key={revision.id}>Revision {revision.number} · {revision.status} · {revision.id}</li>)}</ul>}
-    </section>}{gameId&&<SourceDraftEditor gameId={gameId}/>}</Card.Content></Card>;
+    </section>}{gameId&&<PrivateSourceForm gameId={gameId}/>}</Card.Content></Card>;
 }

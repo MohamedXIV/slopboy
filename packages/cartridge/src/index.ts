@@ -190,3 +190,5 @@ export * from './engine-registry.ts';
 export * from './manifest-v2.ts';
 export * from './package-v2.ts';
 export * from './agent-templates.ts';
+
+export * from './private-source.ts';
