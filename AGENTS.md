@@ -3,7 +3,7 @@
 **Read this before making architectural changes or generating new Slopboy game code.** This is the repository's lightweight onboarding index for Codex, Claude Code, Gemini, GitHub Copilot and future agents. The authoritative requirements are in linked documents and GitHub Issues; this file is *not* permission to implement future features unasked.
 
 ## Essential reading, in order
-1. [ROADMAP.md](ROADMAP.md) — current active Sprint, milestone gates, issue dependencies. Issue #77's integration gate is complete; its PR remains unmerged. Check current claims, PR base and blockers before accepting a task.
+1. [ROADMAP.md](ROADMAP.md) — current active Sprint, milestone gates, issue dependencies. Issue #77's integration gate is complete and its PR is merged. Check current claims, PR base and blockers before accepting a task.
 2. [docs/product/long-term-vision.md](docs/product/long-term-vision.md) — future progression/economy, rich assets, multiplayer, social discovery, governance, device power/UX. **Preserve extension seams, but do not implement deferred Epics.**
 3. [ADR-002](docs/architecture/adr-002-production-cutover.md) — canonical paths, UUIDs, /legacy and guest-save migration.
 4. [ADR-003](docs/architecture/adr-003-agent-native-platform.md) — OAuth-linked ChatGPT/Claude MCP, player/creator dashboard, admin, Neon backend, Vercel frontend.
@@ -11,7 +11,7 @@
 6. [ADR-005](docs/architecture/adr-005-manual-source-ingestion.md) — Paste Code private source-only draft, shared secure ingestion, no unvalidated execution.
 
 ## Product decisions not to accidentally regress
-- Slopboy new UI will become canonical; V1 under /legacy. **Draft PR #14** is not yet a merged production cutover.
+- The new Slopboy UI is canonical and V1 is under `/legacy`.
 - New game URLs use **immutable server-issued UUID game IDs**, never game title/slug. Versioned immutable revision IDs and ownership are distinct from cover/title.
 - AI creates games using approved **game framework templates**, not standalone HTML/CSS/JS websites; manual Paste Code and OAuth MCP share the same source ingestion, build and safety checks.
 - Games are **private by default**. Explicit friend permissions and separately reviewed public release; no untrusted game code executing in privileged Next, Neon, CI or MCP contexts. A private draft is not automatically safe to preview.
@@ -23,7 +23,7 @@
 ## Concurrent AI agents (Sprint 2)
 - **One writer per Issue and branch.** Check [#77](https://github.com/MohamedXIV/slopboy/issues/77) and the target Issue for existing claims before starting; comment `CLAIM: agent / Issue # / branch / file scope / exact base SHA`.
 - Never commit to another agent's branch or force-push integration branches. Avoid shared API/CI/schema files concurrently; split tasks and use PRs with explicit dependencies.
-- Integration branch `integrate/sprint-2-baseline` belongs to the completed #77 gate. PR #91 and its integration work remain separate; passing repository checks does not prove live account authorization.
+- Integration branch `integrate/sprint-2-baseline` belongs to the completed #77 gate. PRs #91 and #97 are merged. Live account authorization has its own acceptance checks.
 - Gemini can independently handle #29 MCP **schemas/tests only** or #33 browser **hostile security fixtures only**, after separate Issue claims. No unapproved real write tools or relaxation of sandbox security.
 - `main` and Vercel Production are **never** targets for unattended agents without explicit owner approval.
 - Separate experimental work (KAPLAY adapter, OAuth mock verification, migration schema) from verified real external services and account access.
