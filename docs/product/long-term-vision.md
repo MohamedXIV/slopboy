@@ -5,6 +5,8 @@
 **Primary implementation roadmap:** [ROADMAP.md](../../ROADMAP.md). **Architectural core:** ADR-002 → ADR-003 → ADR-004 → ADR-005.  
 **GitHub tracking:** [Project #7](https://github.com/users/MohamedXIV/projects/7), deferred Epic issues [#50–#55](https://github.com/MohamedXIV/slopboy/issues/50), and their execution issues [#56–#67](https://github.com/MohamedXIV/slopboy/issues/56).
 
+**Current (not deferred) AI onboarding UX:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) proposes an open `/ai` page that accepts the player's free-form game idea with **Genre optional** and shares versioned, accurate game authoring constraints with ChatGPT/Claude. This is not a new engine, authenticated connector, social/publishing feature or alternative to secure private-draft gates.
+
 ## Why this exists
 
 The first Slopboy release must be modest, but many of its fundamental entities (game IDs, accounts, revisions, device profiles, saves, engine adapters, moderation, catalog, host runtime) will be reused by more advanced systems. We want to **plan extension seams today**, while explicitly **not building speculative systems early**.
@@ -20,6 +22,7 @@ When an AI coding agent implements a current Epic, it should:
 ## Non-negotiable current direction
 
 - **Agent-native platform:** games primarily authored within ChatGPT, Claude and future AI clients; OAuth-linked Remote MCP submits code on behalf of the creator. Manual paste of framework-template code is an equally legitimate first-class fallback (ADR-005).
+- **Cheap, private authoring history:** pasted AI source stays in owner-scoped, append-only Neon draft revisions with immutable UUIDs and digests, not per-player public GitHub repositories; choosing an earlier version creates a new revision instead of replacing history. AI prompts can link back to a clean import route, but must not encode private source in URLs. See [#104](https://github.com/MohamedXIV/slopboy/issues/104) and ADR-006.
 - **Multiple roles, one account:** guests can play, a user can be both player and creator, admin privileges are separately enforced. Private drafts by default, explicit friends sharing, human review before public listing.
 - **Approved frameworks:** pinned KAPLAY first candidate, Phaser 4 future adapter, optional PixiJS evaluation; new submissions are approved game modules/assets, not arbitrary standalone HTML/CSS/JS sites. Browser sandbox and build isolation remain compulsory.
 - **Fantasy hardware is display-only:** logical resolution, aspect ratio, indexed color count, plus actual physical input mapping. No fake CPU, RAM, ROM/cartridge byte limit, save capacity, audio voice limit or fixed hardware FPS. Game performance/service quotas are operational constraints, not simulated chips.
