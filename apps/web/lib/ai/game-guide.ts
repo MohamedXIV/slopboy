@@ -3,6 +3,7 @@ import {ENGINE_REGISTRY} from '../../../../packages/cartridge/src/engine-registr
 
 /** Public documentation contract. No account details, experimental features or secrets. */
 export const GAME_GUIDE_VERSION = 1;
+export const GAME_IMPORT_PATH = '/import';
 export const GAME_GUIDE_PATH = '/ai/game-guide/v1.md';
 export const GAME_GUIDE_JSON_PATH = '/ai/game-guide/v1.json';
 
@@ -31,9 +32,10 @@ export function getGameGuideContract() {
     publishAutomatically: false,
     delivery: {
       sourcePath: 'src/game.ts',
-      dashboardPath: '/manage/new',
+      dashboardPath: GAME_IMPORT_PATH,
+      importPath: GAME_IMPORT_PATH,
       currentMethod: 'copy-source-manually',
-      dashboardPasteCodeStatus: 'under-review-pr-98',
+      draftSaveRequiresVerifiedAccount: true,
       autoFilledImportAvailable: false,
       playablePreviewAvailable: false,
       versionPolicy: 'append-only-private-revisions-with-server-issued-identities',
@@ -89,11 +91,10 @@ ${engineRows}
 ## How to deliver the generated game
 
 - Return the proposed title, two-sentence gameplay explanation, controls, pinned engine choice/status, and the **complete \`src/game.ts\` source** in one clearly labelled \`typescript\` code block. Include a matching draft manifest only if the receiving workflow requires it; never fabricate authenticated server IDs. Give the player clear instructions for what to copy and what to do next.
-- If the AI client supports a **Copy source** action, use it. Otherwise provide a normal copyable code block. You may offer a plainly labelled [Open Slopboy — New Game](/manage/new) navigation link, but **a link alone does not transfer or prefill the source**. Never label it "Import complete", "Save game", or "Play" without a real successful server result.
-- The signed-in **Dashboard → My Games → New Game → Paste Code** pathway is being developed in **Draft PR #98** and is **not yet merged**. Until it is available, give the user their source code so it can be kept locally; do not tell them that Slopboy has saved anything. Once it is genuinely available, the human can paste one template-conformant source file, review it and explicitly choose **Save as private draft**. The server—not the model—assigns owner, game ID and revision ID.
-- Do **not** put source code in URL query strings, URL fragments, analytics payloads or third-party webhooks, and do not invent a prefilled Slopboy import URL, token, API, cross-origin script or authorization flow. A true one-click handoff requires an officially implemented, validated, size-bounded import contract; it is not available in this guide version. Do not ask the user to put secrets or private account identifiers in generated code.
-- If a supported authenticated Slopboy MCP connection exists **and server writes are actually enabled**, use its documented template and authorized draft tools. Check their real responses before claiming a draft exists; otherwise fall back to the manual-copy route.
-- When improving a game, provide the entire updated \`src/game.ts\`, a short change summary and instructions to **save as a new private revision**, not overwrite a previous revision. Existing versions must remain recoverable. Restoring an older revision should create a **new revision derived from it** once version-history UI exists; do not pretend a Git branch, commit or rollback was created in Slopboy.
+- Link to [Open Slopboy Import](${guide.delivery.importPath}) on the same origin as this guide. A link alone does not transfer or prefill the source. Offer a **Copy source** action if the AI client supports it. Ask the player to copy only the complete game module, use **Paste from Clipboard** or paste manually, and select **Check source**. Checking and saving require a verified Slopboy account. Sign in in a separate tab to keep the editor open, then return to the form.
+- After source checks pass, select **Save private draft**. Wait for Slopboy to confirm the game and revision IDs. For this workflow Slopboy builds the manifest from the pinned KAPLAY template. The form accepts one TypeScript or JavaScript source module and needs no separate manifest.
+- Do not put source code in URL query strings, fragments, analytics or browser storage. Do not invent a prefilled Slopboy import URL, token, API or authorization flow.
+- To revise a game, give the entire replacement file and a short change summary. In Slopboy open **Dashboard → My Games → Manage → Version History**, load the version you want and **save as a new private revision**. Earlier versions stay unchanged.
 - Saving a private draft does **not** make it runnable. Isolated builds and safe previews depend on #31, #32, #33 and #4; sharing with friends depends on explicit permissions, and public listing depends on human review.
 - The separate **legacy Creator Kit v0.1** uses \`creations/<slug>/manifest.json\`, \`GameModule\` and \`pnpm creator:*\` commands. Its manifest/API is **not interchangeable** with this V2 framework cartridge format. See \`docs/creator-kit.md\` for that local-only compatibility workflow.
 

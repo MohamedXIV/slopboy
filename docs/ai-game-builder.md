@@ -29,9 +29,9 @@ A generator can suggest `src/game.ts` using the real `get_game_template` contrac
 
 ## AI → player → Slopboy handoff (first slice)
 
-The current flow hands **copyable source code** back to the player, not a claim of a completed upload. The agent must give the complete `src/game.ts` in one code block and may provide a clearly labelled `/manage/new` navigation link. The link **does not prefill or transmit code**. Dashboard Paste Code is under review in **Draft PR #98**; no deployed server save is promised until that dependency is merged and accepted. A separate future handoff implementation can support client-side review/prefill using a documented safe transport, without turning URLs into unbounded private-source containers.
+Copy the complete `src/game.ts` from the AI response, return to `/import`, paste the module, and select **Check source**. If prompted, sign in in a separate tab and return to the editor. **Save private draft** displays the server-confirmed game and revision IDs after a verified save. The import link carries no source. The form uses the pinned KAPLAY template and needs no separate manifest.
 
-When an account-backed upload is available, every save creates an **immutable, server-owned private source revision**. An AI revision response includes the complete replacement file and a change summary; users can keep working from any older version by saving it as a *new* revision. It never silently overwrites old code or claims to create Git commits. Source delivery, safe execution and friend access remain three separate operations.
+The dashboard's My Games links to **Version History**. Load any version and save it as a new immutable revision. Older versions remain available through **Load older versions**. Hosted persistence requires migration 005, development credentials and live acceptance.
 
 ## Privacy, validation and rollback
 

@@ -1,7 +1,6 @@
 'use client';
 
 import {useState, type FormEvent} from 'react';
-import {useRouter} from 'next/navigation';
 import {Alert, Button, Card, Input, Label, ListBox, Select, TextArea, TextField} from '@heroui/react';
 import {PRIVATE_SOURCE_LIMIT, PRIVATE_SOURCE_TEMPLATE} from '@slopboy/cartridge/private-source-template';
 import {isGameUuid} from '@slopboy/catalog';
@@ -22,7 +21,8 @@ const errors: Record<string, string> = {
 };
 
 export default function ImportGameForm() {
-  const router = useRouter();
+  const [saved, setSaved] = useState<{gameId: string; revisionId: string} | null>(null);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [language, setLanguage] = useState<SourceLanguage>('typescript');
@@ -77,18 +77,20 @@ export default function ImportGameForm() {
       const response = await fetch('/api/manage/source', {method: 'POST',
         headers: {'Content-Type': 'application/json'}, body: JSON.stringify(request)});
       const result = await response.json() as {
-        error?: string; diagnostics?: Diagnostic[]; gameId?: string;
+        error?: string; diagnostics?: Diagnostic[]; gameId?: string; revisionId?: string;
       };
       if (response.status === 422) {
         setDiagnostics(Array.isArray(result.diagnostics) ? result.diagnostics : []);
         setNotice('Code validation failed. Fix these problems and try again.');
       } else if (!response.ok) {
+        setNeedsSignIn(response.status === 401);
         setNotice(errors[result.error ?? ''] ?? 'Unable to complete the request right now. Try again.');
       } else if (intent === 'validate') {
+        setNeedsSignIn(false);
         setNotice('Source checks passed. Save explicitly to keep it as a private draft.');
-      } else if (result.gameId && isGameUuid(result.gameId)) {
+      } else if (result.gameId && isGameUuid(result.gameId) && result.revisionId && isGameUuid(result.revisionId)) {
         rotateTabSubmissionSeed();
-        router.push(`/manage/${result.gameId}/history`);
+        setSaved({gameId: result.gameId, revisionId: result.revisionId});
       } else {
         setNotice('Save returned an unexpected result. Check your dashboard before trying again.');
       }
@@ -98,6 +100,16 @@ export default function ImportGameForm() {
       setBusy(false);
     }
   }
+
+  if (saved) return <Card variant="secondary">
+    <Card.Header><Card.Title>Private draft saved</Card.Title></Card.Header>
+    <Card.Content className="space-y-3">
+      <p className="break-all">Game ID <code>{saved.gameId}</code></p>
+      <p className="break-all">Revision ID <code>{saved.revisionId}</code></p>
+      <p><a className="underline" href={`/manage/${saved.gameId}/history`}>Open Version History</a></p>
+      <p><a className="underline" href="/dashboard">Go to My Games</a></p>
+    </Card.Content>
+  </Card>;
 
   return <Card variant="secondary">
     <Card.Header><Card.Title>Save a private source draft</Card.Title>
@@ -147,6 +159,10 @@ export default function ImportGameForm() {
             {item.line ? `Line ${item.line}${item.column ? `:${item.column}` : ''}: ` : ''}{item.message}
           </li>)}</ul>
         </Alert.Content></Alert>}
+        {needsSignIn && <p className="text-sm">
+          <a className="underline" href="/auth/sign-in" target="_blank" rel="noopener noreferrer">Sign in in a new tab</a>
+          {' '}then return here to keep working with your pasted source.
+        </p>}
         {notice && <p role="status" className="text-sm">{notice}</p>}
         <div className="flex flex-wrap gap-3">
           <Button type="submit" value="validate" variant="secondary" isDisabled={busy || oversized || !source.trim()}>

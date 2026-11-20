@@ -9,7 +9,7 @@ import {
   type ChatProvider,
   type GamePromptOptions,
 } from '../../lib/ai/game-prompt.ts';
-import {getGameGuideMarkdown} from '../../lib/ai/game-guide.ts';
+import {GAME_IMPORT_PATH,getGameGuideMarkdown} from '../../lib/ai/game-guide.ts';
 
 const GENRES = [
   ['','No preference — surprise me'],
@@ -90,6 +90,7 @@ export default function AIGameBuilder() {
         <Button variant="secondary" type="button" onPress={()=>openIn('claude')} isDisabled={!ready}>Open in Claude</Button>
       </div>
       <div className="sb-ai-builder-foot">
+        <a href={GAME_IMPORT_PATH}>Import generated source</a>
         <a href="/ai/game-guide/v1.md" target="_blank" rel="noopener noreferrer">View as Markdown ↗</a>
         <a href="/ai/game-guide/v1.json" target="_blank" rel="noopener noreferrer">Machine-readable JSON ↗</a>
       </div>

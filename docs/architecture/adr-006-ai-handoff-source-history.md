@@ -11,7 +11,7 @@ Start with a cheap, explicit clipboard handoff from ChatGPT, Claude and other AI
 
 Use the authenticated `POST /api/manage/source` and `POST /api/manage/games/:id/source` contracts from #98. Save one pinned KAPLAY `.ts`/`.js` module after server validation to immutable, private `game_source_drafts` rows in Neon. The owner chooses when to validate and save. No code runs as part of upload, source listing, or restore.
 
-Expose a separate private read-only source-history API with verified session, matching game ownership/platform-admin permission, draft-only/private-only filters, strict game/revision UUIDs, and `private, no-store` responses. List the newest 50 metadata records without source text. Fetch a selected revision's source only on owner action and render in a text editor. **Restore means POST a new immutable revision**, preserving the old content and digest. Unvalidated pre-migration source must pass current checks before being re-saved.
+Expose a separate private read-only source-history API with verified session, matching game ownership/platform-admin permission, draft-only/private-only filters, strict game/revision UUIDs, and `private, no-store` responses. List 50 metadata records per page without source text. Older pages use the last revision UUID as an exclusive cursor, scoped to the same game and ordered by timestamp and UUID. Fetch a selected revision's source only on owner action and render in a text editor. **Restore means POST a new immutable revision**, preserving the old content and digest. Unvalidated pre-migration source must pass current checks before being re-saved.
 
 ## Alternatives rejected for this phase
 
@@ -23,6 +23,6 @@ Expose a separate private read-only source-history API with verified session, ma
 
 - Each stored version consumes bounded per-owner source storage. Existing #98 quotas and idempotency stay authoritative; `source-history` is not a duplicate write path.
 - Untrusted source never executes in Next, Neon, MCP or a privileged CI worker. **Preview, share, publish and builds remain disabled** pending #32/#33/#4/#45.
-- #98 owns Neon migration 005, permissions and actual dev account acceptance. History routes fail closed if schema/session is unavailable. No migration or Production changes in #104.
-- Version history pagination beyond 50, large multi-file assets, diff UI, branching/merging, friend grants and publishing are deferred, not represented as implemented capabilities.
-- #102's AI game guide should point its final handoff to `/import` only after the independent PRs are integrated.
+- The integration is responsible for migration 005, grants and dev account acceptance. History routes fail closed if the schema or session is unavailable.
+- Large multi-file assets, diff UI, branching/merging, friend grants and publishing are deferred, not represented as implemented capabilities.
+- The integrated #102 guide links to `/import` on the same origin. The import form keeps pasted text in memory and opens sign-in in a separate tab.

@@ -3,7 +3,7 @@ import {neon} from '@neondatabase/serverless';
 import {isGameUuid} from '@slopboy/catalog';
 import {currentSubject} from '../../../../../../lib/auth/server';
 import {PLATFORM_OWNER_ID} from '../../../../../../server/game-ownership';
-import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL, sourceHistoryItems,
+import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL, sourceHistoryPage,
   type SourceHistoryRow} from '../../../../../../server/source-history-queries';
 
 export const dynamic = 'force-dynamic';
@@ -19,7 +19,9 @@ export async function GET(request: NextRequest, {params}: {params: Promise<{game
   const {gameId} = await params;
   if (!isGameUuid(gameId)) return failure('NOT_FOUND', 404);
   const revisionId = request.nextUrl.searchParams.get('revision');
-  if (revisionId !== null && !isGameUuid(revisionId)) return failure('NOT_FOUND', 404);
+  const before = request.nextUrl.searchParams.get('before');
+  if ((revisionId !== null && !isGameUuid(revisionId)) ||
+      (before !== null && (!isGameUuid(before) || revisionId !== null))) return failure('NOT_FOUND', 404);
   if (!process.env.DATABASE_URL) return failure('DATABASE_UNAVAILABLE', 503);
 
   try {
@@ -35,9 +37,9 @@ export async function GET(request: NextRequest, {params}: {params: Promise<{game
         validated: row.engine_manifest !== null,
       }}, {headers});
     }
-    const rows = await sql.query(LIST_SOURCE_HISTORY_SQL, [actor.id, gameId, PLATFORM_OWNER_ID]);
+    const rows = await sql.query(LIST_SOURCE_HISTORY_SQL, [actor.id, gameId, PLATFORM_OWNER_ID, before]);
     if (!rows.length) return failure('NOT_FOUND', 404);
-    return NextResponse.json({revisions: sourceHistoryItems(rows as SourceHistoryRow[])}, {headers});
+    return NextResponse.json(sourceHistoryPage(rows as SourceHistoryRow[]), {headers});
   } catch {
     // Never leak private SQL/source/database provider errors to the browser or logs.
     return failure('DATABASE_UNAVAILABLE', 503);

@@ -6,6 +6,7 @@ import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/
 import {CREATE_GAME_SQL,UPDATE_GAME_SQL} from '../apps/web/server/game-management-queries.ts';
 import {READ_PLAYABLE_GAME_SQL} from '../apps/web/server/playable-catalog-query.ts';
 import {READ_SOURCE_DRAFT_SQL,CREATE_SOURCE_DRAFT_SQL} from '../apps/web/server/source-draft-queries.ts';
+import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL} from '../apps/web/server/source-history-queries.ts';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, readdir, writeFile, access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -776,7 +777,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     await executePsql(config,{sql:`
       GRANT INSERT(id,owner_id,title,tagline,description,genre),UPDATE(title)
         ON public.games TO slopboy_test_web;
-      GRANT SELECT(id,game_id,created_by,created_at,source_text,request_key,request_digest,source_digest),
+      GRANT SELECT(id,game_id,created_by,created_at,language,source_text,engine_manifest,request_key,request_digest,source_digest),
         INSERT(id,game_id,created_by,language,source_text,engine_manifest,source_digest,request_key,request_digest)
         ON public.game_source_drafts TO slopboy_test_web;
       GRANT INSERT(actor_id,action,target_type,target_id) ON public.audit_events TO slopboy_test_web;
@@ -803,8 +804,38 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.match((await executePsql(config,{sql:validated(alice,"'"+gameUuid+"'",'d',editKey,editRevision)
       .replace('export default {}','export default { /* edit */ }')})).stdout,/^stored/);
     assert.match((await executePsql(config,{sql:readSource(alice,gameUuid)})).stdout,/\/\* edit \*\//);
+    const restoreKey = '96969696-9696-4696-8696-969696969696';
+    const restoreRevision = '97979797-9797-4797-8797-979797979798';
+    const restore = validated(alice, "'" + gameUuid + "'", 'e', restoreKey, restoreRevision);
+    assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /stored/);
+    assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /replayed/);
+
+    const history = (actor: string, before: string | null = null) => executePsql(config, {sql:
+      `SET ROLE slopboy_test_web;
+      PREPARE source_history(uuid,uuid,uuid,uuid) AS ${LIST_SOURCE_HISTORY_SQL};
+      EXECUTE source_history('${actor}','${gameUuid}','${curator}',${before ? "'" + before + "'" : 'NULL'});`});
+    const historicalSource = (actor: string, id: string) => executePsql(config, {sql:
+      `SET ROLE slopboy_test_web;
+      PREPARE source_version(uuid,uuid,uuid,uuid) AS ${READ_SOURCE_REVISION_SQL};
+      EXECUTE source_version('${actor}','${gameUuid}','${curator}','${id}');`});
+    const sourceVersionRows = (stdout: string) => pgQueryRows(stdout).filter(row => row !== 'SET');
+    const firstHistory = sourceVersionRows((await history(alice)).stdout);
+    assert.deepEqual(firstHistory.map(row => row.split('|')[0]), [restoreRevision, editRevision, revisionUuid]);
+    for (const id of [revisionUuid, restoreRevision]) {
+      assert.match((await historicalSource(alice, id)).stdout, /export default \{\}/);
+    }
+    assert.deepEqual(sourceVersionRows((await history(bob)).stdout), []);
+    assert.deepEqual(sourceVersionRows((await historicalSource(bob, revisionUuid)).stdout), []);
+    assert.deepEqual(sourceVersionRows((await history(alice, sourceId)).stdout), [], 'A cursor from another game is rejected');
+
     await executePsql(config,{sql:`INSERT INTO game_source_drafts(id,game_id,created_by,language,source_text)
-      SELECT gen_random_uuid(), '${gameUuid}', '${alice}', 'typescript', 'old draft' FROM generate_series(1,20)`});
+      SELECT gen_random_uuid(), '${gameUuid}', '${alice}', 'typescript', 'old draft' FROM generate_series(1,55)`});
+    const page = sourceVersionRows((await history(alice)).stdout).map(row => row.split('|')[0]);
+    assert.equal(page.length, 51);
+    const older = sourceVersionRows((await history(alice, page[49])).stdout).map(row => row.split('|')[0]);
+    assert.equal(older.length, 8);
+    assert.equal(older[0], page[50]);
+    assert.equal(new Set([...page.slice(0,50), ...older]).size, 58);
     assert.match((await executePsql(config,{sql:validated(alice,"'"+gameUuid+"'",'a','94949494-9494-4494-8494-949494949494','95959595-9595-4595-8595-959595959595')})).stdout,/^quota/);
     assert.match((await executePsql(config,{sql:validated()})).stdout,/^replayed/,'Retry does not spend quota');
     assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[5]);

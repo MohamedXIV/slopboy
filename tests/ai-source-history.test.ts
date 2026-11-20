@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL,
-  sourceHistoryItems} from '../apps/web/server/source-history-queries.ts';
+  sourceHistoryItems, sourceHistoryPage} from '../apps/web/server/source-history-queries.ts';
 
 test('history list returns only revision metadata; source text is never in the list query or response', () => {
   assert.doesNotMatch(LIST_SOURCE_HISTORY_SQL, /source_text/i);
-  assert.match(LIST_SOURCE_HISTORY_SQL, /ORDER BY d\.created_at DESC,d\.id DESC LIMIT 50/i);
+  assert.match(LIST_SOURCE_HISTORY_SQL, /ORDER BY d\.created_at DESC,d\.id DESC LIMIT 51/i);
   assert.match(LIST_SOURCE_HISTORY_SQL, /ORDER BY d\.created_at DESC NULLS LAST,d\.id DESC NULLS LAST\s*$/i,
     'the result must also be ordered after the lateral join so the first item is the latest');
   assert.deepEqual(sourceHistoryItems([
@@ -29,4 +29,16 @@ test('history query applies owner/admin, exact UUID, private-draft visibility an
   }
   assert.match(READ_SOURCE_REVISION_SQL, /d\.id=\$4::uuid/);
   assert.match(READ_SOURCE_REVISION_SQL, /d\.game_id=g\.id/);
+});
+
+
+test('history returns a cursor only when an older row exists', () => {
+  const rows = Array.from({length: 51}, (_, index) => ({
+    id: String(index), language: 'typescript', source_digest: null, created_at: '2026-11-20',
+    engine_manifest: null,
+  }));
+  const page = sourceHistoryPage(rows);
+  assert.equal(page.revisions.length, 50);
+  assert.equal(page.nextBefore, '49');
+  assert.equal(sourceHistoryPage(rows.slice(50)).nextBefore, null);
 });

@@ -22,6 +22,7 @@ const errorMessage: Record<string, string> = {
 
 export default function SourceHistory({gameId}: {gameId: string}) {
   const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
+  const [nextBefore, setNextBefore] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<RevisionSource | null>(null);
@@ -33,16 +34,19 @@ export default function SourceHistory({gameId}: {gameId: string}) {
   const oversized = sourceBytes > PRIVATE_SOURCE_LIMIT;
   const endpoint = `/api/manage/games/${encodeURIComponent(gameId)}/source-history`;
 
-  const refresh = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+  const refresh = useCallback(async (signal?: AbortSignal, before?: string): Promise<boolean> => {
     try {
-      const response = await fetch(endpoint, {cache: 'no-store', signal});
-      const data = await response.json() as {error?: string; revisions?: RevisionSummary[]};
+      const pageUrl = before ? `${endpoint}?before=${encodeURIComponent(before)}` : endpoint;
+      const response = await fetch(pageUrl, {cache: 'no-store', signal});
+      const data = await response.json() as {error?: string; revisions?: RevisionSummary[]; nextBefore?: string | null};
       if (signal?.aborted) return false;
       if (!response.ok || !Array.isArray(data.revisions)) {
         setNotice(errorMessage[data.error ?? ''] ?? 'Could not load your private versions.');
         return false;
       }
-      setRevisions(data.revisions);
+      const page = data.revisions;
+      setRevisions(current => before ? [...current, ...page] : page);
+      setNextBefore(data.nextBefore ?? null);
       return true;
     } catch {
       if (!signal?.aborted) setNotice('History could not be loaded. Try again later.');
@@ -58,6 +62,17 @@ export default function SourceHistory({gameId}: {gameId: string}) {
     const timer = window.setTimeout(() => {void refresh(controller.signal);}, 0);
     return () => {window.clearTimeout(timer); controller.abort();};
   }, [refresh]);
+
+  async function loadOlderVersions() {
+    if (!nextBefore || busy) return;
+    setNotice('');
+    setBusy(true);
+    try {
+      await refresh(undefined, nextBefore);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function loadRevision(revisionId: string) {
     if (busy) return;
@@ -129,7 +144,7 @@ export default function SourceHistory({gameId}: {gameId: string}) {
       <Alert.Title>Source only · Preview disabled</Alert.Title>
       Your revisions are private source text. None of them can be built, run, shared or published here yet.
     </Alert.Content></Alert>
-    <Card variant="secondary"><Card.Header><Card.Title>Latest 50 stored versions</Card.Title>
+    <Card variant="secondary"><Card.Header><Card.Title>Stored versions</Card.Title>
       <Card.Description>Newest first · each save keeps the earlier version unchanged</Card.Description>
     </Card.Header><Card.Content>
       {loading ? <p role="status">Loading private versions…</p> : revisions.length === 0
@@ -148,6 +163,8 @@ export default function SourceHistory({gameId}: {gameId: string}) {
                 onPress={() => void loadRevision(revision.id)}>Load into editor</Button>
             </div>
           </li>)}</ol>}
+      {nextBefore && <Button className="mt-3" type="button" variant="secondary" isDisabled={busy}
+        onPress={() => void loadOlderVersions()}>Load older versions</Button>}
     </Card.Content></Card>
     {selected && <Card variant="secondary"><Card.Header>
       <Card.Title>Save as a new version</Card.Title>

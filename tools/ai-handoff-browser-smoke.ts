@@ -62,6 +62,70 @@ async function main() {
     })`);
     assert.deepEqual(JSON.parse(String(initial)), {value: '', disabled: false, preview: true, save: true},
       'source must not be auto-read, preview must stay disabled and manual paste must be available');
+    await browser.setViewport(390, 844);
+    const mobile = await browser.evaluate(`JSON.stringify({
+      width: window.innerWidth, overflow: document.documentElement.scrollWidth > window.innerWidth
+    })`);
+    assert.deepEqual(JSON.parse(String(mobile)), {width: 390, overflow: false});
+
+    await browser.evaluate(`(() => {
+      Object.defineProperty(navigator.clipboard, 'readText', {
+        configurable: true, value: () => Promise.reject(new DOMException('Denied', 'NotAllowedError'))
+      });
+      Array.from(document.querySelectorAll('button')).find(button =>
+        button.textContent?.includes('Paste from Clipboard')).click();
+    })()`);
+    for (let attempt = 0; attempt < 30; attempt++) {
+      if (await browser.evaluate(`document.body.textContent.includes('Clipboard permission was denied')`)) break;
+      await sleep(100);
+    }
+    assert.equal(await browser.evaluate(`document.body.textContent.includes('Clipboard permission was denied')`), true);
+
+    const sourceField = 'textarea[placeholder*="import kaplay"]';
+    await browser.evaluate(`(() => {
+      const source = document.querySelector(${JSON.stringify(sourceField)});
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(source, '<div>Inert QA source</div>');
+      source.dispatchEvent(new Event('input', {bubbles: true}));
+    })()`);
+    assert.equal(await browser.evaluate(`document.querySelector(${JSON.stringify(sourceField)}).value`), '<div>Inert QA source</div>');
+    assert.equal(await browser.evaluate(`Array.from(document.querySelectorAll('div')).some(e => e.textContent === 'Inert QA source')`), false);
+
+    await browser.setViewport(1280, 900);
+    await browser.evaluate(`location.href = '/ai'`);
+    for (let attempt = 0; attempt < 60; attempt++) {
+      if (await browser.evaluate(`Boolean(document.querySelector('a[href="/import"]'))`)) break;
+      await sleep(100);
+    }
+    assert.equal(await browser.evaluate('window.innerWidth'), 1280);
+    assert.equal(await browser.evaluate(`document.querySelector('#sb-ai-genre').value`), '');
+    await browser.evaluate(`(() => {
+      window.slopboyOutbound = [];
+      window.open = url => {window.slopboyOutbound.push(url); return null;};
+    })()`);
+    let providerButtonsReady = false;
+    for (let attempt = 0; attempt < 50; attempt++) {
+      providerButtonsReady = Boolean(await browser.evaluate(`(() => {
+        const idea = document.querySelector('#sb-ai-builder textarea') ?? document.querySelector('textarea');
+        const value = 'A tiny arcade puzzle ' + ${attempt};
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(idea, value);
+        idea.dispatchEvent(new Event('input', {bubbles: true}));
+        return Array.from(document.querySelectorAll('button')).some(button =>
+          button.textContent?.includes('Open in ChatGPT') && !button.disabled);
+      })()`));
+      if (providerButtonsReady) break;
+      await sleep(100);
+    }
+    assert.ok(providerButtonsReady, 'An idea without Genre enables the provider actions');
+    await browser.evaluate(`(() => {
+      for (const provider of ['ChatGPT', 'Claude']) {
+        Array.from(document.querySelectorAll('button')).find(button =>
+          button.textContent?.includes('Open in ' + provider)).click();
+      }
+    })()`);
+    const urls = await browser.evaluate('window.slopboyOutbound') as string[];
+    assert.equal(urls.length, 2);
+    assert.deepEqual(urls.map(url => new URL(url).hostname), ['chatgpt.com', 'claude.ai']);
+    for (const url of urls) assert.ok(new URL(url).searchParams.get('q')?.includes(server.url + '/import'));
     console.log('AI clipboard handoff browser + guest authorization smoke passed.');
   } finally {
     browser?.close();
