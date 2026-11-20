@@ -6,6 +6,8 @@
 **Long-term product register:** [Long-Term Vision](docs/product/long-term-vision.md) · [Agents' entrypoint](AGENTS.md)
 **Architecture:** [ADR-002](docs/architecture/adr-002-production-cutover.md) (UUIDs/Legacy) · [ADR-003](docs/architecture/adr-003-agent-native-platform.md) (ChatGPT/Claude MCP, SaaS roles, hosting) · [ADR-004](docs/architecture/adr-004-approved-game-frameworks.md) (approved frameworks/cartridge runtime)
 
+**AI game-idea entry point:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) adds a public `/ai` prompt/guide experience with versioned Markdown/JSON and **optional Genre**. This discoverability track complements #46/#49; it does not bypass OAuth, account-owned drafts, adapter approval, sandboxing or public-review gates. Pending separate Draft PR review; no production cutover.
+
 ## Locked product direction
 
 - **Framework-based AI games:** new cartridges contain game source written against an **approved, version-pinned engine template** (first KAPLAY candidate, Phaser 4 planned, PixiJS 8 later evaluation); not arbitrary self-contained HTML/CSS/JS websites. An engine-neutral host contract handles input, saves, lifecycle and display. Frameworks do not make uploaded JavaScript trusted. See [ADR-004](docs/architecture/adr-004-approved-game-frameworks.md) and [Epic #43](https://github.com/MohamedXIV/slopboy/issues/43).
