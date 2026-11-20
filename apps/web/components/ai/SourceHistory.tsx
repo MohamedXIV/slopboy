@@ -1,10 +1,10 @@
 'use client';
 
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {Alert, Button, Card, Label, ListBox, Select, TextArea, TextField} from '@heroui/react';
 import {PRIVATE_SOURCE_LIMIT} from '@slopboy/cartridge/private-source-template';
-import {existingGameSourceRequest, reuseSubmission,
-  type PendingSubmission, type SourceLanguage} from '../../lib/ai/source-import';
+import {existingGameSourceRequest, getTabSubmissionSeed, rotateTabSubmissionSeed,
+  scopedSubmissionId, sourceByteLength, type SourceLanguage} from '../../lib/ai/source-import';
 
 type RevisionSummary = {id: string; language: string; checksum: string | null;
   createdAt: string; validated: boolean};
@@ -29,7 +29,8 @@ export default function SourceHistory({gameId}: {gameId: string}) {
   const [language, setLanguage] = useState<SourceLanguage>('typescript');
   const [notice, setNotice] = useState('');
   const [diagnostics, setDiagnostics] = useState<{message: string; line?: number; column?: number}[]>([]);
-  const pendingSave = useRef<PendingSubmission | null>(null);
+  const sourceBytes = sourceByteLength(source);
+  const oversized = sourceBytes > PRIVATE_SOURCE_LIMIT;
   const endpoint = `/api/manage/games/${encodeURIComponent(gameId)}/source-history`;
 
   const refresh = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
@@ -77,7 +78,6 @@ export default function SourceHistory({gameId}: {gameId: string}) {
       setSelected(data.revision);
       setSource(data.revision.source);
       setLanguage(data.revision.language as SourceLanguage);
-      pendingSave.current = null;
       setNotice(data.revision.validated
         ? 'Version loaded as editable text. Saving creates a new revision, not an overwrite.'
         : 'Legacy unvalidated source loaded. It must pass current checks before another save.');
@@ -89,14 +89,14 @@ export default function SourceHistory({gameId}: {gameId: string}) {
   }
 
   async function saveAsNewVersion() {
-    if (busy || !selected || !source.trim()) return;
-    const unchangedPayload = JSON.stringify(existingGameSourceRequest(language, source, 'save'));
-    pendingSave.current = reuseSubmission(pendingSave.current, unchangedPayload, () => crypto.randomUUID());
-    const request = existingGameSourceRequest(language, source, 'save', pendingSave.current.id);
+    if (busy || oversized || !selected || !source.trim()) return;
     setBusy(true);
     setNotice('');
     setDiagnostics([]);
     try {
+      const unchangedPayload = JSON.stringify(existingGameSourceRequest(language, source, 'save'));
+      const submission = await scopedSubmissionId(getTabSubmissionSeed(), `game:${gameId}`, unchangedPayload);
+      const request = existingGameSourceRequest(language, source, 'save', submission);
       const response = await fetch(`/api/manage/games/${encodeURIComponent(gameId)}/source`, {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(request),
       });
@@ -108,10 +108,12 @@ export default function SourceHistory({gameId}: {gameId: string}) {
         setNotice(errorMessage[data.error ?? ''] ?? 'Unable to save a new version. Try again.');
       } else if (data.revisionId) {
         const id = data.revisionId;
+        rotateTabSubmissionSeed();
         const refreshed = await refresh();
         setNotice(refreshed ? `Saved a new private source revision: ${id}`
           : `Save confirmed (${id}), but the history list could not be refreshed.`);
-        if (refreshed) {setSelected(null); setSource(''); pendingSave.current = null;}
+        setSelected(null);
+        setSource('');
       } else {
         setNotice('The save response was incomplete. Check history before retrying.');
       }
@@ -153,7 +155,7 @@ export default function SourceHistory({gameId}: {gameId: string}) {
     </Card.Header><Card.Content><div className="space-y-4">
       <Select fullWidth isDisabled={busy} value={language} onChange={value => {
         if (value === 'typescript' || value === 'javascript') {
-          setLanguage(value); pendingSave.current = null; setDiagnostics([]);
+          setLanguage(value); setDiagnostics([]);
         }
       }}><Label>Language</Label><Select.Trigger><Select.Value/><Select.Indicator/></Select.Trigger>
         <Select.Popover><ListBox>
@@ -162,10 +164,15 @@ export default function SourceHistory({gameId}: {gameId: string}) {
         </ListBox></Select.Popover>
       </Select>
       <TextField isRequired isDisabled={busy}><Label>Editable source text</Label>
-        <TextArea className="font-mono" rows={15} maxLength={PRIVATE_SOURCE_LIMIT} value={source}
-          onChange={event => {setSource(event.target.value); pendingSave.current = null;
+        <TextArea className="font-mono" rows={15} spellCheck={false} autoCapitalize="none" autoCorrect="off"
+          value={source} onChange={event => {setSource(event.target.value);
             setDiagnostics([]); setNotice('');}}/>
       </TextField>
+      {oversized && <Alert status="danger"><Alert.Indicator/><Alert.Content>
+        <Alert.Title>Source is too large to save</Alert.Title>
+        {sourceBytes.toLocaleString()} UTF-8 bytes; the limit is {PRIVATE_SOURCE_LIMIT.toLocaleString()}.
+        The text has not been cut off. Shorten it to save a new version.
+      </Alert.Content></Alert>}
       {diagnostics.length > 0 && <Alert status="danger"><Alert.Indicator/><Alert.Content>
         <Alert.Title>Source checks found issues</Alert.Title>
         <ul>{diagnostics.map((item, index) => <li key={index}>
@@ -173,10 +180,10 @@ export default function SourceHistory({gameId}: {gameId: string}) {
         </li>)}</ul>
       </Alert.Content></Alert>}
       <div className="flex flex-wrap gap-3">
-        <Button type="button" variant="primary" isDisabled={busy || !source.trim()}
+        <Button type="button" variant="primary" isDisabled={busy || oversized || !source.trim()}
           onPress={() => void saveAsNewVersion()}>Save as a new version</Button>
         <Button type="button" variant="secondary" isDisabled={busy}
-          onPress={() => {setSelected(null); setSource(''); setNotice(''); pendingSave.current = null;}}>
+          onPress={() => {setSelected(null); setSource(''); setNotice('');}}>
           Cancel
         </Button>
       </div>

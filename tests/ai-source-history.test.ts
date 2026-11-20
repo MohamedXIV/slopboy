@@ -6,6 +6,8 @@ import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL,
 test('history list returns only revision metadata; source text is never in the list query or response', () => {
   assert.doesNotMatch(LIST_SOURCE_HISTORY_SQL, /source_text/i);
   assert.match(LIST_SOURCE_HISTORY_SQL, /ORDER BY d\.created_at DESC,d\.id DESC LIMIT 50/i);
+  assert.match(LIST_SOURCE_HISTORY_SQL, /ORDER BY d\.created_at DESC NULLS LAST,d\.id DESC NULLS LAST\s*$/i,
+    'the result must also be ordered after the lateral join so the first item is the latest');
   assert.deepEqual(sourceHistoryItems([
     {id: 'rev-2', language: 'typescript', source_digest: 'abc', created_at: '2026-11-20', engine_manifest: {}},
     {id: 'rev-1', language: 'javascript', source_digest: null, created_at: '2026-11-19', engine_manifest: null},

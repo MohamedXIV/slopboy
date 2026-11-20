@@ -12,7 +12,8 @@ LEFT JOIN LATERAL (
   FROM public.game_source_drafts d WHERE d.game_id=g.id
   ORDER BY d.created_at DESC,d.id DESC LIMIT 50
 ) d ON TRUE
-${OWNER_DRAFT_BOUNDARY}`;
+${OWNER_DRAFT_BOUNDARY}
+ORDER BY d.created_at DESC NULLS LAST,d.id DESC NULLS LAST`;
 
 export const READ_SOURCE_REVISION_SQL = `SELECT d.id::text AS id,d.language,d.source_text,
   d.source_digest,d.created_at::text AS created_at,d.engine_manifest

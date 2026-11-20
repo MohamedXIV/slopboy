@@ -15,9 +15,16 @@ async function main() {
   try {
     const importResponse = await fetch(server.url + '/import');
     assert.equal(importResponse.status, 200);
-    assert.match(await importResponse.text(), /Bring your game to Slopboy/);
+    const importHtml = await importResponse.text();
+    assert.match(importHtml, /Bring your game to Slopboy/);
+    assert.match(importHtml, /spellcheck="false"/i, 'private code must not use enhanced spell checking');
+    assert.doesNotMatch(importHtml, /maxlength="65536"/i,
+      'the browser must not silently truncate source before showing size diagnostics');
 
     const gameId = 'b9e52a74-17b0-4214-aa77-36210f237a91';
+    const management = await fetch(server.url + `/manage/${gameId}`);
+    assert.equal(management.status, 200);
+    assert.match(await management.text(), /Private source version history/);
     const history = await fetch(server.url + `/api/manage/games/${gameId}/source-history`);
     assert.equal(history.status, 401, 'history must not reveal source to a guest');
     assert.match(history.headers.get('cache-control') ?? '', /no-store/);
