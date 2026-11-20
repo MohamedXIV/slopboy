@@ -5,6 +5,8 @@
 **Primary implementation roadmap:** [ROADMAP.md](../../ROADMAP.md). **Architectural core:** ADR-002 → ADR-003 → ADR-004 → ADR-005.  
 **GitHub tracking:** [Project #7](https://github.com/users/MohamedXIV/projects/7), deferred Epic issues [#50–#55](https://github.com/MohamedXIV/slopboy/issues/50), and their execution issues [#56–#67](https://github.com/MohamedXIV/slopboy/issues/56).
 
+**Current (not deferred) AI onboarding UX:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) proposes an open `/ai` page that accepts the player's free-form game idea with **Genre optional** and shares versioned, accurate game authoring constraints with ChatGPT/Claude. This is not a new engine, authenticated connector, social/publishing feature or alternative to secure private-draft gates.
+
 ## Why this exists
 
 The first Slopboy release must be modest, but many of its fundamental entities (game IDs, accounts, revisions, device profiles, saves, engine adapters, moderation, catalog, host runtime) will be reused by more advanced systems. We want to **plan extension seams today**, while explicitly **not building speculative systems early**.
