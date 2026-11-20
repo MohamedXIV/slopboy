@@ -20,6 +20,8 @@ test('an ordinary game idea is sufficient: Genre and difficulty stay optional', 
   assert.doesNotMatch(prompt, /Optional style\/Genre preference:/);
   assert.doesNotMatch(prompt, /Optional challenge preference:/);
   assert.ok(prompt.includes(GUIDE_URL));
+  assert.match(prompt, /complete src\/game\.ts in a copyable code block/);
+  assert.match(prompt, /Do not claim a link has auto-imported/);
   assert.throws(() => buildLaunchPrompt({idea:'  '}, GUIDE_URL), /describe your game idea/);
 });
 
@@ -55,6 +57,10 @@ test('versioned Markdown and JSON mirror the canonical V2 device and engine regi
   assert.equal(contract.schemaVersion, 1);
   assert.equal(contract.genreRequired, false);
   assert.equal(contract.publishAutomatically, false);
+  assert.equal(contract.delivery.currentMethod, 'copy-source-manually');
+  assert.equal(contract.delivery.autoFilledImportAvailable, false);
+  assert.equal(contract.delivery.playablePreviewAvailable, false);
+  assert.equal(contract.delivery.versionPolicy, 'append-only-private-revisions-with-server-issued-identities');
   assert.deepEqual(contract.device.display, V2_DEVICE_1000.display);
   assert.deepEqual(contract.device.inputs, V2_DEVICE_1000.inputs);
   assert.equal(contract.device.revision, V2_DEVICE_1000.revision);
@@ -74,6 +80,11 @@ test('versioned Markdown and JSON mirror the canonical V2 device and engine regi
   assert.match(markdown, /160 × 144/);
   assert.match(markdown, /`kaplay`.*experimental/);
   assert.match(markdown, /legacy Creator Kit v0\.1/i);
+  assert.match(markdown, /Copy source/);
+  assert.match(markdown, /Draft PR #98/);
+  assert.match(markdown, /a link alone does not transfer or prefill the source/);
+  assert.match(markdown, /save as a new private revision/);
+  assert.match(markdown, /do not invent a prefilled Slopboy import URL/i);
   assert.doesNotMatch(markdown, /64 KiB|8 KiB|512 KiB|4 audio voices/i);
   const json = await getJson();
   assert.match(json.headers.get('content-type') || '', /application\/json/);

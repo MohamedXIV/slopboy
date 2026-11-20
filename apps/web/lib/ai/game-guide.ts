@@ -29,6 +29,15 @@ export function getGameGuideContract() {
     manifestSchemaVersion: 1,
     genreRequired: false,
     publishAutomatically: false,
+    delivery: {
+      sourcePath: 'src/game.ts',
+      dashboardPath: '/manage/new',
+      currentMethod: 'copy-source-manually',
+      dashboardPasteCodeStatus: 'under-review-pr-98',
+      autoFilledImportAvailable: false,
+      playablePreviewAvailable: false,
+      versionPolicy: 'append-only-private-revisions-with-server-issued-identities',
+    },
     instructionsSource: 'packages/cartridge/src/agent-templates.ts',
     validationSource: 'packages/cartridge/src/manifest-v2.ts',
     authoringWorkflow: 'source generation → private source draft → isolated build/sandbox gates → owner preview → explicit sharing/review',
@@ -79,8 +88,12 @@ ${engineRows}
 
 ## How to deliver the generated game
 
-- Return the proposed title, two-sentence gameplay explanation, controls, pinned engine choice and status, and complete \`src/game.ts\` source. Include a matching draft manifest only if the receiving workflow requires it; never fabricate authenticated server IDs.
-- If a supported authenticated Slopboy MCP connection exists, discover the template and let the actual server assign identity/owner. Otherwise the user may copy one template-conformant source file to the signed-in **Dashboard → My Games → New Game → Paste Code** path as a **private source-only draft**, where available.
+- Return the proposed title, two-sentence gameplay explanation, controls, pinned engine choice/status, and the **complete \`src/game.ts\` source** in one clearly labelled \`typescript\` code block. Include a matching draft manifest only if the receiving workflow requires it; never fabricate authenticated server IDs. Give the player clear instructions for what to copy and what to do next.
+- If the AI client supports a **Copy source** action, use it. Otherwise provide a normal copyable code block. You may offer a plainly labelled [Open Slopboy — New Game](/manage/new) navigation link, but **a link alone does not transfer or prefill the source**. Never label it "Import complete", "Save game", or "Play" without a real successful server result.
+- The signed-in **Dashboard → My Games → New Game → Paste Code** pathway is being developed in **Draft PR #98** and is **not yet merged**. Until it is available, give the user their source code so it can be kept locally; do not tell them that Slopboy has saved anything. Once it is genuinely available, the human can paste one template-conformant source file, review it and explicitly choose **Save as private draft**. The server—not the model—assigns owner, game ID and revision ID.
+- Do **not** put source code in URL query strings, URL fragments, analytics payloads or third-party webhooks, and do not invent a prefilled Slopboy import URL, token, API, cross-origin script or authorization flow. A true one-click handoff requires an officially implemented, validated, size-bounded import contract; it is not available in this guide version. Do not ask the user to put secrets or private account identifiers in generated code.
+- If a supported authenticated Slopboy MCP connection exists **and server writes are actually enabled**, use its documented template and authorized draft tools. Check their real responses before claiming a draft exists; otherwise fall back to the manual-copy route.
+- When improving a game, provide the entire updated \`src/game.ts\`, a short change summary and instructions to **save as a new private revision**, not overwrite a previous revision. Existing versions must remain recoverable. Restoring an older revision should create a **new revision derived from it** once version-history UI exists; do not pretend a Git branch, commit or rollback was created in Slopboy.
 - Saving a private draft does **not** make it runnable. Isolated builds and safe previews depend on #31, #32, #33 and #4; sharing with friends depends on explicit permissions, and public listing depends on human review.
 - The separate **legacy Creator Kit v0.1** uses \`creations/<slug>/manifest.json\`, \`GameModule\` and \`pnpm creator:*\` commands. Its manifest/API is **not interchangeable** with this V2 framework cartridge format. See \`docs/creator-kit.md\` for that local-only compatibility workflow.
 

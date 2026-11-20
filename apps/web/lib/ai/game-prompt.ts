@@ -21,6 +21,7 @@ export function buildLaunchPrompt(options: GamePromptOptions, guideUrl: string):
     'Please read the guide if available. If you cannot open it, tell me so and ask me to paste it.',
     'You can infer a suitable Genre from my idea; do not require me to pick one.',
     'Use the maintained Slopboy framework cartridge template; do not make a generic HTML game.',
+    'When finished, give me the complete src/game.ts in a copyable code block and clear Slopboy handoff instructions. Do not claim a link has auto-imported or saved my source.',
     'Be honest about experimental engines and validation. Do not claim my game is uploaded, playable, shared or published.',
   );
   return lines.join('\n');

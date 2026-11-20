@@ -27,6 +27,12 @@ This guide uses **V2 framework cartridges**, `packages/hardware/src/v2.ts` and t
 
 A generator can suggest `src/game.ts` using the real `get_game_template` contract; manifest UUID game/revision identity belongs to the server on account-backed submission. New uploads are private source-only drafts (#49); safe build and preview remain gated by #31/#32/#33/#4. Any sharing or public listing is a separate authorization/moderation operation. The guide never tells the AI to report a build or game launch that it has not verified.
 
+## AI → player → Slopboy handoff (first slice)
+
+The current flow hands **copyable source code** back to the player, not a claim of a completed upload. The agent must give the complete `src/game.ts` in one code block and may provide a clearly labelled `/manage/new` navigation link. The link **does not prefill or transmit code**. Dashboard Paste Code is under review in **Draft PR #98**; no deployed server save is promised until that dependency is merged and accepted. A separate future handoff implementation can support client-side review/prefill using a documented safe transport, without turning URLs into unbounded private-source containers.
+
+When an account-backed upload is available, every save creates an **immutable, server-owned private source revision**. An AI revision response includes the complete replacement file and a change summary; users can keep working from any older version by saving it as a *new* revision. It never silently overwrites old code or claims to create Git commits. Source delivery, safe execution and friend access remain three separate operations.
+
 ## Privacy, validation and rollback
 
 - User idea is local browser state until clicking an external provider or copying it. The page never posts it to Slopboy.
