@@ -6,20 +6,19 @@ import {V2TextLink} from '../v2/V2RouteControls';
 import {authClient} from '../../lib/auth/client';
 import {signInFailureMessage} from '../../lib/auth/sign-in-errors';
 
-export default function SignInForm({available=true,oauthEnabled=false}:{available?:boolean;oauthEnabled?:boolean}){
+export default function SignInForm({available=true,oauthRequest=false}:{available?:boolean;oauthRequest?:boolean}){
   const router=useRouter();
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [showPassword,setShowPassword]=useState(false);
-  const [oauthChecking,setOAuthChecking]=useState(oauthEnabled);
+  const [oauthChecking,setOAuthChecking]=useState(oauthRequest);
   const [oauthExpired,setOAuthExpired]=useState(false);
 
   useEffect(()=>{
-    if(!oauthEnabled){return;}
+    if(!oauthRequest){return;}
     const params=new URLSearchParams(window.location.search);
-    if(!params.has('client_id')){setOAuthChecking(false);return;}
     // OAuth requests are signed by the provider; the SDK carries that query on continuation.
     const mustSignInAgain=(params.get('prompt')??'').split(/\s+/).some(value=>value==='login'||value==='create');
     let cancelled=false;
@@ -37,7 +36,7 @@ export default function SignInForm({available=true,oauthEnabled=false}:{availabl
       }
     })();
     return ()=>{cancelled=true;};
-  },[oauthEnabled]);
+  },[oauthRequest]);
 
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
@@ -49,7 +48,7 @@ export default function SignInForm({available=true,oauthEnabled=false}:{availabl
         setError(signInFailureMessage(result.error));
         return;
       }
-      if(oauthEnabled&&new URLSearchParams(window.location.search).has('client_id')){
+      if(oauthRequest){
         // A successful OAuth sign-in normally redirects itself. Resume only if it did not.
         if(!result.data?.redirect)await authClient.oauth2.continue({selected:true});
         return;

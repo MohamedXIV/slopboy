@@ -8,7 +8,8 @@ export const dynamic='force-dynamic';
 export const metadata={title:'Sign in · Slopboy'};
 
 /** The approved Lab authentication composition, connected to the actual sign-in flow. */
-export default function SignInPage(){
+export default async function SignInPage({searchParams}:{searchParams:Promise<{client_id?:string|string[]}>}){
+  const query=await searchParams;
   const configured=authReady({
     NEON_AUTH_BASE_URL:process.env.NEON_AUTH_BASE_URL,
     NEON_AUTH_COOKIE_SECRET:process.env.NEON_AUTH_COOKIE_SECRET,
@@ -18,7 +19,8 @@ export default function SignInPage(){
     <SlopboyAuthPanel titleId="sb-auth-title"
       secondary={<V2TextLink href="/auth/activate">Have an invitation? Activate your account</V2TextLink>}>
       <SignInForm available={configured}
-        oauthEnabled={configured&&process.env.VERCEL_ENV==='preview'&&process.env.MCP_DEV_OAUTH_ENABLED==='1'}/>
+        oauthRequest={configured&&process.env.VERCEL_ENV==='preview'&&
+          process.env.MCP_DEV_OAUTH_ENABLED==='1'&&typeof query.client_id==='string'&&Boolean(query.client_id)}/>
       {!configured&&<Alert status="warning">
         <Alert.Indicator/>
         <Alert.Content>

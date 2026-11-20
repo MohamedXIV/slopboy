@@ -6,18 +6,13 @@ import {authClient} from '../../lib/auth/client';
 type PublicClient={client_name?:string|null};
 
 /** The SDK forwards Neon's signed query; never construct OAuth redirect URLs here. */
-export default function OAuthConsentForm(){
+export default function OAuthConsentForm({clientId,requestedScope}:{clientId:string;requestedScope:string}){
   const [client,setClient]=useState<PublicClient|null>(null);
-  const [scope,setScope]=useState<string[]>([]);
   const [loading,setLoading]=useState(true);
   const [submitting,setSubmitting]=useState(false);
   const [error,setError]=useState('');
 
   useEffect(()=>{
-    const params=new URLSearchParams(window.location.search);
-    const clientId=params.get('client_id');
-    if(!clientId){setError('Missing OAuth client. Start again from ChatGPT or Claude.');setLoading(false);return;}
-    setScope((params.get('scope')??'').split(/\s+/).filter(Boolean));
     let cancelled=false;
     authClient.oauth2.publicClient({query:{client_id:clientId}})
       .then(({data,error:clientError})=>{
@@ -28,7 +23,7 @@ export default function OAuthConsentForm(){
       .catch(()=>{if(!cancelled)setError('Could not verify this OAuth client. Restart the connection from the app.');})
       .finally(()=>{if(!cancelled)setLoading(false);});
     return ()=>{cancelled=true;};
-  },[]);
+  },[clientId]);
 
   async function decide(accept:boolean){
     if(!client||submitting)return;
@@ -55,7 +50,7 @@ export default function OAuthConsentForm(){
     <Card.Content className="flex flex-col gap-3">
       <p className="text-sm">Requested access:</p>
       <ul className="list-disc pl-5 text-sm">
-        {scope.map(value=><li key={value}>{value}</li>)}
+        {requestedScope.split(/\s+/).filter(Boolean).map(value=><li key={value}>{value}</li>)}
       </ul>
       <p className="text-sm">The dev MCP connector can read your Slopboy account ID. It cannot create, change, or delete games.</p>
       {error&&<Alert status="danger"><Alert.Indicator/><Alert.Content>
