@@ -1,6 +1,6 @@
 # OAuth and remote MCP compatibility
 
-[Issue #28](https://github.com/MohamedXIV/slopboy/issues/28) tracks provider compatibility. This spike tests the resource-server half with the official `@neon/oauth` SDK. Live ChatGPT and Claude OAuth acceptance remains open.
+[Issue #28](https://github.com/MohamedXIV/slopboy/issues/28) tracks provider compatibility. The Preview-only endpoint uses the official `@neon/oauth` SDK. Live ChatGPT and Claude OAuth acceptance remains open.
 
 ## What the spike verified
 
@@ -15,12 +15,14 @@ Run `pnpm exec node --experimental-strip-types --test tests/neon-oauth-compatibi
 | Neon-shaped `openid offline_access` grant on a route that requires `mcp:write` | `403 insufficient_scope` |
 | Authorization server discovery unavailable | `503` |
 
-The existing `/api/mcp` route still uses the HS256 test-issuer verifier and serves public tools without a token. This work does not swap its verifier or expose a protected write tool. Loopback results cover the SDK adapter and JWT checks, while provider consent, authorization code exchange, and connector behavior require separate live evidence.
+The new `/api/mcp/dev` route serves the catalog tools and `get_connected_account` behind the SDK guard. The account tool returns the verified subject for comparison with the signed-in test account. Requests without a bearer token receive a challenge before tool execution. The route requires an expiry claim and `openid`. The existing public `/api/mcp` route is separate. The dev endpoint has no persistence callback or write permissions.
+
+Loopback results cover the SDK adapter, JWT checks and tool dispatch. Provider consent, authorization code exchange, and connector behavior require separate live evidence.
 
 ## Managed Neon compatibility limits
 
 - **Scopes.** Managed Better Auth documents a fixed scope set of `openid`, `profile`, `email`, and `offline_access`. Slopboy currently expects `mcp:write`. Accepting an OpenID profile scope for a game mutation would change the permission model. For writes, either choose a provider that issues the application scope or implement explicit Slopboy-side delegated consent and revocation tied to the verified issuer, subject, client and resource. Keep writes disabled until that decision and #29's ownership-aware storage are verified.
-- **Resource and audience.** Use the exact stable HTTPS endpoint URL including `/api/mcp` for the MCP resource, `aud`, and RFC 9728 metadata. Neon documents that clients must send `resource` with both authorization and token requests for JWT issuance. Set the issuer to the exact development branch's Neon Auth URL, including its path. Signing keys alone do not distinguish Neon branches.
+- **Resource and audience.** Use the exact stable HTTPS endpoint URL including `/api/mcp/dev` for the MCP resource, `aud`, and RFC 9728 metadata. Neon documents that clients must send `resource` with both authorization and token requests for JWT issuance. Set the issuer to the exact development branch's Neon Auth URL, including its path. Signing keys alone do not distinguish Neon branches.
 - **Withdrawal and expiry.** Neon documents one-hour access JWTs and refresh-token rotation with `offline_access`. Removing the resource prevents new issuance but already-issued JWTs stay valid until expiry. Record both refresh behavior after disconnect and access behavior with the previously issued token. If immediate loss of write access is required, enforce a server-side active grant on every write or choose a provider that supports the required revocation semantics.
 - **Sign-in and consent.** The provider requires the application to host both pages on a trusted domain. The existing dashboard login does not itself prove that signed OAuth continuation and an approval or denial work. Check how each connector registers, and verify the exact redirect and token endpoint authentication method. Neon documents `client_secret_basic` for confidential clients and PKCE for public clients.
 
@@ -28,7 +30,15 @@ The existing `/api/mcp` route still uses the HS256 test-issuer verifier and serv
 
 ## Live read-only acceptance
 
-Use an authorized dev Neon Auth branch, a stable externally reachable HTTPS MCP endpoint and hosted login and consent pages, plus access to private ChatGPT and Claude connector settings. Set the endpoint URL as the dev provider's MCP resource. Avoid changing the URL between registration and testing. Use a protected, read-only test tool and keep the public discovery tools and the write gate as they are.
+Use an authorized Neon Auth dev branch, a stable externally reachable Vercel Preview URL, hosted OAuth login and consent pages on a trusted domain, and access to private ChatGPT and Claude connector settings. Set the Preview URL plus `/api/mcp/dev` as the dev provider's MCP resource. Configure these values on the OAuth preview branch only.
+
+| Preview setting | Value |
+| --- | --- |
+| `MCP_DEV_OAUTH_ENABLED` | `1` |
+| `MCP_DEV_OAUTH_ISSUER` | Exact Neon Auth development issuer, including its path |
+| `MCP_DEV_OAUTH_RESOURCE` | Exact HTTPS Preview URL ending in `/api/mcp/dev` |
+
+The route also requires Vercel's `VERCEL_ENV=preview`. The RFC 9728 metadata URL is `/.well-known/oauth-protected-resource/api/mcp/dev` on the same Preview. Configure the provider and redeploy the Preview before connecting either client. An unconfigured Preview returns `404`; a configured Preview challenges an anonymous discovery request with `401`. Avoid changing the URL between registration and testing.
 
 | Client | Registration and redirect to verify |
 | --- | --- |
@@ -46,4 +56,4 @@ For each client, record the exact deployed commit and resource URL, discovered i
 | Deployed endpoint rejects missing and wrong-audience tokens | Pending | Pending |
 | Refresh and disconnect or revocation behavior | Pending | Pending |
 
-This spike requires no database migration or deployment configuration. Reverting it removes the test, its dev dependency, and these documentation changes. [Issue #30](https://github.com/MohamedXIV/slopboy/issues/30) tracks the full private-draft flow after OAuth acceptance and write integration.
+This spike requires no database migration. To disable the dev route, remove its Preview enable flag and redeploy. Reverting the PR removes the route and its tests. [Issue #30](https://github.com/MohamedXIV/slopboy/issues/30) tracks the full private-draft flow after OAuth acceptance and write integration.

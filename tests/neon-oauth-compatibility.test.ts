@@ -5,13 +5,14 @@ import { createServer } from 'node:http';
 import test from 'node:test';
 import { createMcpAuth } from '@neon/oauth/mcp';
 import { createMetadataHandlers, withMcpAuth } from '@neon/oauth/mcp/next';
+import { createDevMcpHandlers, readDevOAuthConfig } from '../apps/web/lib/mcp/dev-oauth.ts';
 
 test('Neon OAuth SDK protects a read-only MCP fixture using discovery and EdDSA', async t => {
   const keys = generateKeyPairSync('ed25519');
   const wrongKeys = generateKeyPairSync('ed25519');
   const kid = 'local-fixture';
-  const resource = 'https://slopboy.example/api/mcp';
-  const metadataUrl = 'https://slopboy.example/.well-known/oauth-protected-resource/api/mcp';
+  const resource = 'https://slopboy.example/api/mcp/dev';
+  const metadataUrl = 'https://slopboy.example/.well-known/oauth-protected-resource/api/mcp/dev';
   const issuerPath = '/slopboy-dev/auth';
   const requestedPaths: string[] = [];
 
@@ -120,9 +121,69 @@ test('Neon OAuth SDK protects a read-only MCP fixture using discovery and EdDSA'
   assert.equal(missingScope.status, 403);
   assert.match(missingScope.headers.get('www-authenticate') ?? '', /insufficient_scope/);
 
+  const dev = createDevMcpHandlers(auth);
+  function rpc(request: Record<string, unknown>, accessToken?: string) {
+    return dev.handleRequest(new Request(resource, {
+      method: 'POST',
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      body: JSON.stringify({ jsonrpc: '2.0', ...request }),
+    }));
+  }
+
+  assert.equal((await rpc({ id: 1, method: 'tools/list' })).status, 401);
+  assert.equal((await rpc({ id: 1, method: 'tools/list' }, token({ exp: undefined }))).status, 401);
+  const wrongAudience = await rpc({ id: 1, method: 'tools/list' }, token({ aud: `${resource}/other` }));
+  assert.equal(wrongAudience.status, 401);
+
+  const setup = await rpc({ id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }, accessToken);
+  assert.equal((await setup.json()).result.protocolVersion, '2025-06-18');
+  assert.equal((await rpc({ method: 'notifications/initialized' }, accessToken)).status, 202);
+
+  const list = await rpc({ id: 2, method: 'tools/list' }, accessToken);
+  const names = (await list.json()).result.tools.map((tool: { name: string }) => tool.name);
+  assert.ok(names.includes('get_connected_account'));
+  assert.ok(names.includes('list_supported_engines'));
+  assert.ok(!names.includes('create_game_draft'));
+
+  const account = await rpc({ id: 3, method: 'tools/call', params: { name: 'get_connected_account' } }, accessToken);
+  assert.equal(account.headers.get('cache-control'), 'no-store');
+  const content = (await account.json()).result.content;
+  assert.deepEqual(JSON.parse(content[0].text), { accountId: 'dev-user' });
+  const spoofed = await rpc({
+    id: 4,
+    method: 'tools/call',
+    params: { name: 'get_connected_account', arguments: { userId: 'other-user' } },
+  }, accessToken);
+  assert.equal((await spoofed.json()).error.code, -32602);
+
+  const write = await rpc({ id: 5, method: 'tools/call', params: { name: 'create_game_draft' } }, accessToken);
+  assert.ok(!(await write.json()).result);
+
   const unavailable = createMcpAuth({ baseUrl: `${issuer}/unavailable`, resource });
   const unavailableCall = withMcpAuth(unavailable, () => {
     assert.fail('an unavailable issuer must not authorize a request');
   });
   assert.equal((await unavailableCall(call(accessToken), undefined)).status, 503);
+});
+
+
+test('the development endpoint requires a preview deployment and explicit HTTPS configuration', () => {
+  const env = {
+    VERCEL_ENV: 'preview',
+    MCP_DEV_OAUTH_ENABLED: '1',
+    MCP_DEV_OAUTH_ISSUER: 'https://issuer.example/app/auth',
+    MCP_DEV_OAUTH_RESOURCE: 'https://slopboy.example/api/mcp/dev',
+  };
+  assert.deepEqual(readDevOAuthConfig(env), {
+    baseUrl: env.MCP_DEV_OAUTH_ISSUER,
+    resource: env.MCP_DEV_OAUTH_RESOURCE,
+    scopesSupported: ['openid', 'offline_access'],
+  });
+  for (const changes of [
+    { VERCEL_ENV: 'production' },
+    { VERCEL_ENV: undefined },
+    { MCP_DEV_OAUTH_ENABLED: undefined },
+    { MCP_DEV_OAUTH_ISSUER: 'http://issuer.example/app/auth' },
+    { MCP_DEV_OAUTH_RESOURCE: 'https://slopboy.example/api/mcp' },
+  ]) assert.equal(readDevOAuthConfig({ ...env, ...changes }), undefined);
 });
