@@ -17,7 +17,8 @@ export default function SignInPage(){
   return <main className="sb-auth-page">
     <SlopboyAuthPanel titleId="sb-auth-title"
       secondary={<V2TextLink href="/auth/activate">Have an invitation? Activate your account</V2TextLink>}>
-      <SignInForm available={configured}/>
+      <SignInForm available={configured}
+        oauthEnabled={configured&&process.env.VERCEL_ENV==='preview'&&process.env.MCP_DEV_OAUTH_ENABLED==='1'}/>
       {!configured&&<Alert status="warning">
         <Alert.Indicator/>
         <Alert.Content>

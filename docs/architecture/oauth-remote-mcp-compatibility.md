@@ -40,6 +40,12 @@ Use an authorized Neon Auth dev branch, a stable externally reachable Vercel Pre
 
 The route also requires Vercel's `VERCEL_ENV=preview`. The RFC 9728 metadata URL is `/.well-known/oauth-protected-resource/api/mcp/dev` on the same Preview. Configure the provider and redeploy the Preview before connecting either client. An unconfigured Preview returns `404`; a configured Preview challenges an anonymous discovery request with `401`. Avoid changing the URL between registration and testing.
 
+### Hosted authorization pages
+
+The OAuth-enabled Preview uses `/auth/sign-in` as the login page and `/auth/consent` as the consent page, both hosted on the same Preview origin. The sign-in form checks an existing Neon session on an OAuth request and uses the official `authClient.oauth2.continue({selected:true})` flow; a successful email/password login preserves the provider's signed OAuth query instead of redirecting to the dashboard. The consent page resolves the client with `oauth2.publicClient` and uses `oauth2.consent({accept})` for explicit Allow/Deny. The SDK handles callback navigation; the app does not manufacture OAuth redirect URLs. Both pages disallow framing with a `Content-Security-Policy` response header. `/auth/consent` is not available unless Preview OAuth and session configuration are explicitly enabled.
+
+The Vercel variables and Neon trusted origin must be restricted to `feat/28-neon-oauth-compatibility` and the `slopboy-dev` Auth branch. No change to Production OAuth, no provisioned `mcp:write`, and no shared credentials are required. If a private connector needs browser login or consent, the account owner must complete it themselves; do not record raw tokens or session identifiers.
+
 | Client | Registration and redirect to verify |
 | --- | --- |
 | ChatGPT | Check CIMD or the builder's supported registration mode. Use the exact redirect displayed for the private connector. OpenAI documents `https://chatgpt.com/connector/oauth/{callback_id}` for servers without its RFC 9207 issuer-identification support. |
