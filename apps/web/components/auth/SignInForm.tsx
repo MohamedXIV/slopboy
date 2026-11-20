@@ -1,18 +1,42 @@
 'use client';
-import {useState,type FormEvent} from 'react';
+import {useEffect,useState,type FormEvent} from 'react';
 import {useRouter} from 'next/navigation';
 import {Alert,Button,Input,Label,TextField} from '@heroui/react';
 import {V2TextLink} from '../v2/V2RouteControls';
 import {authClient} from '../../lib/auth/client';
 import {signInFailureMessage} from '../../lib/auth/sign-in-errors';
 
-export default function SignInForm({available=true}:{available?:boolean}){
+export default function SignInForm({available=true,oauthRequest=false}:{available?:boolean;oauthRequest?:boolean}){
   const router=useRouter();
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
   const [showPassword,setShowPassword]=useState(false);
+  const [oauthChecking,setOAuthChecking]=useState(oauthRequest);
+  const [oauthExpired,setOAuthExpired]=useState(false);
+
+  useEffect(()=>{
+    if(!oauthRequest){return;}
+    const params=new URLSearchParams(window.location.search);
+    // OAuth requests are signed by the provider; the SDK carries that query on continuation.
+    const mustSignInAgain=(params.get('prompt')??'').split(/\s+/).some(value=>value==='login'||value==='create');
+    let cancelled=false;
+    (async()=>{
+      try{
+        const {data:session}=await authClient.getSession();
+        if(!session||mustSignInAgain){if(!cancelled)setOAuthChecking(false);return;}
+        // The SDK navigates to consent (or directly to the relying party).
+        await authClient.oauth2.continue({selected:true});
+      }catch(failure){
+        if(cancelled)return;
+        if((failure as {status?:number}|null)?.status===400)setOAuthExpired(true);
+        else setError(signInFailureMessage(failure));
+        setOAuthChecking(false);
+      }
+    })();
+    return ()=>{cancelled=true;};
+  },[oauthRequest]);
 
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
@@ -24,6 +48,11 @@ export default function SignInForm({available=true}:{available?:boolean}){
         setError(signInFailureMessage(result.error));
         return;
       }
+      if(oauthRequest){
+        // A successful OAuth sign-in normally redirects itself. Resume only if it did not.
+        if(!result.data?.redirect)await authClient.oauth2.continue({selected:true});
+        return;
+      }
       router.replace('/dashboard');
       router.refresh();
     }catch(failure){
@@ -32,6 +61,12 @@ export default function SignInForm({available=true}:{available?:boolean}){
       setBusy(false);
     }
   }
+
+  if(oauthExpired)return <Alert status="danger"><Alert.Indicator/><Alert.Content>
+    <Alert.Title>Sign-in request expired</Alert.Title>
+    <Alert.Description>Return to ChatGPT or Claude and start the connection again.</Alert.Description>
+  </Alert.Content></Alert>;
+  if(oauthChecking)return <p role="status">Checking your Slopboy session…</p>;
 
   return <form className="sb-auth-form" onSubmit={submit} aria-label="Sign in to Slopboy">
     <TextField name="email" type="email" isRequired isDisabled={!available}>
