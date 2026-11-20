@@ -1,118 +1,49 @@
-# OAuth 2.1 and Remote MCP Protected Resource Compatibility Spike
+# OAuth and remote MCP compatibility
 
-**Deliverable for Issue #28** · **Date:** 2026-11-08  
-**Parent Epic:** #17 (ChatGPT / Claude Remote MCP Integration)  
-**Author:** Lead Software Engineer
+[Issue #28](https://github.com/MohamedXIV/slopboy/issues/28) tracks provider compatibility. This spike tests the resource-server half with the official `@neon/oauth` SDK. Live ChatGPT and Claude OAuth acceptance remains open.
 
----
+## What the spike verified
 
-## 1. Executive Summary
+Run `pnpm exec node --experimental-strip-types --test tests/neon-oauth-compatibility.test.ts`. The test uses `@neon/oauth@0.3.0`, the Next.js SDK adapters, a loopback issuer with discovery and JWKS, and ephemeral Ed25519 keys. The protected handler returns the verified subject and client ID. It has no storage or mutation capability.
 
-This spike investigates, specifies, and implements the **OAuth 2.1 Protected Resource** and **Streamable HTTP Model Context Protocol (MCP)** server for Slopboy.
+| Case | Observed SDK result |
+| --- | --- |
+| Bare and path-specific RFC 9728 metadata | `200` with the exact resource, issuer and advertised scopes |
+| Missing bearer token | `401` with `WWW-Authenticate` and the path-specific `resource_metadata` URL |
+| Signature and resource valid, `openid` present | `200` with the signed `sub` and `client_id` |
+| Wrong audience, different issuer with the same signing key, expired token, missing subject, or bad signature | `401 invalid_token` |
+| Neon-shaped `openid offline_access` grant on a route that requires `mcp:write` | `403 insufficient_scope` |
+| Authorization server discovery unavailable | `503` |
 
-### Core Architecture Findings
+The existing `/api/mcp` route still uses the HS256 test-issuer verifier and serves public tools without a token. This work does not swap its verifier or expose a protected write tool. Loopback results cover the SDK adapter and JWT checks, while provider consent, authorization code exchange, and connector behavior require separate live evidence.
 
-1. **One Unified Remote MCP Endpoint (`/api/mcp`):**
-   - Both **ChatGPT Plugins** and **Claude Remote MCP Connectors** connect to the exact same HTTPS endpoint using the standard Model Context Protocol (JSON-RPC 2.0 over Streamable HTTP).
-   - Unauthenticated discovery tools (`list_supported_engines`, `get_engine_capabilities`, `recommend_engine`, `get_game_template`, `validate_game_source`) are accessible for context discovery.
-   - Privileged write tools (`create_game_draft`) strictly require an OAuth 2.1 Bearer Token with `mcp:write` scope.
+## Managed Neon compatibility limits
 
-2. **RFC 9704 Protected Resource Discovery (`/.well-known/oauth-protected-resource`):**
-   - Automatically informs connecting AI agents where to obtain authorization, which scopes are required, and the exact resource URI to include in the token audience claim (`aud`).
+- **Scopes.** Managed Better Auth documents a fixed scope set of `openid`, `profile`, `email`, and `offline_access`. Slopboy currently expects `mcp:write`. Accepting an OpenID profile scope for a game mutation would change the permission model. For writes, either choose a provider that issues the application scope or implement explicit Slopboy-side delegated consent and revocation tied to the verified issuer, subject, client and resource. Keep writes disabled until that decision and #29's ownership-aware storage are verified.
+- **Resource and audience.** Use the exact stable HTTPS endpoint URL including `/api/mcp` for the MCP resource, `aud`, and RFC 9728 metadata. Neon documents that clients must send `resource` with both authorization and token requests for JWT issuance. Set the issuer to the exact development branch's Neon Auth URL, including its path. Signing keys alone do not distinguish Neon branches.
+- **Withdrawal and expiry.** Neon documents one-hour access JWTs and refresh-token rotation with `offline_access`. Removing the resource prevents new issuance but already-issued JWTs stay valid until expiry. Record both refresh behavior after disconnect and access behavior with the previously issued token. If immediate loss of write access is required, enforce a server-side active grant on every write or choose a provider that supports the required revocation semantics.
+- **Sign-in and consent.** The provider requires the application to host both pages on a trusted domain. The existing dashboard login does not itself prove that signed OAuth continuation and an approval or denial work. Check how each connector registers, and verify the exact redirect and token endpoint authentication method. Neon documents `client_secret_basic` for confidential clients and PKCE for public clients.
 
-3. **Strict Audience and Subject Enforcement:**
-   - **Audience Binding (RFC 9068):** The token `aud` claim must explicitly match the Slopboy MCP resource (`https://slopboy.com/mcp` or configured resource URI). Tokens issued for other APIs or general login cannot be replayed against Slopboy.
-   - **Server-Derived Subject (`sub`):** Draft ownership is assigned exclusively to `token.sub`. The API server **never accepts a `userId` or `ownerId` supplied in client arguments or model completions**.
+[Neon OAuth provider guide](https://neon.com/docs/auth/guides/plugins/oauth-provider) · [Official SDK](https://www.npmjs.com/package/@neon/oauth/v/0.3.0) · [RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)
 
-4. **Neon Managed Better Auth (`@neon/oauth`):**
-   - Neon's November 2026 Managed Better Auth ships an OAuth 2.1 Provider supporting Authorization Code + PKCE S256, token refresh, revocation, and CIMD.
-   - Slopboy's MCP resource layer verifies access tokens via HMAC-SHA256 (in development) or RS256/ES256 JWKS public key introspection against the Neon Auth issuer.
+## Live read-only acceptance
 
----
+Use an authorized dev Neon Auth branch, a stable externally reachable HTTPS MCP endpoint and hosted login and consent pages, plus access to private ChatGPT and Claude connector settings. Set the endpoint URL as the dev provider's MCP resource. Avoid changing the URL between registration and testing. Use a protected, read-only test tool and keep the public discovery tools and the write gate as they are.
 
-## 2. Specification & Standards Mapping
+| Client | Registration and redirect to verify |
+| --- | --- |
+| ChatGPT | Check CIMD or the builder's supported registration mode. Use the exact redirect displayed for the private connector. OpenAI documents `https://chatgpt.com/connector/oauth/{callback_id}` for servers without its RFC 9207 issuer-identification support. |
+| Claude | Verify automatic registration or use a managed client if needed. Anthropic documents `https://claude.ai/api/mcp/auth_callback` for a manually registered client. |
 
-| Standard | Role in Slopboy | Implementation |
-|---|---|---|
-| **RFC 9704** | OAuth 2.0 Protected Resource Metadata | `GET /.well-known/oauth-protected-resource` returns `resource`, `authorization_servers`, and `scopes_supported`. |
-| **RFC 8414** | OAuth 2.0 Authorization Server Metadata | `/.well-known/oauth-authorization-server` endpoint hosted by Neon Auth. |
-| **RFC 7636** | Proof Key for Code Exchange (PKCE) | Enforces `code_challenge_method: S256` for both ChatGPT and Claude during authorization code exchange. |
-| **RFC 6750** | Bearer Token Usage | Parses `Authorization: Bearer <token>` and returns standardized `WWW-Authenticate` headers on error. |
-| **RFC 9068** | JWT Profile for Access Tokens | Validates `iss` (issuer), `aud` (resource audience), `sub` (user UUID), `exp` (expiry), `nbf` (not before), and `scope`. |
-| **MCP 2024-11-05** | Model Context Protocol | JSON-RPC 2.0 protocol over Streamable HTTP (`initialize`, `tools/list`, `tools/call`, `ping`). |
+[OpenAI authentication guide](https://developers.openai.com/apps-sdk/build/auth) · [Anthropic custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
 
----
+For each client, record the exact deployed commit and resource URL, discovered issuer and registration mode, the login and consent outcome, PKCE `S256`, and a successful protected read. Confirm its verified subject matches the intended dev dashboard account. Run the missing-token and wrong-audience cases against the same deployed protected handler using a controlled dev harness if the connector cannot send those requests. Record the OAuth refresh outcome, disconnect or grant withdrawal, and the remaining lifetime of any valid access JWT. Keep only redacted evidence and HTTP outcomes. Bearer tokens, refresh tokens, codes, client secrets and raw session IDs stay out of logs and issue comments.
 
-## 3. Scope Hierarchy
+| Live check | ChatGPT | Claude |
+| --- | --- | --- |
+| Client registration, consent, callback and PKCE | Pending | Pending |
+| Authorized read tied to the dev dashboard subject | Pending | Pending |
+| Deployed endpoint rejects missing and wrong-audience tokens | Pending | Pending |
+| Refresh and disconnect or revocation behavior | Pending | Pending |
 
-```text
-mcp:read    -> Inspect engine capabilities, templates, validate source (read-only)
-mcp:write   -> Create private game drafts, upload cartridge files, trigger builds
-mcp:admin   -> Operator moderation queue, review requests, audit log queries
-```
-
----
-
-## 4. Threat Model and Validation Rules
-
-```text
-AI Client (ChatGPT / Claude)
-          |
-          | 1. Discovers Protected Resource Metadata (RFC 9704)
-          v
-/.well-known/oauth-protected-resource
-          |
-          | 2. Redirects user to Neon Auth for Consent (PKCE S256)
-          v
-Neon Managed Better Auth
-          |
-          | 3. Returns Access Token (aud="https://slopboy.com/mcp", scope="mcp:write", sub=UUID)
-          v
-POST /api/mcp (tools/call: create_game_draft)
-          |
-          | 4. Server verifies:
-          |    - Valid signature
-          |    - Not expired (exp > now)
-          |    - Matching issuer (iss == Neon Auth)
-          |    - Matching audience (aud == Slopboy MCP Resource)
-          |    - Scope contains "mcp:write"
-          v
-Create Draft:
-  - gameId = randomUUID()
-  - revisionId = randomUUID()
-  - ownerId = token.sub (IGNORES any user-supplied ownerId)
-  - status = "private_draft"
-```
-
-### Security Gates Enforced by Token Verifier:
-1. **Missing Authorization Header:** Returns `401 Unauthorized` with `WWW-Authenticate: Bearer error="invalid_request"`.
-2. **Invalid Signature / Malformed Token:** Returns `401 Unauthorized` with `WWW-Authenticate: Bearer error="invalid_token"`.
-3. **Expired Token:** Returns `401 Unauthorized` with `WWW-Authenticate: Bearer error="invalid_token", error_description="Token expired"`.
-4. **Mismatched Audience:** Returns `403 Forbidden` with `WWW-Authenticate: Bearer error="invalid_token", error_description="Audience mismatch"`.
-5. **Insufficient Scope:** Returns `403 Forbidden` with `WWW-Authenticate: Bearer error="insufficient_scope", scope="mcp:write"`.
-6. **Owner Spoofing Defense:** Any `userId` or `ownerId` parameter in `args` is discarded; ownership is bound exclusively to `subject.userId`.
-
----
-
-## 5. Client Integration Constraints
-
-### ChatGPT Plugin / Action
-- **OAuth Callback URL:** `https://chatgpt.com/api/aip/plugin-.../oauth/callback`
-- **PKCE:** S256 required.
-- **Client Authentication:** Public client with PKCE, or confidential client with client secret configured in OpenAI Plugin Developer Portal.
-- **Audience:** Must pass `resource: https://slopboy.com/api/mcp` during token exchange.
-
-### Claude Custom Remote MCP Connector
-- **OAuth Callback URL:** `https://claude.ai/api/mcp/oauth_callback`
-- **Connector Type:** Streamable HTTP over HTTPS.
-- **Audience:** Verified against MCP resource URL.
-
----
-
-## 6. Verification and Test Results
-
-All test cases are implemented and automated in `tests/mcp-oauth.test.ts`:
-- RFC 9704 Protected Resource Metadata returns expected discovery JSON.
-- Public discovery tools (`list_supported_engines`, `get_engine_capabilities`, `recommend_engine`, `get_game_template`, `validate_game_source`) execute without authentication.
-- Privileged `create_game_draft` rejects unauthenticated, malformed, expired, wrong-audience, and wrong-scope requests with RFC 6750 error responses.
-- Privileged `create_game_draft` succeeds with a valid token and derives `ownerId` from the token subject.
+This spike requires no database migration or deployment configuration. Reverting it removes the test, its dev dependency, and these documentation changes. [Issue #30](https://github.com/MohamedXIV/slopboy/issues/30) tracks the full private-draft flow after OAuth acceptance and write integration.
