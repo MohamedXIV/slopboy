@@ -32,3 +32,27 @@ untrusted uploads or a KAPLAY/WebKit approval. Player preview and publication
 remain gated by #4/#33/#45. The worker's note envelope and playback lifecycle
 are host constraints, separate from the fantasy device profile. Roll back
 by removing the lab and audio opt-in; no data migration is required.
+
+## Cross-engine checks
+
+Linux WebKit 27.2 initially stopped at startup with `blob:null` access errors.
+Keeping the worker bootstrap object URL until readiness, error, or stop
+resolved the failure without changing the iframe permissions or CSP. Existing
+sandbox fixtures are served by a disposable loopback HTTP server, matching the
+app's browser context. Chromium and Linux WebKit both passed all six fixtures:
+valid frame, forged frame, blocked network operation, invalid palette, forged
+readiness, and frame watchdog. The trusted demo also passed after switching
+each browser offline, including tone playback, local save and stop/restart.
+
+Install Playwright and its WebKit browser/dependencies in a separate test
+environment. Set `PLAYWRIGHT_MODULE` to its absolute `index.mjs` path:
+
+```sh
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs pnpm security:browser
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+  node --experimental-strip-types tools/procedural-demo-webkit-smoke.mjs
+```
+
+Linux WebKit is useful engine-level coverage. Actual Safari/iOS behavior,
+broader hostile resource/navigation cases and arbitrary KAPLAY code remain
+unverified. The untrusted player Preview stays gated.

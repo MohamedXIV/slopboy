@@ -7,6 +7,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
   'use strict';
   let key = null;
   let worker = null;
+  let workerUrl = null;
   let busy = false;
   let watchdog = 0;
   let pendingSave;
@@ -19,6 +20,10 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
   const MAX_FRAME_MS = 1500;
   const VALID_BUTTONS = ['UP','DOWN','LEFT','RIGHT','A','B','START','SELECT'];
   const post = (type, extra={}) => parent.postMessage({scope:'slopboy-v1',key,type,...extra}, '*');
+  function releaseWorkerUrl(){
+    if(workerUrl===null)return;
+    URL.revokeObjectURL(workerUrl);workerUrl=null;
+  }
   function fail(reason) {
     if(phase==='stopped')return;
     phase='stopped';
@@ -27,6 +32,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     pendingSave=undefined;
     if(channel){channel.port1.close();channel=null;}
     if(worker){ worker.terminate(); worker=null; }
+    releaseWorkerUrl();
     busy=false;
     post('error',{reason:String(reason).slice(0,120)});
   }
@@ -125,15 +131,15 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       phase='starting';
       try {
         const source='('+workerMain.toString()+')()';
-        const url=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
-        worker=new Worker(url,{type:'classic'});
-        URL.revokeObjectURL(url);
+        workerUrl=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+        worker=new Worker(workerUrl,{type:'classic'});
         worker.onerror=()=>fail('Worker failed');
         channel=new MessageChannel();
         channel.port1.onmessage=(e)=>{
           const data=e.data;
           if(data?.type==='ready'){
             if(phase!=='starting')return;
+            releaseWorkerUrl();
             clearTimeout(watchdog);phase='running';post('ready');return;
           }
           if(data?.type==='error'){fail(data.reason||'Game crashed');return;}
@@ -176,6 +182,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       if(pendingSave!==undefined)post('save',{value:pendingSave});
       pendingSave=undefined;
       if(worker)worker.terminate();worker=null;
+      releaseWorkerUrl();
       if(channel){channel.port1.close();channel=null;}
       clearTimeout(watchdog);clearTimeout(saveTimer);busy=false;
     }
