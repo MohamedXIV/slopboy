@@ -79,3 +79,30 @@ An independently verified runtime, adapter approval (#45) and preview
 sandbox acceptance (#4/#33) remain required for player builds. The web
 endpoint still reports `blocked_by_adapter`; no hosted migration or worker
 setup is needed for this fixture verification.
+
+## Candidate worker runtime preflight
+
+From a development worker host with Docker, explicitly pull the pinned image printed by
+the probe if it is missing. Then run:
+
+```sh
+bash tools/verify-fixture-worker-runtime.sh runc
+# If the host registers gVisor:
+bash tools/verify-fixture-worker-runtime.sh runsc
+```
+
+The probe starts a trusted program with no host mounts or application credentials.
+It measures the limits from inside the container and exits nonzero if a limit
+is unavailable or differs from policy. It requires 128 MiB memory, zero swap,
+0.5 CPU, 32 processes, a non-root UID/GID, no capabilities or external network,
+no-new-privileges and a read-only filesystem. The probe is an individual
+preflight check. It does not establish sandbox safety for player code.
+
+Codex Cloud currently reports cgroup v2 with `CgroupDriver=none`.
+With `runc`, the basic process controls passed but the measured memory,
+CPU and PID limits were 32 GiB, 4 CPUs and unlimited PIDs. The registered
+`runsc` uses `--ignore-cgroups`, so it could not verify the caps. Its
+temporary directory also remained writable and it did not expose
+no-new-privileges in the process status. Neither candidate passed. Use a
+development host with enforced cgroup limits and repeat the probe before
+attempting the remaining worker approval tests.
