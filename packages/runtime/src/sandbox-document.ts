@@ -37,6 +37,8 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     let frame=null;
     let storedSave=null;
     let trustedPort=null;
+    let tone;
+    let ticking=false;
     const send=(data,transfer)=>{if(trustedPort)trustedPort.postMessage(data,transfer||[]);};
     let down=new Set(), pressed=new Set();
     const clampShade = (shade) => {
@@ -89,6 +91,9 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
           if(!Number.isInteger(width)||width<1||width>512||!Number.isInteger(height)||height<1||height>512||!Number.isInteger(shadeCount)||shadeCount<1||shadeCount>256)throw Error('Bad hardware');
           storedSave=typeof m.save==='string'?m.save:null;
           frame=new Uint8Array(width*height);
+          if(m.audio===true)api.audio={tone:(note)=>{
+            if(ticking && Number.isInteger(note) && note>=36 && note<=84 && tone===undefined)tone=note;
+          }};
           const url=URL.createObjectURL(new Blob([m.code],{type:'text/javascript'}));
           try {
             const imported=await import(url);
@@ -99,10 +104,12 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
           }finally{ URL.revokeObjectURL(url); }
         } else if(m?.type==='tick' && moduleGame){
           down=new Set(m.down);pressed=new Set(m.pressed);
+          tone=undefined;ticking=true;
           moduleGame.update(api,Math.max(0,Math.min(0.05,m.dt)));
           moduleGame.draw(api);
+          ticking=false;
           const data=frame;
-          send({type:'frame',pixels:data},[data.buffer]);
+          send({type:'frame',pixels:data,tone},[data.buffer]);
           frame=new Uint8Array(width*height);
         }
       } catch(e){send({type:'error',reason:String(e?.message||e).slice(0,120)});}
@@ -148,11 +155,12 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
           if(!(pixels instanceof Uint8Array)||pixels.length!==m.width*m.height){fail('Malformed frame');return;}
           for(let i=0;i<pixels.length;i++)if(pixels[i]>=m.shades){fail('Palette overflow');return;}
           clearTimeout(watchdog);busy=false;
-          post('frame',{pixels});
+          const tone=data.tone;
+          post('frame',m.audio===true&&Number.isInteger(tone)&&tone>=36&&tone<=84?{pixels,tone}:{pixels});
         };
         const snapshot=(m.save===null||typeof m.save==='string'&&new TextEncoder().encode(m.save).byteLength<=MAX_SAVE)?m.save:null;
         worker.postMessage({type:'setup',port:channel.port2},[channel.port2]);
-        worker.postMessage({type:'load',code:m.code,width:m.width,height:m.height,shades:m.shades,save:snapshot});
+        worker.postMessage({type:'load',code:m.code,width:m.width,height:m.height,shades:m.shades,save:snapshot,audio:m.audio===true});
         watchdog=setTimeout(()=>fail('Game initialization timeout'),MAX_FRAME_MS);
       }catch(e){fail(e?.message||e);}
     } else if(m.type==='tick' && key===m.key && worker && !busy && phase==='running'){

@@ -73,8 +73,8 @@ export async function openChromePage(url:string,profile:string){
     if(typeof sessionId!=='string')throw Error('Chrome did not attach browser page');
     const validatedSessionId=sessionId;
     await send('Runtime.enable',{},validatedSessionId);
-    async function evaluate(expression:string):Promise<unknown>{
-      const response=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:false},validatedSessionId);
+    async function evaluate(expression:string,userGesture=false):Promise<unknown>{
+      const response=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:false,userGesture},validatedSessionId);
       const result=response.result as Record<string,unknown>|undefined;
       if(!result||!('value' in result))return null;
       return result.value;
