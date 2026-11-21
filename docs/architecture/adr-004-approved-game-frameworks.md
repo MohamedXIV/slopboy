@@ -25,6 +25,14 @@ Versions above are verified reference versions as of the date of this ADR. Adopt
 
 **Framework is a choice, not a device tier.** Any approved engine may target any compatible Slopboy screen. The device contract constrains **logical width/height, aspect ratio and final indexed color count** and exposes its actual controls. It does **not** simulate CPU, RAM, ROM, audio voice caps, physics features, nominal FPS or fake GPU restrictions. Quality and performance remain measured expectations, not fictional chip emulation.
 
+New player projects generate visuals, sprites, music and sound effects from
+source code. Use documented engine and host APIs. If the selected adapter has
+no supported audio interface, keep the game silent. New project reservations
+and build inputs are source-only; historical private assets remain readable
+and reviewed legacy cartridges retain their format. Worker resource controls
+protect the service when building untrusted input. They are independent of
+the fantasy device and do not define gameplay or audio capabilities.
+
 ## Proposed engine-neutral source manifest
 
 *Illustrative schema only; these fields are not yet deployed as parser/runtime code.*
@@ -41,10 +49,7 @@ Versions above are verified reference versions as of the date of this ADR. Adopt
     "adapterProtocol": 1
   },
   "entrypoint": "src/game.ts",
-  "assets": [
-    "assets/player.png",
-    "assets/audio/collect.wav"
-  ]
+  "assets": []
 }
 ~~~
 

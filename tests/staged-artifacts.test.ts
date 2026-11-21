@@ -1,7 +1,7 @@
 import {createHash} from "node:crypto";
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseUploadManifest, validateArtifactBytes, issueArtifactTicket, verifyArtifactTicket } from '../apps/web/server/staged-artifact-policy.ts';
+import { parseUploadManifest, isProceduralProject, validateArtifactBytes, issueArtifactTicket, verifyArtifactTicket } from '../apps/web/server/staged-artifact-policy.ts';
 
 const source = {path: 'src/game.ts', mime: 'text/typescript', bytes: 64, sha256: 'a'.repeat(64)};
 test('staging accepts a canonical entrypoint and rejects traversal, URLs and duplicate paths', () => {
@@ -42,4 +42,11 @@ test('source can reference declared sibling modules only; asset bytes must match
   const image = {path:'assets/x.png',mime:'image/png',bytes:html.length,sha256:digest(html)};
   assert.ok(!validateArtifactBytes(parseUploadManifest({files:[files[0],image]})!,image,html));
   assert.ok(!validateArtifactBytes(manifest,files[0],Buffer.from(entry.toString().replace('score','other'))));
+});
+
+test('new staging is procedural while older manifests remain readable', () => {
+  const legacy = parseUploadManifest({files:[source,{path:'assets/example.png',mime:'image/png',bytes:90,sha256:'b'.repeat(64)}]});
+  assert.ok(legacy);
+  assert.equal(isProceduralProject(legacy),false);
+  assert.equal(isProceduralProject(parseUploadManifest({files:[source]})!),true);
 });

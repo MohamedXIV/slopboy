@@ -699,6 +699,7 @@ export function getGameTemplate(options: {
       '## Notes for AI Coding Agents',
       '- Do not add remote CDN imports or unapproved npm packages.',
       '- Do not access window, document, fetch, or localStorage.',
+      '- Generate visuals, music and sound effects procedurally from source. Keep assets empty.',
       '- Render all visuals inside the 160x144 coordinate space.',
     ].join('\n') + '\n',
   };
@@ -746,7 +747,8 @@ ${engineText}
 
 ## Development Guidelines
 - Always export a default game setup function or GameModule.
-- Keep game logic responsive (60 FPS tick).
+- Keep game logic responsive to the host lifecycle. No fixed simulation tick is required.
+- Generate art and audio procedurally in source with documented host/engine APIs. Leave the game silent if the adapter has no supported audio API. Use no media files or embedded samples.
 - All visuals must fit within the 160x144 viewport.
 `.trim();
 }
@@ -809,7 +811,7 @@ export function scanSourceDiagnostics(
             line: loc.line + 1,
             column: loc.character + 1,
             file: fileName,
-            suggestedFix: `Remove remote import. Use approved engine import "${engine.allowedImports[0]}" or declare assets in manifest.json.`,
+            suggestedFix: `Remove remote import. Use approved engine import "${engine.allowedImports[0]}".`,
           });
         } else {
           const isRelative = importPath.startsWith('./') || importPath.startsWith('../');

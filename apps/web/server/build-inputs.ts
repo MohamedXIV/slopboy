@@ -1,12 +1,12 @@
 import {createHash} from 'node:crypto';
-import {parseUploadManifest} from './staged-artifact-policy.ts';
+import {isProceduralProject,parseUploadManifest} from './staged-artifact-policy.ts';
 
 export function describeBuildInput(raw: unknown) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const manifest = raw as Record<string,unknown>;
   const engine = manifest.engine as Record<string,unknown> | undefined;
   const normalized = parseUploadManifest({files:manifest.files});
-  if (!normalized || manifest.schemaVersion !== normalized.schemaVersion ||
+  if (!normalized || !isProceduralProject(normalized) || manifest.schemaVersion !== normalized.schemaVersion ||
       manifest.deviceProfile !== normalized.deviceProfile || manifest.entrypoint !== normalized.entrypoint ||
       engine?.id !== normalized.engine.id || engine?.version !== normalized.engine.version ||
       engine?.adapterProtocol !== normalized.engine.adapterProtocol) return null;

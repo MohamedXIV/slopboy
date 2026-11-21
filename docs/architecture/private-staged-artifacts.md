@@ -2,7 +2,7 @@
 
 Issue #31 adds a project revision store alongside the single-file source history
 from #106. From Manage → Private project files, a verified owner selects source
-modules and assets for an existing private draft. The server declares a pinned
+modules for an existing private draft. The server declares a pinned
 KAPLAY manifest, reserves capacity, and assigns a UUID. Upload each file as raw
 bytes. Finalization atomically verifies completeness, records the audit event,
 and turns that UUID into an immutable source-and-asset revision. Managed
@@ -29,7 +29,10 @@ of 64 project records per account. The operator can set
 
 The manifest requires exactly one `src/game.ts` or `src/game.js` entrypoint.
 Other modules must be declared under `src/`; relative imports name a declared
-sibling explicitly with its extension. Assets use `assets/` and the PNG, JPEG
+sibling explicitly with its extension. New reservations accept source files
+only. Generate graphics and audio procedurally. Previously staged manifests
+can still be opened and completed, and finalized files can still be downloaded.
+Existing assets use `assets/` and the PNG, JPEG
 (`.jpg`) or WAV allowlist. Requests use canonical lowercase flat paths; archive,
 SVG, HTML and remote URL ingestion are unavailable. Media checks combine a
 declared extension/MIME, exact byte count, signature/header checks, and SHA-256.
@@ -44,7 +47,7 @@ metadata.
 
 | Request | Result |
 | --- | --- |
-| POST base with `{key, manifest:{files:[{path,mime,bytes,sha256}]}}` | Reserve capacity and return stage, server manifest and upload tickets |
+| POST base with `{key, manifest:{files:[{path,mime,bytes,sha256}]}}` | Reserve source-only capacity and return stage, server manifest and upload tickets |
 | GET base | List this game's finalized revisions and active staging records |
 | GET `?project={id}` | Inspect metadata and renew per-file tickets |
 | PUT `?project={id}&file={path}` | Store exact raw bytes with declared Content-Type and `X-Slopboy-Artifact-Ticket` |
