@@ -8,6 +8,7 @@ import {CREATE_GAME_SQL,UPDATE_GAME_SQL} from '../apps/web/server/game-managemen
 import {READ_PLAYABLE_GAME_SQL} from '../apps/web/server/playable-catalog-query.ts';
 import {READ_SOURCE_DRAFT_SQL,CREATE_SOURCE_DRAFT_SQL} from '../apps/web/server/source-draft-queries.ts';
 import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL} from '../apps/web/server/source-history-queries.ts';
+import {READ_OWNED_BUILD_SOURCE_SQL} from '../apps/web/server/build-inputs.ts';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, readdir, writeFile, access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -835,6 +836,15 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.equal(new Set([...page.slice(0,50), ...older]).size, 58);
     assert.match((await executePsql(config,{sql:validated(alice,"'"+gameUuid+"'",'a','94949494-9494-4494-8494-949494949494','95959595-9595-4595-8595-959595959595')})).stdout,/^quota/);
     assert.match((await executePsql(config,{sql:validated()})).stdout,/^replayed/,'Retry does not spend quota');
+    const buildSource = (id: string) => executePsql(config,{sql:`
+      SET ROLE slopboy_test_web;
+      PREPARE build_source(uuid,uuid,uuid) AS ${READ_OWNED_BUILD_SOURCE_SQL};
+      EXECUTE build_source('${id}','${gameUuid}','${revisionUuid}');`});
+    const [ownedInput] = sourceVersionRows((await buildSource(alice)).stdout);
+    assert.match(ownedInput,/kaplay.*typescript\|[a-f0-9]{64}\|17$/);
+    assert.deepEqual(sourceVersionRows((await buildSource(bob)).stdout),[]);
+    assert.deepEqual(sourceVersionRows((await buildSource(admin)).stdout),[]);
+
     // Stage uploads through the restricted app role, exercising the actual transaction and byte store.
     await executePsql(config,{sql:`GRANT EXECUTE ON FUNCTION
       public.staged_game_artifact(uuid,uuid,uuid,text,jsonb,bytea) TO slopboy_test_web`});
