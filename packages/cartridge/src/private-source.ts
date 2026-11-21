@@ -5,7 +5,7 @@ import {scanSourceDiagnostics} from './agent-templates.ts';
 import {PRIVATE_SOURCE_LIMIT, PRIVATE_SOURCE_TEMPLATE} from './private-source-template.ts';
 export {PRIVATE_SOURCE_TEMPLATE} from './private-source-template.ts';
 
-export function inspectPrivateSource(input: unknown) {
+export function inspectPrivateSource(input: unknown, project?: {path: string; localImports: ReadonlySet<string>; entrypoint: boolean}) {
   const rejected = (message: string) => ({ok: false as const, diagnostics: [{message}]});
   if (!input || typeof input !== 'object' || Array.isArray(input)) return rejected('Select a template and paste one source file.');
   const data = input as Record<string, unknown>;
@@ -19,12 +19,14 @@ export function inspectPrivateSource(input: unknown) {
       Buffer.from(source, 'utf8').toString('utf8') !== source)
     return rejected('Paste valid UTF-8 source between 1 and 65,536 bytes.');
   if (/^\s*</.test(source)) return rejected('Paste a game module instead of an HTML page.');
-  const entrypoint = language === 'typescript' ? 'src/game.ts' : 'src/game.js';
+  const entrypoint = project?.path ?? (language === 'typescript' ? 'src/game.ts' : 'src/game.js');
   const file = ts.createSourceFile(entrypoint, source, ts.ScriptTarget.ES2022, true,
     language === 'typescript' ? ts.ScriptKind.TS : ts.ScriptKind.JS);
   const extra: {message: string; line?: number; column?: number}[] = [];
   if (file.referencedFiles.length || file.typeReferenceDirectives.length || file.libReferenceDirectives.length)
     extra.push({message: 'Remove triple-slash references. Only one source file is accepted.'});
+  const allowedImport = (name: string) => ENGINE_REGISTRY.kaplay.allowedImports.includes(name) ||
+    project?.localImports.has(name) === true;
   let defaultExport = false;
   const pending: ts.Node[] = [file];
   while (pending.length) {
@@ -34,11 +36,11 @@ export function inspectPrivateSource(input: unknown) {
       const {line, character} = file.getLineAndCharacterOfPosition(node.getStart(file));
       if (extra.length < 20) extra.push({message, line: line + 1, column: character + 1});
     };
-    if (specifier && (!ts.isStringLiteral(specifier) || !ENGINE_REGISTRY.kaplay.allowedImports.includes(specifier.text)))
+    if (specifier && (!ts.isStringLiteral(specifier) || !allowedImport(specifier.text)))
       problem('Only kaplay and @slopboy/sdk imports are allowed. Inline local helpers.');
     if (ts.isImportTypeNode(node)) {
       const path = ts.isLiteralTypeNode(node.argument) ? node.argument.literal : undefined;
-      if (!path || !ts.isStringLiteral(path) || !ENGINE_REGISTRY.kaplay.allowedImports.includes(path.text))
+      if (!path || !ts.isStringLiteral(path) || !allowedImport(path.text))
         problem('Use types from the pinned template only.');
     }
     if (ts.isIdentifier(node) && node.text === 'require') problem('Use approved static ES module imports.');
@@ -50,7 +52,7 @@ export function inspectPrivateSource(input: unknown) {
       defaultExport = true;
     ts.forEachChild(node, child => { pending.push(child); });
   }
-  if (!defaultExport) extra.push({message: 'Export a default game setup function or game module.'});
+  if (!defaultExport && project?.entrypoint !== false) extra.push({message: 'Export a default game setup function or game module.'});
   if (extra.length) return {ok: false as const, diagnostics: extra};
   try {
     const diagnostics = scanSourceDiagnostics(source, ENGINE_REGISTRY.kaplay, entrypoint)
