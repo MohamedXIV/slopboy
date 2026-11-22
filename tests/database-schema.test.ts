@@ -810,6 +810,9 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /stored/);
     assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /replayed/);
 
+    await executePsql(config,{sql:`
+      GRANT SELECT(id,game_id,revision_number,release_version,status,engine_id,engine_version)
+        ON public.game_revisions TO slopboy_test_web;`});
     const draftListing = (actor:string) => executePsql(config,{sql:`
       SET ROLE slopboy_test_web;
       PREPARE draft_listing(uuid,int) AS ${LIST_OWNED_GAMES_WITH_DRAFT_SQL};
@@ -841,6 +844,9 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     await executePsql(config,{sql:`INSERT INTO game_source_drafts(id,game_id,created_by,language,source_text)
       SELECT gen_random_uuid(), '${gameUuid}', '${alice}', 'typescript', 'old draft' FROM generate_series(1,55)`});
+    const latestLegacyDraft = pgQueryRows((await draftListing(alice)).stdout)
+      .find(row=>row.startsWith(gameUuid+'|'));
+    assert.match(latestLegacyDraft ?? '',/\|f$/,'The latest unvalidated draft supersedes older validated summaries');
     const page = sourceVersionRows((await history(alice)).stdout).map(row => row.split('|')[0]);
     assert.equal(page.length, 51);
     const older = sourceVersionRows((await history(alice, page[49])).stdout).map(row => row.split('|')[0]);
