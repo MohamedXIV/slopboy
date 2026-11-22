@@ -57,6 +57,7 @@ test('versioned Markdown and JSON mirror the canonical V2 device and engine regi
   const contract = getGameGuideContract();
   assert.equal(contract.schemaVersion, 1);
   assert.equal(contract.genreRequired, false);
+  assert.deepEqual(contract.mediaPolicy, {visuals:'procedural', audio:'procedural', assetUploads:false});
   assert.equal(contract.publishAutomatically, false);
   assert.equal(contract.delivery.importPath, '/import');
   assert.equal(contract.delivery.currentMethod, 'copy-source-manually');
@@ -79,6 +80,7 @@ test('versioned Markdown and JSON mirror the canonical V2 device and engine regi
   assert.equal(md.headers.get('x-content-type-options'), 'nosniff');
   const markdown = await md.text();
   assert.match(markdown, /Genre is optional/);
+  assert.match(markdown, /music and sound procedurally from code/);
   assert.match(markdown, /160 × 144/);
   assert.match(markdown, /`kaplay`.*experimental/);
   assert.match(markdown, /legacy Creator Kit v0\.1/i);

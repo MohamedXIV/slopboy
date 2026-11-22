@@ -15,6 +15,7 @@ const errors: Record<string,string> = {
   NOT_FOUND:'This private project is unavailable to your account.',
   INVALID_ARTIFACT:'A file failed source, format or checksum checks.',
   INVALID_INPUT:'Select a game.ts or game.js entrypoint and supported files with unique lowercase names.',
+  PROCEDURAL_SOURCE_REQUIRED:'New projects use source files. Generate your visuals and sound in code.',
   INCOMPLETE:'Upload all declared files before finalizing.',
 };
 
@@ -25,6 +26,7 @@ export default function StagedProject({gameId}:{gameId:string}) {
   const [key,setKey] = useState('');
   const [selected,setSelected] = useState<Stage|null>(null);
   const [busy,setBusy] = useState(false);
+  const acceptsStoredMedia = selected?.manifest.files.some(file => file.path.startsWith('assets/')) ?? false;
   const [notice,setNotice] = useState('');
 
   const request = useCallback(async <T,>(url:string, init?:RequestInit):Promise<T> => {
@@ -67,7 +69,8 @@ export default function StagedProject({gameId}:{gameId:string}) {
       const uploads = await Promise.all(files.map(async file => {
         const ext = file.name.split('.').at(-1) ?? '';
         const mime = formats[ext];
-        if (!mime) throw new Error('Choose .ts, .js, .png, .jpg or .wav files.');
+        if (!mime || (!acceptsStoredMedia && ext !== 'ts' && ext !== 'js'))
+          throw new Error('Choose .ts or .js files for new projects.');
         const path = (ext==='ts'||ext==='js' ? 'src/' : 'assets/')+file.name;
         const digest = await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
         const sha256 = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2,'0')).join('');
@@ -107,7 +110,7 @@ export default function StagedProject({gameId}:{gameId:string}) {
   }
 
   return <Card variant="secondary"><Card.Content className="space-y-4">
-    <p>Upload source and assets for a private revision. Files are stored as data. Build and play are unavailable here.</p>
+    <p>Upload source for a private revision. Generate your visuals and sound in code. Build and play are unavailable here.</p>
     <div className="flex flex-wrap gap-2">
       <Button isDisabled={busy} onPress={() => {setSelected(null);setKey('');setNotice('');}}>New project</Button>
       {projects.map(project => <Button key={project.id} isDisabled={busy} variant="secondary"
@@ -119,8 +122,8 @@ export default function StagedProject({gameId}:{gameId:string}) {
     {selected?.finalizedAt ? <ul>{selected.manifest.files.map(file => <li key={file.path}>
       <Button variant="secondary" isDisabled={busy} onPress={() => void download(file.path)}>Download {file.path}</Button>
     </li>)}</ul> : <>
-      <label className="block">Files (.ts, .js, .png, .jpg, .wav)
-        <input className="block w-full" type="file" multiple accept=".ts,.js,.png,.jpg,.wav"
+      <label className="block">{acceptsStoredMedia ? 'Declared files for this existing project' : 'Source files (.ts or .js)'}
+        <input className="block w-full" type="file" multiple accept={acceptsStoredMedia ? ".ts,.js,.png,.jpg,.wav" : ".ts,.js"}
           disabled={busy} onChange={event => {setFiles(Array.from(event.target.files ?? []));setKey('');}}/>
       </label>
       <div className="flex flex-wrap gap-2">

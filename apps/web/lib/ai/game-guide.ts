@@ -29,6 +29,7 @@ export function getGameGuideContract() {
     entrypoint: 'src/game.ts',
     manifestSchemaVersion: 1,
     genreRequired: false,
+    mediaPolicy: {visuals: 'procedural', audio: 'procedural', assetUploads: false},
     publishAutomatically: false,
     delivery: {
       sourcePath: 'src/game.ts',
@@ -83,9 +84,9 @@ ${engineRows}
 
 1. Create a Slopboy cartridge source module, **not** an \`index.html\` / standalone website, custom DOM shell, CDN script, or random package install.
 2. For a KAPLAY-based first draft, use the exact **\`kaplay@${ENGINE_REGISTRY.kaplay.version}\`** template from \`get_game_template\` / \`packages/cartridge/src/agent-templates.ts\`. Keep its default-exported setup function and host-provided canvas/context; use the real pinned API, never invent lifecycle methods.
-3. Produce \`src/game.ts\` and a \`manifest.json\` with \`schemaVersion: ${guide.manifestSchemaVersion}\`, \`deviceProfile: "${guide.device.id}"\`, \`engine: { id, version, adapterProtocol }\`, \`entrypoint: "${guide.entrypoint}"\`, and \`assets: []\` for a one-file starting point. Required \`gameId\` and \`revisionId\` are **distinct server-issued UUIDs**, not generated from the game's name and not a client-selected identity. Treat locally generated test IDs as non-authoritative placeholders until the server creates the actual draft.
+3. Produce \`src/game.ts\` and a \`manifest.json\` with \`schemaVersion: ${guide.manifestSchemaVersion}\`, \`deviceProfile: "${guide.device.id}"\`, \`engine: { id, version, adapterProtocol }\`, \`entrypoint: "${guide.entrypoint}"\`, and \`assets: []\` for this source-only workflow. Required \`gameId\` and \`revisionId\` are **distinct server-issued UUIDs**, not generated from the game's name and not a client-selected identity. Treat locally generated test IDs as non-authoritative placeholders until the server creates the actual draft.
 4. Restrict imports to the selected engine's exact allowlist. No \`fetch\`, \`XMLHttpRequest\`, \`WebSocket\`, \`window\`, \`document\`, \`localStorage\`, workers, \`eval\`, dynamic imports, remote URLs, or direct backend/secret access. Use the host input/storage lifecycle only where the selected maintained template supports it.
-5. Favor short sessions, immediate feedback, touch/controller-friendly controls, original art/logic and one source file until multi-file assets are supported by the secure pipeline.
+5. Generate backgrounds, sprites, effects, music and sound procedurally from code. Keep the project source-only: no image/audio files, sample packs, or embedded encoded media. Use documented engine and host APIs for drawing and audio. If the selected template has no supported audio API, leave it silent and say why.
 6. Explain how to run the real source/manifest validation. If no tooling was run, say **"not validated"**. Do not claim a build, safe preview, account connection, private upload or published game succeeded without corresponding evidence.
 
 ## How to deliver the generated game

@@ -43,6 +43,10 @@ export function parseUploadManifest(raw: unknown) {
   return {schemaVersion: 1, engine: {id,version,adapterProtocol}, deviceProfile, entrypoint, files: parsed};
 }
 
+export function isProceduralProject(manifest: ProjectManifest) {
+  return manifest.files.every(file => sourcePath.test(file.path));
+}
+
 export function validateArtifactBytes(manifest: ProjectManifest, file: ProjectFile, bytes: Buffer) {
   if (bytes.length !== file.bytes || createHash('sha256').update(bytes).digest('hex') !== file.sha256) return false;
   if (sourcePath.test(file.path)) {
