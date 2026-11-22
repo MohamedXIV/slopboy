@@ -30,3 +30,81 @@ job states, reproducible outputs and authorized preview. These are outside this
 initial read-only slice. Roll back by removing the route and descriptor.
 
 Worker isolation limits protect the build service. They do not model device CPU, RAM, frame rate or audio voices.
+
+## Disposable fixture build jobs
+
+Migration 007 introduces a fixture-only queue with no web-role grants or
+player revision references. Run it against disposable PostgreSQL. The worker
+selects a fixed repo-owned test script and packages a small text fixture into
+a deterministic gzip artifact for the installed Node/zlib version. The
+PostgreSQL artifact SHA-256 is generated from the bytes. A ready fixture job
+confirms that the bytes were stored. It grants no game execution privileges.
+
+Enqueue uses a caller-supplied UUID as the idempotency key. Repeated enqueue
+returns the same row, including after completion. Concurrent claims use
+`SKIP LOCKED`. Every attempt has a fresh lease with a 30-second deadline.
+A previous worker cannot finish a job after its lease expires or is replaced.
+On timeout, crash, or oversize output the worker retries up to three attempts.
+If the last worker disappears, the next claim marks its job failed with
+`LEASE_EXPIRED`. Completion and digest publication use a single update.
+
+Create a database named `slopboy_build_fixture` in a disposable PostgreSQL
+cluster. Set `PGHOST` to that cluster's Unix socket directory, `PGPORT` to its
+port, and `PGUSER` to the disposable role. Apply existing migrations with
+the checksum-tracked migrator:
+
+```sh
+node --experimental-strip-types --input-type=module <<'JS'
+import {migrateUp} from './packages/database/src/migrator.ts';
+console.log(await migrateUp({database:'slopboy_build_fixture'},'packages/database/migrations',7));
+JS
+```
+
+Use a new UUID for `enqueue`, run `work` once per processing attempt, then
+check `status` with the same UUID. For example:
+
+```sh
+fixture_key=$(node -p 'crypto.randomUUID()')
+node --experimental-strip-types tools/fixture-build-cli.ts enqueue "$fixture_key"
+node --experimental-strip-types tools/fixture-build-cli.ts work
+node --experimental-strip-types tools/fixture-build-cli.ts status "$fixture_key"
+```
+
+To remove the fixture queue, stop its CLI processes and roll back 007 with
+the same migrator, targeting 006. This removes fixture job records and their
+bytes only.
+
+The fixture supervisor enforces wall-clock time and stdout bytes. It does not
+sandbox source or enforce CPU, RAM or process limits. The measured Codex
+Docker runtime has no cgroup driver and did not enforce the requested caps.
+An independently verified runtime, adapter approval (#45) and preview
+sandbox acceptance (#4/#33) remain required for player builds. The web
+endpoint still reports `blocked_by_adapter`; no hosted migration or worker
+setup is needed for this fixture verification.
+
+## Candidate worker runtime preflight
+
+From a development worker host with Docker, explicitly pull the pinned image printed by
+the probe if it is missing. Then run:
+
+```sh
+bash tools/verify-fixture-worker-runtime.sh runc
+# If the host registers gVisor:
+bash tools/verify-fixture-worker-runtime.sh runsc
+```
+
+The probe starts a trusted program with no host mounts or application credentials.
+It measures the limits from inside the container and exits nonzero if a limit
+is unavailable or differs from policy. It requires 128 MiB memory, zero swap,
+0.5 CPU, 32 processes, a non-root UID/GID, no capabilities or external network,
+no-new-privileges and a read-only filesystem. The probe is an individual
+preflight check. It does not establish sandbox safety for player code.
+
+Codex Cloud currently reports cgroup v2 with `CgroupDriver=none`.
+With `runc`, the basic process controls passed but the measured memory,
+CPU and PID limits were 32 GiB, 4 CPUs and unlimited PIDs. The registered
+`runsc` uses `--ignore-cgroups`, so it could not verify the caps. Its
+temporary directory also remained writable and it did not expose
+no-new-privileges in the process status. Neither candidate passed. Use a
+development host with enforced cgroup limits and repeat the probe before
+attempting the remaining worker approval tests.

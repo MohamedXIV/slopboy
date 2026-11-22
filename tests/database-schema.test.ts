@@ -1,3 +1,5 @@
+import {claimFixture,enqueueFixture,finishFixture,fixtureStatus,runNextFixtureBuild} from '../tools/fixture-build-queue.ts';
+import {produceFixtureArtifact,runTrustedFixtureChild} from '../tools/fixture-build-worker.ts';
 import {createHash, randomUUID} from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -47,8 +49,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 6);
-  assert.equal(down.length, 6);
+  assert.equal(up.length, 7);
+  assert.equal(down.length, 7);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -60,7 +62,7 @@ test('migration files load cleanly with matching checksums', async () => {
 
   assert.equal(up[3].version, 4);
   assert.equal(up[3].name, 'source_drafts');
-  assert.deepEqual(down.map(file => file.version), [6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(down.map(file => file.version), [7, 6, 5, 4, 3, 2, 1]);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -107,8 +109,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 6);
-    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6]);
+    assert.equal(upResult.applied, 7);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -426,8 +428,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 4);
-    assert.deepEqual(rollback3.versions, [6, 5, 4, 3]);
+    assert.equal(rollback3.rolledBack, 5);
+    assert.deepEqual(rollback3.versions, [7, 6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -459,8 +461,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 6);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6]);
+    assert.equal(reMigrate.applied, 7);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -741,8 +743,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
-    assert.deepEqual(downgrade4.versions,[6,5,4]);
-    assert.equal((await migrateUp(config,migrationsDir)).applied,3);
+    assert.deepEqual(downgrade4.versions,[7,6,5,4]);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,4);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
     const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
@@ -905,9 +907,53 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.ok((await stagedCall('initiate',{...input,key:randomUUID(),quota:capacity*2})).id);
     assert.equal((await stagedCall('describe',{},abandoned.id)).error,'NOT_FOUND');
 
-    assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[6,5]);
+    // Real durable jobs for the fixture-only CLI/worker, with no grants to the web role.
+    await assert.rejects(() => executePsql(config,{sql:
+      'SET ROLE slopboy_test_web; SELECT * FROM public.claim_fixture_build_job()'}));
+    const key = randomUUID();
+    const [firstJob,duplicateJob] = await Promise.all([enqueueFixture(config,key),enqueueFixture(config,key)]);
+    assert.ok(firstJob && duplicateJob);
+    assert.equal(firstJob.id,duplicateJob.id);
+    const [claimOne,claimTwo] = await Promise.all([claimFixture(config),claimFixture(config)]);
+    assert.equal(Number(Boolean(claimOne))+Number(Boolean(claimTwo)),1);
+    const claim = claimOne ?? claimTwo;
+    assert.ok(claim?.lease);
+    await executePsql(config,{sql:"UPDATE public.fixture_build_jobs SET lease_until=clock_timestamp()-interval '1 second'"});
+    const fresh = await claimFixture(config);
+    assert.ok(fresh?.lease);
+    assert.equal(fresh.id,claim.id);
+    assert.notEqual(fresh.lease,claim.lease);
+    const output = await produceFixtureArtifact();
+    assert.equal(output.status,'ready');
+    assert.equal(await finishFixture(config,claim.id,claim.lease,output),null);
+    assert.equal((await finishFixture(config,fresh.id,fresh.lease,output))?.status,'ready');
+
+    const secondKey = randomUUID();
+    await enqueueFixture(config,secondKey);
+    assert.equal((await runNextFixtureBuild(config)).status,'ready');
+    assert.equal((await fixtureStatus(config,key))?.sha256,(await fixtureStatus(config,secondKey))?.sha256);
+    assert.equal((await enqueueFixture(config,key))?.status,'ready');
+
+    const failedKey = randomUUID();
+    await enqueueFixture(config,failedKey);
+    for (const expected of ['queued','queued','failed']) {
+      assert.equal((await runNextFixtureBuild(config,() => runTrustedFixtureChild('timeout',50))).status,expected);
+    }
+    assert.equal((await fixtureStatus(config,failedKey))?.attempts,3);
+    assert.equal((await fixtureStatus(config,failedKey))?.error,'TIMEOUT');
+    const expiredKey = randomUUID();
+    await enqueueFixture(config,expiredKey);
+    const abandonedJob = await claimFixture(config);
+    assert.ok(abandonedJob?.lease);
+    await executePsql(config,{sql:`UPDATE public.fixture_build_jobs SET attempts=3,
+      lease_until=clock_timestamp()-interval '1 second' WHERE id='${abandonedJob.id}'`});
+    assert.equal((await runNextFixtureBuild(config)).status,'failed');
+    assert.equal((await fixtureStatus(config,expiredKey))?.error,'LEASE_EXPIRED');
+    assert.equal((await runNextFixtureBuild(config)).status,'idle');
+
+    assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[7,6,5]);
     assert.match((await executePsql(config,{sql:`SELECT source_text FROM game_source_drafts WHERE id='${revisionUuid}'`})).stdout,/export default/);
-    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6]);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7]);
 
   } finally {
     // Stop server and clean up temporary cluster
