@@ -29,7 +29,7 @@ A generator can suggest `src/game.ts` using the real `get_game_template` contrac
 
 ## AI → player → Slopboy handoff (first slice)
 
-Copy the complete `src/game.ts` from the AI response, return to `/import`, paste the module, and select **Check source**. If prompted, sign in in a separate tab and return to the editor. **Save private draft** displays the server-confirmed game and revision IDs after a verified save. The import link carries no source. The form uses the pinned KAPLAY template and needs no separate manifest.
+Copy the complete `src/game.ts` from the AI response, return to `/import`, paste the module, and select **Check source**. If prompted, sign in in a separate tab and return to the editor. **Save private draft** displays the server-confirmed game and revision IDs after a verified save. The import link carries no source. The form uses the pinned KAPLAY template and needs no separate manifest. New games generate art, music and sound from code. Use only the selected engine and host’s documented drawing and audio APIs.
 
 The dashboard's My Games links to **Version History**. Load any version and save it as a new immutable revision. Older versions remain available through **Load older versions**. Hosted persistence requires migration 005, development credentials and live acceptance.
 

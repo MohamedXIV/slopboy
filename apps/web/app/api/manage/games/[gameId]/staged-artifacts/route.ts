@@ -2,7 +2,7 @@ import {isGameUuid} from '@slopboy/catalog';
 import {currentSubject} from '@/lib/auth/server';
 import {sameOriginMutation} from '@/lib/auth/auth-contract';
 import {readBoundedBytes,readBoundedJson} from '@/server/bounded-json';
-import {issueArtifactTicket,parseUploadManifest,validateArtifactBytes,verifyArtifactTicket} from '@/server/staged-artifact-policy';
+import {isProceduralProject,issueArtifactTicket,parseUploadManifest,validateArtifactBytes,verifyArtifactTicket} from '@/server/staged-artifact-policy';
 import {stagedArtifactStorage,type Stage} from '@/server/staged-artifact-storage';
 import {privateHeaders} from '@/server/private-source-request';
 
@@ -61,6 +61,7 @@ async function handle(request: Request, context: Context) {
       const {key: submission,manifest: raw} = data as Record<string,unknown>;
       const manifest = parseUploadManifest(raw);
       if (typeof submission !== 'string' || !isGameUuid(submission) || !manifest) return failure('INVALID_INPUT',400);
+      if (!isProceduralProject(manifest)) return failure('PROCEDURAL_SOURCE_REQUIRED',422);
       const quota = Number(process.env.STAGED_ARTIFACT_QUOTA_BYTES ?? 16*1024*1024);
       if (!Number.isSafeInteger(quota) || quota<1 || quota>64*1024*1024) return failure('UNAVAILABLE',503);
       const stage = await store.initiate(submission,quota,manifest);

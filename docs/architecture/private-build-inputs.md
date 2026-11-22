@@ -5,7 +5,7 @@ the verified owner and private draft status, then normalizes the stored engine
 manifest and its path, MIME, byte count and SHA-256 for each file. A validated
 single-file revision from #106 and a finalized project from #107 use the same
 descriptor. Legacy source without a validated manifest, unfinalized uploads,
-foreign drafts and unsupported engine versions cannot be prepared.
+foreign drafts, unsupported engine versions and projects containing media files cannot be prepared. New games generate visuals and audio in source; existing asset downloads remain available through the staging API.
 
 An owner can request
 `GET /api/manage/games/{gameId}/build-input?kind=source|project&revision={revisionId}`.
@@ -28,3 +28,5 @@ The KAPLAY adapter (#45) and sandbox work (#4/#33) are open gates. Future #32 wo
 still needs a protected worker, resource/time limits, durable asynchronous
 job states, reproducible outputs and authorized preview. These are outside this
 initial read-only slice. Roll back by removing the route and descriptor.
+
+Worker isolation limits protect the build service. They do not model device CPU, RAM, frame rate or audio voices.

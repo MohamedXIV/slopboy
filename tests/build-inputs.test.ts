@@ -8,7 +8,7 @@ const manifest = {
   engine:{id:engine.id,version:engine.version,adapterProtocol:engine.adapterProtocol},
   files:[
     {path:'src/game.ts',mime:'text/typescript',bytes:34,sha256:'a'.repeat(64)},
-    {path:'assets/a.png',mime:'image/png',bytes:40,sha256:'b'.repeat(64)},
+    {path:'src/helper.ts',mime:'text/typescript',bytes:40,sha256:'b'.repeat(64)},
   ],
 };
 test('build input digest is stable across file order and keys, and changes with content', () => {
@@ -35,4 +35,9 @@ test('validated source and a one-file project have the same build input identity
   assert.ok(single);
   assert.equal(single.inputDigest,describeBuildInput({...manifest,files:[manifest.files[0]]})?.inputDigest);
   assert.equal(describeSingleFileBuildInput({...source,engine_manifest:null}),null);
+});
+
+test('legacy media can be read from staging but is ineligible for a procedural build input', () => {
+  assert.equal(describeBuildInput({...manifest,files:[manifest.files[0],
+    {path:'assets/a.png',mime:'image/png',bytes:40,sha256:'b'.repeat(64)}]}),null);
 });
