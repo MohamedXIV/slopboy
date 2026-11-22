@@ -58,3 +58,14 @@ export async function readManagedGame(actorId:string,gameId:string){
       releaseVersion:r.release_version,status:r.revision_status,engine:r.engine_id,
       engineVersion:r.engine_version,createdAt:r.revision_created_at}))};
 }
+
+export async function readTrustedPreviewGame(actorId:string,gameId:string):Promise<{title:string}|null>{
+  const sql=database();
+  const [row]=await sql`
+    SELECT g.title
+    FROM public.games g JOIN public.users actor ON actor.id=g.owner_id
+    WHERE g.id=${gameId}::uuid AND actor.id=${actorId}::uuid AND actor.role<>'system'
+      AND g.visibility='private' AND g.status='draft'
+    LIMIT 1`;
+  return typeof row?.title==='string' ? {title:row.title} : null;
+}

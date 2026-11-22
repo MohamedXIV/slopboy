@@ -16,7 +16,7 @@ type Revision={
 type Game={id:string;title:string;status:string;visibility:string;latestRevision:Revision|null};
 type Account={user:User;profile:Profile|null};
 
-export default function AccountDashboard(){
+export default function AccountDashboard({trustedPreviewEnabled}:{trustedPreviewEnabled:boolean}){
   const router=useRouter();
   const [account,setAccount]=useState<Account|null>(null);
   const [games,setGames]=useState<readonly Game[]>([]);
@@ -145,6 +145,8 @@ export default function AccountDashboard(){
                   <div className="flex flex-wrap items-center gap-2">
                     <Link href={`/games/${game.id}`} className="link font-semibold">{game.title}</Link>
                     <Link href={`/manage/${game.id}`} className="link">Manage</Link>
+                    {trustedPreviewEnabled && game.visibility==='private' && game.status==='draft' &&
+                      <Link href={`/manage/${game.id}/preview`} className="link">Preview demo</Link>}
                     <span className="text-muted">{game.status} · {game.visibility}</span>
                   </div>
                   <p className="text-xs text-muted">

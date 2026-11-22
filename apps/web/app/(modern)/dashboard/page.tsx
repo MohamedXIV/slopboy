@@ -1,3 +1,4 @@
+import {trustedOwnerPreviewEnabled} from '@/server/trusted-owner-preview';
 import AccountDashboard from '../../../components/auth/AccountDashboard';
 import {redirect} from 'next/navigation';
 import {authReady} from '../../../lib/auth/auth-contract';
@@ -12,5 +13,5 @@ export default function Dashboard(){
     NEON_AUTH_BASE_URL:process.env.NEON_AUTH_BASE_URL,
     NEON_AUTH_COOKIE_SECRET:process.env.NEON_AUTH_COOKIE_SECRET,
   }))redirect('/auth/sign-in');
-  return <AccountDashboard/>;
+  return <AccountDashboard trustedPreviewEnabled={trustedOwnerPreviewEnabled()}/>;
 }

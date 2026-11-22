@@ -8,13 +8,12 @@ import {PROCEDURAL_DEMO} from '@/lib/ai/procedural-demo';
 
 const {width,height,indexedColors} = V2_DEVICE_1000.display;
 const responseTimeoutMs = 2500;
-const saveKey = 'slopboy-procedural-lab-v1';
 const controls: Record<string,V2Button> = {ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT'};
 const colors = V2_LCD_PALETTES.moss.colors.map(color => [
   Number.parseInt(color.slice(1,3),16),Number.parseInt(color.slice(3,5),16),Number.parseInt(color.slice(5,7),16),
 ]);
 
-export default function ProceduralDemo() {
+export default function ProceduralDemo({saveKey = 'slopboy-procedural-lab-v1'}:{saveKey?:string}) {
   const frame = useRef<HTMLIFrameElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const session = useRef<{key:string; phase:'boot'|'starting'|'running'; deadline:number|null; saveDeadline:number|null; stopRequested:boolean; pressed:Set<V2Button>}|null>(null);
@@ -205,7 +204,7 @@ export default function ProceduralDemo() {
       session.current = null;
       closeAudio();
     };
-  },[closeAudio,stop,stopTone]);
+  },[closeAudio,saveKey,stop,stopTone]);
 
   return <Card variant="secondary"><Card.Content className="space-y-4">
     <canvas ref={canvas} width={width} height={height} aria-label="Procedural game display"
