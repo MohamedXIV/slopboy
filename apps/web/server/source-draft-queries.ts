@@ -1,7 +1,7 @@
 /** All source access is scoped to the owner or an admin of platform games. */
-export const READ_SOURCE_DRAFT_SQL=`SELECT d.id::text AS id,d.language,d.source_text,d.created_at::text AS created_at
+export const READ_SOURCE_DRAFT_SQL=`SELECT d.id::text AS id,d.language,d.source_text,d.engine_manifest,d.source_digest,d.created_at::text AS created_at
 FROM public.games g JOIN public.users actor ON actor.id=$1::uuid
-LEFT JOIN LATERAL (SELECT id,language,source_text,created_at FROM public.game_source_drafts
+LEFT JOIN LATERAL (SELECT id,language,source_text,engine_manifest,source_digest,created_at FROM public.game_source_drafts
   WHERE game_id=g.id ORDER BY created_at DESC,id DESC LIMIT 1) d ON true
 WHERE g.id=$2::uuid AND actor.role<>'system' AND actor.id<>$3::uuid
 AND ((g.owner_id=actor.id AND g.owner_id<>$3::uuid) OR (g.owner_id=$3::uuid AND actor.role='admin')) LIMIT 1`;

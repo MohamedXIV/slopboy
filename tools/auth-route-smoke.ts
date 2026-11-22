@@ -20,7 +20,7 @@ async function main(){
     const managed='/api/manage/games/5b0edbf4-644d-43f4-9ad3-5506eacd05d3';
     assert.equal((await get(managed)).status,401,'Private management requires a session');
     assert.equal((await get(managed+'/source')).status,401,'Private source requires a session');
-    for(const [path,method] of [['/api/manage/games','POST'],[managed,'PATCH'],
+    for(const [path,method] of [['/api/manage/games','POST'],['/api/manage/source','POST'],[managed,'PATCH'],
       [managed+'/source','POST'],['/api/account/library','POST']] as const){
       const response=await fetch(app.url+path,{method,headers:{'Origin':app.url,
         'Sec-Fetch-Site':'same-origin','Content-Type':'application/json'},body:'{}'});
@@ -79,6 +79,14 @@ async function main(){
     assert.equal(activation.status,200,'Invited-account activation page remains reachable');
     assert.match(await activation.text(),/Authentication is not configured in this deployment/,
       'Unconfigured account activation must fail closed');
+    const crossOriginSource=await fetch(app.url+'/api/manage/source',{
+      method:'POST',headers:{'Origin':'https://unrelated.invalid','Content-Type':'application/json'},body:'{}',
+    });
+    assert.equal(crossOriginSource.status,403);
+    assert.match(String(crossOriginSource.headers.get('cache-control')),/no-store/);
+    const newGame=await get('/manage/new');
+    assert.equal(newGame.status,307);
+    assert.equal(newGame.headers.get('location'),'/dashboard');
     const dashboard=await get('/dashboard');
     assert.equal(dashboard.status,307,'Unconfigured dashboard routes to the honest sign-in panel');
     assert.equal(dashboard.headers.get('location'),'/auth/sign-in');
