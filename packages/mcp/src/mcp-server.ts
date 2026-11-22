@@ -17,7 +17,7 @@ import {
   getGameTemplate,
   validateGameSource,
   getEngineDescriptor,
-  validateManifestV2,
+  getEngineRegistry,
   type CartridgeManifestV2,
 } from '@slopboy/cartridge';
 import { V2_DEVICE_1000 } from '@slopboy/hardware/v2';
@@ -33,25 +33,65 @@ export const MCP_SERVER_INFO = Object.freeze({
   version: '0.1.0',
 });
 
+const MCP_TOOL_CONTRACT_VERSION = '1.0.0';
+const SOURCE_LIMIT_BYTES = 64 * 1024;
+
+type ToolProperty =
+  | {
+      readonly type: 'string';
+      readonly description: string;
+      readonly enum?: readonly string[];
+      readonly default?: string;
+      readonly maxLength?: number;
+      readonly pattern?: string;
+    }
+  | { readonly type: 'object'; readonly description: string };
+
+interface ToolInputSchema {
+  readonly type: 'object';
+  readonly properties: Readonly<Record<string, ToolProperty>>;
+  readonly required?: readonly string[];
+  readonly additionalProperties: false;
+}
+
 export interface McpToolDefinition {
   readonly name: string;
   readonly description: string;
-  readonly inputSchema: Record<string, unknown>;
+  readonly inputSchema: ToolInputSchema;
   readonly requiresScope?: string;
 }
 
-export const MCP_TOOLS: readonly McpToolDefinition[] = Object.freeze([
+const engineId = {
+  type: 'string',
+  description: 'Engine identifier from the Slopboy registry',
+  enum: getEngineRegistry().map(engine => engine.id),
+} as const;
+const deviceProfile = {
+  type: 'string',
+  description: 'Target device profile',
+  enum: [V2_DEVICE_1000.id],
+  default: V2_DEVICE_1000.id,
+} as const;
+const title = {
+  type: 'string',
+  description: 'Game title (1 to 80 characters)',
+  maxLength: 80,
+  pattern: '\\S',
+} as const;
+const sourceCode = {
+  type: 'string',
+  description: 'Complete TypeScript or JavaScript entrypoint (at most 64 KiB in UTF-8)',
+  maxLength: SOURCE_LIMIT_BYTES,
+} as const;
+
+export const MCP_TOOLS = Object.freeze<McpToolDefinition[]>([
   {
     name: 'list_supported_engines',
     description: 'Lists all approved and candidate Slopboy game engines, pinned versions, capabilities, and virtual hardware display specifications.',
     inputSchema: {
       type: 'object',
-      properties: {
-        deviceProfile: {
-          type: 'string',
-          description: 'Target device profile (default: "slopboy-1000")',
-        },
-      },
+      additionalProperties: false,
+      properties: { deviceProfile },
     },
   },
   {
@@ -59,16 +99,8 @@ export const MCP_TOOLS: readonly McpToolDefinition[] = Object.freeze([
     description: 'Retrieves allowed imports, forbidden APIs, hardware constraints, and entrypoint guidelines for a specific engine.',
     inputSchema: {
       type: 'object',
-      properties: {
-        engineId: {
-          type: 'string',
-          description: 'Engine identifier (e.g. "kaplay", "pixel-v1", "phaser", "pixi")',
-        },
-        deviceProfile: {
-          type: 'string',
-          description: 'Target device profile (default: "slopboy-1000")',
-        },
-      },
+      additionalProperties: false,
+      properties: { engineId, deviceProfile },
       required: ['engineId'],
     },
   },
@@ -77,10 +109,13 @@ export const MCP_TOOLS: readonly McpToolDefinition[] = Object.freeze([
     description: 'Recommends an approved game engine and architecture based on the user prompt, gameplay genre, or mechanics.',
     inputSchema: {
       type: 'object',
+      additionalProperties: false,
       properties: {
         prompt: {
           type: 'string',
-          description: 'User prompt or game genre description (e.g. "retro arcade platformer", "physics puzzle", "tilemap RPG")',
+          description: 'User prompt or game genre description',
+          maxLength: 4000,
+          pattern: '\\S',
         },
       },
       required: ['prompt'],
@@ -91,20 +126,8 @@ export const MCP_TOOLS: readonly McpToolDefinition[] = Object.freeze([
     description: 'Generates a complete, typed, and validated starter cartridge project with manifest, entrypoint source, and controls.',
     inputSchema: {
       type: 'object',
-      properties: {
-        engineId: {
-          type: 'string',
-          description: 'Engine identifier ("kaplay", "pixel-v1", "phaser", "pixi")',
-        },
-        title: {
-          type: 'string',
-          description: 'Game title (max 80 chars)',
-        },
-        deviceProfile: {
-          type: 'string',
-          description: 'Target device profile (default: "slopboy-1000")',
-        },
-      },
+      additionalProperties: false,
+      properties: { engineId, title, deviceProfile },
       required: ['engineId'],
     },
   },
@@ -113,18 +136,13 @@ export const MCP_TOOLS: readonly McpToolDefinition[] = Object.freeze([
     description: 'Validates cartridge TypeScript/JavaScript source code and manifest against Slopboy security rules, returning structured, actionable diagnostics for self-correction.',
     inputSchema: {
       type: 'object',
+      additionalProperties: false,
       properties: {
-        engineId: {
-          type: 'string',
-          description: 'Engine identifier ("kaplay", "pixel-v1")',
-        },
-        sourceCode: {
-          type: 'string',
-          description: 'Complete entrypoint source code',
-        },
+        engineId,
+        sourceCode,
         manifest: {
           type: 'object',
-          description: 'Optional partial or complete manifest.json object',
+          description: 'Optional manifest.json object. Manifest problems are returned as diagnostics.',
         },
       },
       required: ['engineId', 'sourceCode'],
@@ -136,28 +154,57 @@ export const MCP_TOOLS: readonly McpToolDefinition[] = Object.freeze([
     requiresScope: 'mcp:write',
     inputSchema: {
       type: 'object',
-      properties: {
-        engineId: {
-          type: 'string',
-          description: 'Engine identifier ("kaplay", "pixel-v1")',
-        },
-        title: {
-          type: 'string',
-          description: 'Game title (1 to 80 characters)',
-        },
-        sourceCode: {
-          type: 'string',
-          description: 'Complete entrypoint source code',
-        },
-        deviceProfile: {
-          type: 'string',
-          description: 'Device profile (default: "slopboy-1000")',
-        },
-      },
+      additionalProperties: false,
+      properties: { engineId, title, sourceCode, deviceProfile },
       required: ['engineId', 'title', 'sourceCode'],
     },
   },
 ]);
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function invalidArgument(schema: ToolInputSchema, args: Record<string, unknown>): string | undefined {
+  for (const key of schema.required ?? []) {
+    if (!Object.hasOwn(args, key)) return key;
+  }
+
+  for (const [key, value] of Object.entries(args)) {
+    if (!Object.hasOwn(schema.properties, key)) return 'arguments';
+    const property = schema.properties[key];
+    if (property.type === 'object') {
+      if (!isObject(value)) return key;
+      continue;
+    }
+
+    if (typeof value !== 'string') return key;
+    if (property.enum && !property.enum.includes(value)) return key;
+    if (property.pattern && !new RegExp(property.pattern).test(value)) return key;
+    if (key === 'sourceCode' && Buffer.byteLength(value, 'utf8') > SOURCE_LIMIT_BYTES) return key;
+    if (property.maxLength !== undefined && value.length > property.maxLength &&
+        Array.from(value).length > property.maxLength) return key;
+  }
+}
+
+function invalidArguments(id: JsonRpcRequest['id'], field: string): JsonRpcResponse {
+  return {
+    jsonrpc: '2.0',
+    id,
+    error: {
+      code: -32602,
+      message: 'Tool arguments do not match the input schema',
+      data: { code: 'INVALID_TOOL_ARGUMENTS', field },
+    },
+  };
+}
+
+function draftUnavailable() {
+  return Object.assign(new Error('Draft creation requires authenticated persistence'), {
+    status: 503,
+    code: -32003,
+  });
+}
 
 export interface McpServerOptions {
   readonly authConfig?: TokenVerificationOptions;
@@ -300,7 +347,13 @@ export async function handleMcpHttpRequest(
         id: jsonRpc.id ?? null,
         error: {
           code: errorRecord.code || -32603,
-          message: status >= 500 && status !== 503 ? 'Internal error' : (errorRecord.message || 'Internal error'),
+          message: status === 503
+            ? 'Tool unavailable'
+            : status >= 500 ? 'Internal error' : (errorRecord.message || 'Internal error'),
+          data: { code: status === 503 ? 'TOOL_UNAVAILABLE'
+            : status === 401 ? 'AUTH_REQUIRED'
+            : status === 403 ? 'INSUFFICIENT_SCOPE'
+            : 'INTERNAL_ERROR' },
         },
       }),
     };
@@ -344,41 +397,36 @@ export async function processJsonRpc(
             name: t.name,
             description: t.description,
             inputSchema: t.inputSchema,
+            _meta: { 'slopboy.dev/contractVersion': MCP_TOOL_CONTRACT_VERSION },
           })),
         },
       };
     }
 
     case 'tools/call': {
-      if (!params || typeof params.name !== 'string') {
-        return {
-          jsonrpc: '2.0',
-          id,
-          error: { code: -32602, message: 'Invalid params: "name" required' },
-        };
+      if (!isObject(params) || typeof params.name !== 'string' || !params.name) {
+        return invalidArguments(id, 'name');
       }
 
       const toolName = params.name;
-      const toolArgs = (params.arguments || {}) as Record<string, unknown>;
       const toolDef = MCP_TOOLS.find(t => t.name === toolName);
 
       if (!toolDef) {
         return {
           jsonrpc: '2.0',
           id,
-          error: { code: -32601, message: `Tool not found: "${toolName}"` },
+          error: {
+            code: -32601,
+            message: 'Tool not found',
+            data: { code: 'TOOL_NOT_FOUND' },
+          },
         };
       }
 
       // Check if tool requires authorization
       let subject: AuthSubject | undefined = undefined;
       if (toolDef.requiresScope) {
-        if (!options.authConfig) {
-          const error: any = new Error('OAuth authentication not configured on server');
-          error.status = 500;
-          error.code = -32603;
-          throw error;
-        }
+        if (!options.authConfig) throw draftUnavailable();
 
         const authResult = verifyAccessToken(authHeader, {
           ...options.authConfig,
@@ -396,12 +444,14 @@ export async function processJsonRpc(
         subject = authResult.subject;
       }
 
-      if (toolName === 'create_game_draft' && (!options.onSaveDraft || !options.authConfig)) {
-        const error = new Error('Draft creation unavailable until authenticated persistence is configured') as Error & { status: number; code: number };
-        error.status = 503;
-        error.code = -32003;
-        throw error;
-      }
+      if (toolDef.requiresScope && !options.onSaveDraft) throw draftUnavailable();
+
+      const toolArgs = params.arguments === undefined ? {} : params.arguments;
+      if (!isObject(toolArgs)) return invalidArguments(id, 'arguments');
+
+      const field = invalidArgument(toolDef.inputSchema, toolArgs);
+      if (field) return invalidArguments(id, field);
+
       const callResult = await executeTool(toolName, toolArgs, subject, options);
 
       return {
@@ -472,15 +522,7 @@ async function executeTool(
       const engineId = String(args.engineId || '');
       const title = typeof args.title === 'string' ? args.title.trim() : '';
       const sourceCode = typeof args.sourceCode === 'string' ? args.sourceCode : '';
-      if (!options.onSaveDraft) {
-        const error = new Error('Draft storage is not configured') as Error & { status: number };
-        error.status = 503;
-        throw error;
-      }
-      if (!title || title.length > 80 || Buffer.byteLength(sourceCode, 'utf8') > 65536) {
-        return { ok: false, error: 'INVALID_INPUT', message: 'Title (1–80 chars) and source (at most 64 KiB) are required' };
-      }
-      const deviceProfile = typeof args.deviceProfile === 'string' ? args.deviceProfile : V2_DEVICE_1000.id;
+      if (!options.onSaveDraft) throw draftUnavailable();
 
       const desc = getEngineDescriptor(engineId);
       if (!desc) {

@@ -8,6 +8,7 @@ import {
   MCP_PROTOCOL_VERSION,
   MCP_SERVER_INFO,
   type TokenVerificationOptions,
+  type McpServerOptions,
 } from '../packages/mcp/src/index.ts';
 
 const TEST_SECRET = 'super-secret-test-key-32-chars-long!';
@@ -383,8 +384,14 @@ import kaplay from 'kaplay';
 export default function setupGame(kInit, canvas) {}
 `;
 
-  let savedDraft: any = null;
-  const res = await handleMcpHttpRequest(
+  const savedDrafts: Array<Parameters<NonNullable<McpServerOptions['onSaveDraft']>>[0]> = [];
+  const options: McpServerOptions = {
+    authConfig: DEFAULT_AUTH_CONFIG,
+    onSaveDraft: async draft => {
+      savedDrafts.push(draft);
+    },
+  };
+  const callDraft = (extra: Record<string, unknown> = {}) => handleMcpHttpRequest(
     {
       method: 'POST',
       headers: { Authorization: `Bearer ${validToken}` },
@@ -394,25 +401,25 @@ export default function setupGame(kInit, canvas) {}
         method: 'tools/call',
         params: {
           name: 'create_game_draft',
-          arguments: {
-            engineId: 'kaplay',
-            title: 'Laser Asteroid',
-            sourceCode: validCode,
-            // Attacker attempts to spoof ownerId/userId:
-            userId: 'usr_impersonated_victim',
-            ownerId: 'usr_impersonated_victim',
-          },
+          arguments: { engineId: 'kaplay', title: 'Laser Asteroid', sourceCode: validCode, ...extra },
         },
       }),
     },
-    {
-      authConfig: DEFAULT_AUTH_CONFIG,
-      onSaveDraft: async draft => {
-        savedDraft = draft;
-      },
-    }
+    options
   );
 
+  for (const field of ['ownerId', 'userId']) {
+    const spoofed = await callDraft({ [field]: 'usr_impersonated_victim' });
+    assert.equal(spoofed.status, 200);
+    assert.deepEqual(JSON.parse(spoofed.body).error.data, {
+      code: 'INVALID_TOOL_ARGUMENTS',
+      field: 'arguments',
+    });
+    assert.ok(!spoofed.body.includes('usr_impersonated_victim'));
+    assert.equal(savedDrafts.length, 0);
+  }
+
+  const res = await callDraft();
   assert.equal(res.status, 200);
   const json = JSON.parse(res.body);
   const payload = JSON.parse(json.result.content[0].text);
@@ -425,11 +432,9 @@ export default function setupGame(kInit, canvas) {}
 
   // CRITICAL DEFENSE: ownerId MUST be derived from token sub, NOT user-supplied spoofed parameter!
   assert.equal(payload.ownerId, 'usr_legitimate_creator_uuid_123');
-  assert.notEqual(payload.ownerId, 'usr_impersonated_victim');
-
-  assert.ok(savedDraft);
-  assert.equal(savedDraft.ownerId, 'usr_legitimate_creator_uuid_123');
-  assert.equal(savedDraft.title, 'Laser Asteroid');
+  assert.equal(savedDrafts.length, 1);
+  assert.equal(savedDrafts[0].ownerId, 'usr_legitimate_creator_uuid_123');
+  assert.equal(savedDrafts[0].title, 'Laser Asteroid');
 });
 
 test('draft creation is unavailable without a durable persistence handler even with valid token', async () => {
