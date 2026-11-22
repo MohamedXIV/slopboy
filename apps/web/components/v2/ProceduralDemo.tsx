@@ -7,6 +7,7 @@ import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {PROCEDURAL_DEMO} from '@/lib/ai/procedural-demo';
 
 const {width,height,indexedColors} = V2_DEVICE_1000.display;
+const responseTimeoutMs = 2500;
 const saveKey = 'slopboy-procedural-lab-v1';
 const controls: Record<string,V2Button> = {ArrowUp:'UP',ArrowDown:'DOWN',ArrowLeft:'LEFT',ArrowRight:'RIGHT'};
 const colors = V2_LCD_PALETTES.moss.colors.map(color => [
@@ -16,7 +17,7 @@ const colors = V2_LCD_PALETTES.moss.colors.map(color => [
 export default function ProceduralDemo() {
   const frame = useRef<HTMLIFrameElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
-  const session = useRef<{key:string; phase:'boot'|'starting'|'running'; busy:boolean; pressed:Set<V2Button>}|null>(null);
+  const session = useRef<{key:string; phase:'boot'|'starting'|'running'; deadline:number|null; pressed:Set<V2Button>}|null>(null);
   const audio = useRef<AudioContext|null>(null);
   const oscillator = useRef<OscillatorNode|null>(null);
   const muted = useRef(false);
@@ -39,16 +40,16 @@ export default function ProceduralDemo() {
     if (context) void context.close().catch(()=>{});
   },[stopTone]);
 
-  function stop() {
+  const stop = useCallback((reason = 'Stopped') => {
     const current = session.current;
     if (!current) return;
     frame.current?.contentWindow?.postMessage({scope:'slopboy-v1',key:current.key,type:'stop'},'*');
     session.current = null;
     closeAudio();
     setRunning(false);
-    setStatus('Stopped');
+    setStatus(reason);
     canvas.current?.getContext('2d')?.clearRect(0,0,width,height);
-  }
+  },[closeAudio]);
 
   function start() {
     if (session.current) return;
@@ -57,7 +58,7 @@ export default function ProceduralDemo() {
       audio.current = context;
       void context.resume().catch(()=>{});
     } catch { /* The game also works without audio support. */ }
-    session.current = {key:crypto.randomUUID(),phase:'boot',busy:false,pressed:new Set()};
+    session.current = {key:crypto.randomUUID(),phase:'boot',deadline:performance.now()+responseTimeoutMs,pressed:new Set()};
     setSaved(false);
     setStatus('Starting');
     setRunning(true);
@@ -88,14 +89,12 @@ export default function ProceduralDemo() {
       if (data.key !== current.key) return;
       if (data.type === 'ready' && current.phase === 'starting') {
         current.phase = 'running';
+        current.deadline = null;
         setStatus('Running');
         return;
       }
       if (data.type === 'error') {
-        session.current = null;
-        closeAudio();
-        setRunning(false);
-        setStatus('Sandbox stopped');
+        stop('Sandbox stopped');
         return;
       }
       if (current.phase !== 'running') return;
@@ -103,9 +102,9 @@ export default function ProceduralDemo() {
         try { localStorage.setItem(saveKey,data.value); setSaved(true); } catch {}
         return;
       }
-      if (data.type !== 'frame' || !current.busy ||
+      if (data.type !== 'frame' || current.deadline === null ||
           !(data.pixels instanceof Uint8Array) || data.pixels.length !== width*height) return;
-      current.busy = false;
+      current.deadline = null;
       const context = canvas.current?.getContext('2d');
       if (context) {
         const image = context.createImageData(width,height);
@@ -147,8 +146,13 @@ export default function ProceduralDemo() {
     window.addEventListener('keydown',onKey);
     const ticker = window.setInterval(() => {
       const current = session.current;
-      if (!current || current.phase !== 'running' || current.busy || !frame.current?.contentWindow) return;
-      current.busy = true;
+      if (!current) return;
+      if (current.deadline !== null && performance.now() >= current.deadline) {
+        stop('Sandbox timed out');
+        return;
+      }
+      if (current.phase !== 'running' || current.deadline !== null || !frame.current?.contentWindow) return;
+      current.deadline = performance.now()+responseTimeoutMs;
       frame.current.contentWindow.postMessage({scope:'slopboy-v1',key:current.key,type:'tick',
         dt:1/30,down:[],pressed:[...current.pressed]},'*');
       current.pressed.clear();
@@ -160,13 +164,13 @@ export default function ProceduralDemo() {
       session.current = null;
       closeAudio();
     };
-  },[closeAudio,stopTone]);
+  },[closeAudio,stop,stopTone]);
 
   return <Card variant="secondary"><Card.Content className="space-y-4">
     <canvas ref={canvas} width={width} height={height} aria-label="Procedural game display"
       className="mx-auto w-full max-w-xs rounded bg-black [image-rendering:pixelated]"/>
     <div className="flex flex-wrap gap-2">
-      <Button onPress={running ? stop : start}>{running ? 'Stop demo' : 'Start demo'}</Button>
+      <Button onPress={running ? () => stop() : start}>{running ? 'Stop demo' : 'Start demo'}</Button>
       <Button variant="secondary" onPress={toggleMute}>{isMuted ? 'Unmute' : 'Mute'}</Button>
       <Button variant="secondary" isDisabled={!running} onPress={() => session.current?.pressed.add('A')}>Save position</Button>
     </div>

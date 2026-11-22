@@ -40,8 +40,25 @@ try {
  await p.waitForFunction(()=>window.probe.closed===1&&!document.querySelector('iframe'));
  await click('Start demo');
  await pixel(115,117);
+ await p.evaluate(() => {
+  window.dropDemoFrames = true;
+  window.addEventListener('message', event => {
+    if (window.dropDemoFrames &&
+        event.source === document.querySelector('iframe')?.contentWindow &&
+        event.data?.scope === 'slopboy-v1' && event.data.type === 'frame') {
+      event.stopImmediatePropagation();
+    }
+  }, true);
+ });
+ await p.getByText('Sandbox timed out',{exact:true}).waitFor({timeout:7000});
+ await p.waitForFunction(()=>window.probe.closed===2&&!document.querySelector('iframe'));
+ assert.equal(await p.evaluate(()=>localStorage.getItem('slopboy-procedural-lab-v1')),'[7,8]');
+ await p.evaluate(()=>{window.dropDemoFrames=false;});
+ await click('Start demo');
+ await pixel(115,117);
  await click('Stop demo');
- console.log('WebKit '+browser.version()+' passed offline input, opaque iframe, Web Audio, mute, local save, teardown and restart');
+ await p.waitForFunction(()=>window.probe.closed===3);
+ console.log('WebKit '+browser.version()+' passed offline input, opaque iframe, Web Audio, mute, local save, timeout recovery and restart');
 } finally {
  await browser.close(); await server?.stop();
 }

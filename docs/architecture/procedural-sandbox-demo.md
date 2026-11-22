@@ -56,3 +56,10 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
 Linux WebKit is useful engine-level coverage. Actual Safari/iOS behavior,
 broader hostile resource/navigation cases and arbitrary KAPLAY code remain
 unverified. The untrusted player Preview stays gated.
+
+The demo host also monitors startup and outstanding-frame deadlines. If the
+iframe stops replying, the host removes it, clears the canvas and closes
+Web Audio even if the iframe cannot report its own watchdog error. A new
+session starts from the prior local snapshot. Both demo smoke tests simulate
+missing frame responses in the host test harness and check this recovery.
+This does not measure host responsiveness under browser process exhaustion.
