@@ -1,12 +1,12 @@
 # Slopboy — Agent-Native Platform Roadmap
 
-**Updated:** 2026-11-19 · **Status:** Sprint 2 integration is complete. The canonical routes and game ownership work are on main. The first private source ingestion slice is in [Draft PR #98](https://github.com/MohamedXIV/slopboy/pull/98).
+**Updated:** 2026-11-22 · **Status:** Sprint 2 integration is complete. The canonical routes and game ownership work are on main. Private source drafts, revision history and staged source uploads are on main.
 
 **GitHub Project:** [Slopboy — Agent-Native Platform Roadmap](https://github.com/users/MohamedXIV/projects/7)  
 **Long-term product register:** [Long-Term Vision](docs/product/long-term-vision.md) · [Agents' entrypoint](AGENTS.md)
 **Architecture:** [ADR-002](docs/architecture/adr-002-production-cutover.md) (UUIDs/Legacy) · [ADR-003](docs/architecture/adr-003-agent-native-platform.md) (ChatGPT/Claude MCP, SaaS roles, hosting) · [ADR-004](docs/architecture/adr-004-approved-game-frameworks.md) (approved frameworks/cartridge runtime)
 
-**AI game-idea entry point:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) adds a public `/ai` prompt/guide experience with versioned Markdown/JSON and **optional Genre**. This discoverability track complements #46/#49; it does not bypass OAuth, account-owned drafts, adapter approval, sandboxing or public-review gates. Pending separate Draft PR review; no production cutover.
+**AI game-idea entry point:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) adds a public `/ai` prompt/guide experience with versioned Markdown/JSON and **optional Genre**. This discoverability track complements #46/#49; it does not bypass OAuth, account-owned drafts, adapter approval, sandboxing or public-review gates. Merged in [PR #106](https://github.com/MohamedXIV/slopboy/pull/106).
 
 ## Locked product direction
 
@@ -52,9 +52,9 @@ The canonical-route sequence #23 → #22 → #24 and the #44 engine contract are
 ## Active Sprint 2 — Integration and account-backed platform
 
 - **Merged baseline:** Integration #77 and PRs #78, #91 and #97 are complete on main. Keep #26/#27/#34/#90 acceptance tracked separately. A prior production checkpoint verified a signed-in player creating and reloading a private draft and receiving an admin denial. A second authenticated account, real admin actions, and hosted publication and revocation still need verification. See [#90](https://github.com/MohamedXIV/slopboy/issues/90) for that evidence and its limits.
-- **Manual source ingestion:** Draft PR #98 covers #49 and the single-file portion of #31. Its checks passed on the draft head. Hosted signed-in desktop/mobile acceptance and migration 005 rollout remain pending. The rest of #31 covers staged source and asset uploads, storage and revision finalization.
-- **Next repo task, #29:** Start with versioned provider-neutral tool schemas, error contracts and tests. Reuse the engine discovery and template code already on main. Keep deployed writes disabled until #28 verifies OAuth identity and the ownership-aware draft service is ready. #30 tracks real ChatGPT and Claude acceptance.
-- **Playable private cartridges:** #32 covers isolated builds. #45 and #33/#4 cover adapter and runtime isolation acceptance. The private source editor stores data only. Public release requires a separate moderation decision under #38.
+- **Manual source ingestion:** #98 added private validation and persistence, #106 added AI handoff and immutable revision history, and #107 added private staged uploads. #110 makes new projects source-only and preserves owner access to previously uploaded files. Track hosted and live migration evidence separately from repository merges.
+- **MCP contracts and OAuth:** [PR #100](https://github.com/MohamedXIV/slopboy/pull/100) covers versioned tool inputs and errors. Keep deployed writes disabled until OAuth identity and ownership-aware persistence are verified. [Draft PR #101](https://github.com/MohamedXIV/slopboy/pull/101) has a read-only dev OAuth Preview. Real ChatGPT and Claude consent, identity, refresh and disconnect remain acceptance gates under #28/#30.
+- **Playable private cartridges:** #108 supplies deterministic build inputs, and #109 adds fixture-only build jobs. #111 demonstrates a repository-owned game with procedural graphics, audio and offline saves. Player builds and preview stay gated on #32/#45/#33/#4. Public release requires separate moderation under #38.
 
 Follow the single-writer rule in [AGENTS.md](AGENTS.md) and check current issue and PR claims before starting. Repository checks on a commit and live account acceptance are separate evidence.
 
@@ -64,7 +64,7 @@ Follow the single-writer rule in [AGENTS.md](AGENTS.md) and check current issue 
 
 **Engine work runs in parallel:** [#44](https://github.com/MohamedXIV/slopboy/issues/44) should design the engine-neutral manifest/host API alongside #23 without blocking the canonical route cutover. [#45](https://github.com/MohamedXIV/slopboy/issues/45) + [#46](https://github.com/MohamedXIV/slopboy/issues/46) are gates for the first end-to-end AI-created KAPLAY game (#30). Phaser #47 and PixiJS #48 are **not launch blockers** for that first vertical slice.
 
-**Manual creator path:** [#49](https://github.com/MohamedXIV/slopboy/issues/49) now has a draft implementation in PR #98. Preview still depends on #4/#32/#33 and the engine adapter gate.
+**Manual creator path:** [#49](https://github.com/MohamedXIV/slopboy/issues/49) supports saving private source drafts. Preview still depends on #4/#32/#33 and the engine adapter gate.
 
 **Backend and connector follow-up:** #25 is complete. #26 tracks live account isolation and #28 tracks OAuth compatibility for the MCP write path.
 
