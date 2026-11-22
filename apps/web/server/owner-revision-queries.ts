@@ -7,20 +7,34 @@
 export const OWNER_GAMES_PAGE_SIZE=50;
 export const OWNER_REVISION_HISTORY_LIMIT=50;
 
-export const LIST_OWNED_GAMES_SQL=[
-  "SELECT g.id::text AS id,g.title,g.status,g.visibility,",
-  "r.id::text AS latest_revision_id,r.revision_number AS latest_revision_number,",
-  "r.release_version AS latest_release_version,r.status AS latest_revision_status,",
-  "r.engine_id AS latest_engine_id,r.engine_version AS latest_engine_version",
-  "FROM public.games g",
-  "LEFT JOIN LATERAL (",
-  "  SELECT id,revision_number,release_version,status,engine_id,engine_version",
-  "  FROM public.game_revisions WHERE game_id=g.id",
-  "  ORDER BY revision_number DESC,id DESC LIMIT 1",
-  ") r ON TRUE",
-  "WHERE g.owner_id=$1::uuid AND EXISTS (SELECT 1 FROM public.users u WHERE u.id=$1::uuid)",
-  "ORDER BY g.created_at DESC,g.id DESC LIMIT $2::int"
-].join('\n');
+function listOwnedGamesSql(withDraft:boolean) {
+  return [
+    "SELECT g.id::text AS id,g.title,g.status,g.visibility,",
+    "r.id::text AS latest_revision_id,r.revision_number AS latest_revision_number,",
+    "r.release_version AS latest_release_version,r.status AS latest_revision_status,",
+    "r.engine_id AS latest_engine_id,r.engine_version AS latest_engine_version",
+    ...(withDraft ? [",d.created_at::text AS draft_saved_at,d.validated AS draft_validated"] : []),
+    "FROM public.games g",
+    "LEFT JOIN LATERAL (",
+    "  SELECT id,revision_number,release_version,status,engine_id,engine_version",
+    "  FROM public.game_revisions WHERE game_id=g.id",
+    "  ORDER BY revision_number DESC,id DESC LIMIT 1",
+    ") r ON TRUE",
+    ...(withDraft ? [
+      "LEFT JOIN LATERAL (",
+      "  SELECT created_at,engine_manifest IS NOT NULL AS validated",
+      "  FROM public.game_source_drafts WHERE game_id=g.id",
+      "  AND g.visibility='private' AND g.status='draft'",
+      "  ORDER BY created_at DESC,id DESC LIMIT 1",
+      ") d ON TRUE",
+    ] : []),
+    "WHERE g.owner_id=$1::uuid AND EXISTS (SELECT 1 FROM public.users u WHERE u.id=$1::uuid)",
+    "ORDER BY g.created_at DESC,g.id DESC LIMIT $2::int"
+  ].join('\n');
+}
+
+export const LIST_OWNED_GAMES_SQL=listOwnedGamesSql(false);
+export const LIST_OWNED_GAMES_WITH_DRAFT_SQL=listOwnedGamesSql(true);
 
 /**
  * A LEFT JOIN yields one row for a real owned game without revisions; no row

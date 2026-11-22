@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve,dirname } from 'node:path';
 import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
-import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/owner-revision-queries.ts';
+import {LIST_OWNED_GAMES_WITH_DRAFT_SQL,LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/owner-revision-queries.ts';
 import {CREATE_GAME_SQL,UPDATE_GAME_SQL} from '../apps/web/server/game-management-queries.ts';
 import {READ_PLAYABLE_GAME_SQL} from '../apps/web/server/playable-catalog-query.ts';
 import {READ_SOURCE_DRAFT_SQL,CREATE_SOURCE_DRAFT_SQL} from '../apps/web/server/source-draft-queries.ts';
@@ -809,6 +809,17 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     const restore = validated(alice, "'" + gameUuid + "'", 'e', restoreKey, restoreRevision);
     assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /stored/);
     assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /replayed/);
+
+    const draftListing = (actor:string) => executePsql(config,{sql:`
+      SET ROLE slopboy_test_web;
+      PREPARE draft_listing(uuid,int) AS ${LIST_OWNED_GAMES_WITH_DRAFT_SQL};
+      EXECUTE draft_listing('${actor}',50);`});
+    const ownerDraft = pgQueryRows((await draftListing(alice)).stdout).find(row=>row.startsWith(gameUuid+'|'));
+    assert.ok(ownerDraft);
+    assert.match(ownerDraft,/\|[0-9]{4}-[0-9]{2}-[0-9]{2}[^|]*\|t$/);
+    assert.doesNotMatch(ownerDraft,/export default|source_digest|adapterProtocol/);
+    assert.ok(!pgQueryRows((await draftListing(bob)).stdout).some(row=>row.startsWith(gameUuid+'|')));
+    assert.ok(!pgQueryRows((await draftListing(admin)).stdout).some(row=>row.startsWith(gameUuid+'|')));
 
     const history = (actor: string, before: string | null = null) => executePsql(config, {sql:
       `SET ROLE slopboy_test_web;

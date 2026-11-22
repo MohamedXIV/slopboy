@@ -13,7 +13,7 @@ type Revision={
   id:string;revisionNumber:number;releaseVersion:string|null;
   status:string;engineId:string;engineVersion:string;
 };
-type Game={id:string;title:string;status:string;visibility:string;latestRevision:Revision|null};
+type Game={id:string;title:string;status:string;visibility:string;latestRevision:Revision|null;sourceDraft:{savedAt:string;validated:boolean}|null};
 type Account={user:User;profile:Profile|null};
 
 export default function AccountDashboard({trustedPreviewEnabled}:{trustedPreviewEnabled:boolean}){
@@ -149,12 +149,21 @@ export default function AccountDashboard({trustedPreviewEnabled}:{trustedPreview
                       <Link href={`/manage/${game.id}/preview`} className="link">Preview demo</Link>}
                     <span className="text-muted">{game.status} · {game.visibility}</span>
                   </div>
+                  {game.sourceDraft && <p className="text-xs text-muted">
+                    Saved <time dateTime={game.sourceDraft.savedAt}>
+                      {new Date(game.sourceDraft.savedAt).toLocaleString()}
+                    </time> · {game.sourceDraft.validated ? 'Source validation passed' : 'Source not validated'}
+                    {' · Private draft preview unavailable'}
+                    {' · '}<Link href={`/manage/${game.id}/history`} className="link">Source history</Link>
+                  </p>}
+                  {trustedPreviewEnabled && game.visibility==='private' && game.status==='draft' &&
+                    <p className="text-xs text-muted">Preview demo runs the built-in game.</p>}
                   <p className="text-xs text-muted">
                     {game.latestRevision
                       ? `Revision ${game.latestRevision.revisionNumber}${game.latestRevision.releaseVersion
                         ? ' · '+game.latestRevision.releaseVersion : ''} · ${game.latestRevision.status}
                         · ${game.latestRevision.engineId} ${game.latestRevision.engineVersion}`
-                      : 'No uploaded revisions yet'}
+                      : 'No cartridge revisions yet'}
                   </p>
                 </li>)}
               </ul>}

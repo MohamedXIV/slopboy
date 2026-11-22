@@ -1,7 +1,7 @@
 import {neon} from '@neondatabase/serverless';
 import {isGameUuid} from '@slopboy/catalog';
 import {
-  LIST_OWNED_GAMES_SQL,OWNER_GAMES_PAGE_SIZE,
+  LIST_OWNED_GAMES_SQL,LIST_OWNED_GAMES_WITH_DRAFT_SQL,OWNER_GAMES_PAGE_SIZE,
   OWNER_REVISION_HISTORY_LIMIT,READ_OWNED_REVISIONS_SQL,
 } from '../../server/owner-revision-queries';
 import type {Subject} from './auth-contract';
@@ -26,6 +26,7 @@ export interface OwnerRevision{
 export interface OwnerGame{
   readonly id:string;readonly title:string;readonly status:string;readonly visibility:string;
   readonly latestRevision:OwnerRevision|null;
+  readonly sourceDraft:{savedAt:string;validated:boolean}|null;
 }
 export interface OwnedGameHistory{
   readonly gameId:string;
@@ -78,14 +79,21 @@ export async function readProfile(subject:Subject):Promise<DatabaseProfile|null>
  * parameters, roles and even admin users cannot widen access to other owners. */
 export async function listOwnedGames(subject:Subject):Promise<readonly OwnerGame[]>{
   const sql=sqlClient();if(!sql)throw Error('DATABASE_UNAVAILABLE');
-  const rows=await sql.query(LIST_OWNED_GAMES_SQL,[subject.id,OWNER_GAMES_PAGE_SIZE]);
+  const args=[subject.id,OWNER_GAMES_PAGE_SIZE];
+  const rows=await sql.query(LIST_OWNED_GAMES_WITH_DRAFT_SQL,args).catch(error=>{
+    // Some deployments have not applied the source migration or its column grants.
+    if (!['42P01','42703','42501'].includes(error?.code)) throw error;
+    return sql.query(LIST_OWNED_GAMES_SQL,args);
+  });
   return rows.map(row=>{
     if(!isGameUuid(String(row.id))||typeof row.title!=='string'||
       typeof row.status!=='string'||typeof row.visibility!=='string')
       throw Error('INVALID_OWNED_GAME_METADATA');
     return {id:String(row.id),title:String(row.title),
       status:String(row.status),visibility:String(row.visibility),
-      latestRevision:parseOwnerRevision(row as Record<string,unknown>,'latest_')};
+      latestRevision:parseOwnerRevision(row as Record<string,unknown>,'latest_'),
+      sourceDraft:typeof row.draft_saved_at==='string' && typeof row.draft_validated==='boolean'
+        ? {savedAt:new Date(row.draft_saved_at).toISOString(),validated:row.draft_validated} : null};
   });
 }
 
