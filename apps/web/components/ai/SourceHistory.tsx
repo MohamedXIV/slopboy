@@ -6,6 +6,8 @@ import {PRIVATE_SOURCE_LIMIT} from '@slopboy/cartridge/private-source-template';
 import {existingGameSourceRequest, getTabSubmissionSeed, rotateTabSubmissionSeed,
   scopedSubmissionId, sourceByteLength, type SourceLanguage} from '../../lib/ai/source-import';
 
+import {compareSourceLines} from '../../lib/ai/source-version-comparison';
+
 type RevisionSummary = {id: string; language: string; checksum: string | null;
   createdAt: string; validated: boolean};
 type RevisionSource = RevisionSummary & {source: string};
@@ -26,6 +28,10 @@ export default function SourceHistory({gameId}: {gameId: string}) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState<RevisionSource | null>(null);
+  const [compareFrom, setCompareFrom] = useState('');
+  const [compareTo, setCompareTo] = useState('');
+  const [changes, setChanges] = useState<ReturnType<typeof compareSourceLines>>();
+  const [compareNotice, setCompareNotice] = useState('');
   const [source, setSource] = useState('');
   const [language, setLanguage] = useState<SourceLanguage>('typescript');
   const [notice, setNotice] = useState('');
@@ -74,30 +80,48 @@ export default function SourceHistory({gameId}: {gameId: string}) {
     }
   }
 
+  async function readRevision(revisionId: string): Promise<RevisionSource> {
+    const response = await fetch(`${endpoint}?revision=${encodeURIComponent(revisionId)}`, {cache:'no-store'});
+    const data = await response.json() as {error?: string; revision?: RevisionSource};
+    if (!response.ok || data.revision?.id !== revisionId ||
+        typeof data.revision.source !== 'string' ||
+        !['typescript', 'javascript'].includes(data.revision.language)) {
+      throw Error(data.error ?? 'INVALID_REVISION');
+    }
+    return data.revision;
+  }
+
+  async function compareVersions() {
+    if (busy || !compareFrom || !compareTo || compareFrom === compareTo) return;
+    setBusy(true);
+    setCompareNotice('');
+    setChanges(undefined);
+    try {
+      const [before, after] = await Promise.all([readRevision(compareFrom), readRevision(compareTo)]);
+      setChanges(compareSourceLines(before.source, after.source));
+    } catch (error) {
+      setCompareNotice((error instanceof Error && errorMessage[error.message]) ||
+        'Could not compare these versions. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function loadRevision(revisionId: string) {
     if (busy) return;
     setBusy(true);
     setNotice('');
     setDiagnostics([]);
     try {
-      // Only a revision UUID travels in the URL, never its code.
-      const response = await fetch(`${endpoint}?revision=${encodeURIComponent(revisionId)}`,
-        {cache: 'no-store'});
-      const data = await response.json() as {error?: string; revision?: RevisionSource};
-      if (!response.ok || !data.revision || data.revision.id !== revisionId ||
-          typeof data.revision.source !== 'string' ||
-          !['typescript', 'javascript'].includes(data.revision.language)) {
-        setNotice(errorMessage[data.error ?? ''] ?? 'This version could not be loaded.');
-        return;
-      }
-      setSelected(data.revision);
-      setSource(data.revision.source);
-      setLanguage(data.revision.language as SourceLanguage);
-      setNotice(data.revision.validated
+      const revision = await readRevision(revisionId);
+      setSelected(revision);
+      setSource(revision.source);
+      setLanguage(revision.language as SourceLanguage);
+      setNotice(revision.validated
         ? 'Version loaded as editable text. Saving creates a new revision, not an overwrite.'
         : 'Legacy unvalidated source loaded. It must pass current checks before another save.');
-    } catch {
-      setNotice('Could not load the selected version. Try again.');
+    } catch (error) {
+      setNotice(error instanceof Error ? errorMessage[error.message] ?? 'Could not load the selected version. Try again.' : 'Could not load the selected version. Try again.');
     } finally {
       setBusy(false);
     }
@@ -166,6 +190,43 @@ export default function SourceHistory({gameId}: {gameId: string}) {
       {nextBefore && <Button className="mt-3" type="button" variant="secondary" isDisabled={busy}
         onPress={() => void loadOlderVersions()}>Load older versions</Button>}
     </Card.Content></Card>
+    {revisions.length >= 2 && <Card variant="secondary">
+      <Card.Header><Card.Title>Compare versions</Card.Title></Card.Header>
+      <Card.Content className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([
+            {label:'From version', value:compareFrom, set:setCompareFrom},
+            {label:'To version', value:compareTo, set:setCompareTo},
+          ]).map(({label,value,set}) => <Select key={label} value={value || null} isDisabled={busy}
+            onChange={key => {
+              set(typeof key === 'string' ? key : '');
+              setChanges(undefined);
+              setCompareNotice('');
+            }}>
+            <Label>{label}</Label>
+            <Select.Trigger><Select.Value/><Select.Indicator/></Select.Trigger>
+            <Select.Popover><ListBox>
+              {revisions.map(revision => <ListBox.Item key={revision.id} id={revision.id}>
+                {revision.createdAt} · {revision.id.slice(0,8)}
+              </ListBox.Item>)}
+            </ListBox></Select.Popover>
+          </Select>)}
+        </div>
+        <Button type="button" variant="secondary"
+          isDisabled={busy || !compareFrom || !compareTo || compareFrom === compareTo}
+          onPress={() => void compareVersions()}>Compare versions</Button>
+        {compareNotice && <p role="status">{compareNotice}</p>}
+        {changes === null && <p role="status">These versions have too many changes to display together.</p>}
+        {changes?.length === 0 && <p role="status">No line changes.</p>}
+        {!!changes?.length && <ul aria-label="Source changes" className="max-h-96 space-y-1 overflow-auto text-xs">
+          {changes.map(change => <li key={`${change.kind}-${change.line}`}
+            className="grid grid-cols-[auto_minmax(0,1fr)] gap-2 rounded border px-2 py-1">
+            <span>{change.kind === 'added' ? 'Added' : 'Removed'} {change.line}</span>
+            <code className="whitespace-pre-wrap break-all">{change.text}</code>
+          </li>)}
+        </ul>}
+      </Card.Content>
+    </Card>}
     {selected && <Card variant="secondary"><Card.Header>
       <Card.Title>Save as a new version</Card.Title>
       <Card.Description>Editing a copy of {selected.id}. The original is never overwritten.</Card.Description>
