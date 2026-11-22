@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve,dirname } from 'node:path';
 import {LIST_PUBLIC_GAMES_SQL,READ_VISIBLE_GAME_SQL} from '../apps/web/server/catalog-queries.ts';
-import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/owner-revision-queries.ts';
+import {LIST_OWNED_GAMES_WITH_DRAFT_SQL,LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/owner-revision-queries.ts';
 import {CREATE_GAME_SQL,UPDATE_GAME_SQL} from '../apps/web/server/game-management-queries.ts';
 import {READ_PLAYABLE_GAME_SQL} from '../apps/web/server/playable-catalog-query.ts';
 import {READ_SOURCE_DRAFT_SQL,CREATE_SOURCE_DRAFT_SQL} from '../apps/web/server/source-draft-queries.ts';
@@ -810,6 +810,20 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /stored/);
     assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /replayed/);
 
+    await executePsql(config,{sql:`
+      GRANT SELECT(id,game_id,revision_number,release_version,status,engine_id,engine_version)
+        ON public.game_revisions TO slopboy_test_web;`});
+    const draftListing = (actor:string) => executePsql(config,{sql:`
+      SET ROLE slopboy_test_web;
+      PREPARE draft_listing(uuid,int) AS ${LIST_OWNED_GAMES_WITH_DRAFT_SQL};
+      EXECUTE draft_listing('${actor}',50);`});
+    const ownerDraft = pgQueryRows((await draftListing(alice)).stdout).find(row=>row.startsWith(gameUuid+'|'));
+    assert.ok(ownerDraft);
+    assert.match(ownerDraft,/\|[0-9]{4}-[0-9]{2}-[0-9]{2}[^|]*\|t$/);
+    assert.doesNotMatch(ownerDraft,/export default|source_digest|adapterProtocol/);
+    assert.ok(!pgQueryRows((await draftListing(bob)).stdout).some(row=>row.startsWith(gameUuid+'|')));
+    assert.ok(!pgQueryRows((await draftListing(admin)).stdout).some(row=>row.startsWith(gameUuid+'|')));
+
     const history = (actor: string, before: string | null = null) => executePsql(config, {sql:
       `SET ROLE slopboy_test_web;
       PREPARE source_history(uuid,uuid,uuid,uuid) AS ${LIST_SOURCE_HISTORY_SQL};
@@ -830,6 +844,9 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     await executePsql(config,{sql:`INSERT INTO game_source_drafts(id,game_id,created_by,language,source_text)
       SELECT gen_random_uuid(), '${gameUuid}', '${alice}', 'typescript', 'old draft' FROM generate_series(1,55)`});
+    const latestLegacyDraft = pgQueryRows((await draftListing(alice)).stdout)
+      .find(row=>row.startsWith(gameUuid+'|'));
+    assert.match(latestLegacyDraft ?? '',/\|f$/,'The latest unvalidated draft supersedes older validated summaries');
     const page = sourceVersionRows((await history(alice)).stdout).map(row => row.split('|')[0]);
     assert.equal(page.length, 51);
     const older = sourceVersionRows((await history(alice, page[49])).stdout).map(row => row.split('|')[0]);
