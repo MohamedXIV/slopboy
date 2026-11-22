@@ -1,3 +1,4 @@
+import {createHash, randomUUID} from 'node:crypto';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve,dirname } from 'node:path';
@@ -6,6 +7,8 @@ import {LIST_OWNED_GAMES_SQL,READ_OWNED_REVISIONS_SQL} from '../apps/web/server/
 import {CREATE_GAME_SQL,UPDATE_GAME_SQL} from '../apps/web/server/game-management-queries.ts';
 import {READ_PLAYABLE_GAME_SQL} from '../apps/web/server/playable-catalog-query.ts';
 import {READ_SOURCE_DRAFT_SQL,CREATE_SOURCE_DRAFT_SQL} from '../apps/web/server/source-draft-queries.ts';
+import {LIST_SOURCE_HISTORY_SQL, READ_SOURCE_REVISION_SQL} from '../apps/web/server/source-history-queries.ts';
+import {READ_OWNED_BUILD_SOURCE_SQL} from '../apps/web/server/build-inputs.ts';
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, readdir, writeFile, access, copyFile, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -44,8 +47,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 4);
-  assert.equal(down.length, 4);
+  assert.equal(up.length, 6);
+  assert.equal(down.length, 6);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -57,10 +60,7 @@ test('migration files load cleanly with matching checksums', async () => {
 
   assert.equal(up[3].version, 4);
   assert.equal(up[3].name, 'source_drafts');
-  assert.equal(down[0].version, 4);
-  assert.equal(down[1].version, 3);
-  assert.equal(down[2].version, 2);
-  assert.equal(down[3].version, 1);
+  assert.deepEqual(down.map(file => file.version), [6, 5, 4, 3, 2, 1]);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -107,8 +107,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 4);
-    assert.deepEqual(upResult.versions, [1, 2, 3, 4]);
+    assert.equal(upResult.applied, 6);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -426,8 +426,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 2);
-    assert.deepEqual(rollback3.versions, [4, 3]);
+    assert.equal(rollback3.rolledBack, 4);
+    assert.deepEqual(rollback3.versions, [6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -459,8 +459,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 4);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4]);
+    assert.equal(reMigrate.applied, 6);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -741,8 +741,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
-    assert.deepEqual(downgrade4.versions,[4]);
-    assert.equal((await migrateUp(config,migrationsDir)).applied,1);
+    assert.deepEqual(downgrade4.versions,[6,5,4]);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,3);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
     const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
@@ -760,6 +760,154 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.ok((await executePsql(config,{sql:platformWrite})).stdout.includes(platformSourceId));
     assert.ok((await executePsql(config,{sql:readSource(admin,platformGame)})).stdout.includes('private source'));
     assert.equal(pgQueryRows((await executePsql(config,{sql:readSource(alice,platformGame)})).stdout).length,0);
+
+    const gameUuid='91919191-9191-4191-8191-919191919191';
+    const revisionUuid='92929292-9292-4292-8292-929292929292';
+    const submission='93939393-9393-4393-8393-939393939393';
+    const validated=(actor=alice, target='NULL', fingerprint='a', key=submission, id=revisionUuid)=>`
+      SELECT outcome,game_id,revision_id,checksum FROM public.save_validated_source(
+        '${actor}','${curator}',${target},'${gameUuid}','${id}','${key}',
+        repeat('${fingerprint}',64),'{"title":"Validated draft","genre":"Puzzle"}',
+        '{"engine":{"id":"kaplay","version":"3001.0.19"}}','typescript','export default {}');`;
+    await assert.rejects(()=>executePsql(config,{sql:validated().replace("'typescript'","'invalid-language'")}));
+    assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${gameUuid}'`})).stdout.trim(),'0',
+      'A failed source insert rolls back game creation');
+    await executePsql(config,{sql:`
+      GRANT INSERT(id,owner_id,title,tagline,description,genre),UPDATE(title)
+        ON public.games TO slopboy_test_web;
+      GRANT SELECT(id,game_id,created_by,created_at,language,source_text,engine_manifest,request_key,request_digest,source_digest),
+        INSERT(id,game_id,created_by,language,source_text,engine_manifest,source_digest,request_key,request_digest)
+        ON public.game_source_drafts TO slopboy_test_web;
+      GRANT INSERT(actor_id,action,target_type,target_id) ON public.audit_events TO slopboy_test_web;
+      GRANT EXECUTE ON FUNCTION public.save_validated_source(uuid,uuid,uuid,uuid,uuid,uuid,text,jsonb,jsonb,text,text)
+        TO slopboy_test_web;`});
+    const writeAsApp=()=>executePsql(config,{sql:'SET ROLE slopboy_test_web;'+validated()});
+    const results=await Promise.all([writeAsApp(),writeAsApp()]);
+
+    assert.deepEqual(results.map(r=>r.stdout.trim().split('\n').at(-1)!.split('|')[0]).sort(),['replayed','stored']);
+    for(const {stdout} of results){
+      const [,game,revision,digest]=stdout.trim().split('\n').at(-1)!.split('|');
+      assert.equal(game,gameUuid);
+      assert.equal(revision,revisionUuid);
+      assert.match(digest,/^[0-9a-f]{64}$/);
+    }
+    assert.match((await executePsql(config,{sql:validated(alice,'NULL','b')})).stdout,/^conflict/);
+    assert.match((await executePsql(config,{sql:validated(bob,"'"+gameUuid+"'")})).stdout,/^not_found/);
+    assert.match((await executePsql(config,{sql:validated(admin,"'"+gameUuid+"'")})).stdout,/^not_found/);
+    assert.equal((await executePsql(config,{sql:`SELECT owner_id,visibility,status FROM games WHERE id='${gameUuid}'`})).stdout.trim(),
+      alice+'|private|draft');
+    assert.match((await executePsql(config,{sql:readSource(alice,gameUuid)})).stdout,/export default/);
+    const editKey='98989898-9898-4898-8898-989898989898';
+    const editRevision='97979797-9797-4797-8797-979797979797';
+    assert.match((await executePsql(config,{sql:validated(alice,"'"+gameUuid+"'",'d',editKey,editRevision)
+      .replace('export default {}','export default { /* edit */ }')})).stdout,/^stored/);
+    assert.match((await executePsql(config,{sql:readSource(alice,gameUuid)})).stdout,/\/\* edit \*\//);
+    const restoreKey = '96969696-9696-4696-8696-969696969696';
+    const restoreRevision = '97979797-9797-4797-8797-979797979798';
+    const restore = validated(alice, "'" + gameUuid + "'", 'e', restoreKey, restoreRevision);
+    assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /stored/);
+    assert.match((await executePsql(config, {sql: 'SET ROLE slopboy_test_web;' + restore})).stdout, /replayed/);
+
+    const history = (actor: string, before: string | null = null) => executePsql(config, {sql:
+      `SET ROLE slopboy_test_web;
+      PREPARE source_history(uuid,uuid,uuid,uuid) AS ${LIST_SOURCE_HISTORY_SQL};
+      EXECUTE source_history('${actor}','${gameUuid}','${curator}',${before ? "'" + before + "'" : 'NULL'});`});
+    const historicalSource = (actor: string, id: string) => executePsql(config, {sql:
+      `SET ROLE slopboy_test_web;
+      PREPARE source_version(uuid,uuid,uuid,uuid) AS ${READ_SOURCE_REVISION_SQL};
+      EXECUTE source_version('${actor}','${gameUuid}','${curator}','${id}');`});
+    const sourceVersionRows = (stdout: string) => pgQueryRows(stdout).filter(row => row !== 'SET');
+    const firstHistory = sourceVersionRows((await history(alice)).stdout);
+    assert.deepEqual(firstHistory.map(row => row.split('|')[0]), [restoreRevision, editRevision, revisionUuid]);
+    for (const id of [revisionUuid, restoreRevision]) {
+      assert.match((await historicalSource(alice, id)).stdout, /export default \{\}/);
+    }
+    assert.deepEqual(sourceVersionRows((await history(bob)).stdout), []);
+    assert.deepEqual(sourceVersionRows((await historicalSource(bob, revisionUuid)).stdout), []);
+    assert.deepEqual(sourceVersionRows((await history(alice, sourceId)).stdout), [], 'A cursor from another game is rejected');
+
+    await executePsql(config,{sql:`INSERT INTO game_source_drafts(id,game_id,created_by,language,source_text)
+      SELECT gen_random_uuid(), '${gameUuid}', '${alice}', 'typescript', 'old draft' FROM generate_series(1,55)`});
+    const page = sourceVersionRows((await history(alice)).stdout).map(row => row.split('|')[0]);
+    assert.equal(page.length, 51);
+    const older = sourceVersionRows((await history(alice, page[49])).stdout).map(row => row.split('|')[0]);
+    assert.equal(older.length, 8);
+    assert.equal(older[0], page[50]);
+    assert.equal(new Set([...page.slice(0,50), ...older]).size, 58);
+    assert.match((await executePsql(config,{sql:validated(alice,"'"+gameUuid+"'",'a','94949494-9494-4494-8494-949494949494','95959595-9595-4595-8595-959595959595')})).stdout,/^quota/);
+    assert.match((await executePsql(config,{sql:validated()})).stdout,/^replayed/,'Retry does not spend quota');
+    const buildSource = (id: string) => executePsql(config,{sql:`
+      SET ROLE slopboy_test_web;
+      PREPARE build_source(uuid,uuid,uuid) AS ${READ_OWNED_BUILD_SOURCE_SQL};
+      EXECUTE build_source('${id}','${gameUuid}','${revisionUuid}');`});
+    const [ownedInput] = sourceVersionRows((await buildSource(alice)).stdout);
+    assert.match(ownedInput,/kaplay.*typescript\|[a-f0-9]{64}\|17$/);
+    assert.deepEqual(sourceVersionRows((await buildSource(bob)).stdout),[]);
+    assert.deepEqual(sourceVersionRows((await buildSource(admin)).stdout),[]);
+
+    // Stage uploads through the restricted app role, exercising the actual transaction and byte store.
+    await executePsql(config,{sql:`GRANT EXECUTE ON FUNCTION
+      public.staged_game_artifact(uuid,uuid,uuid,text,jsonb,bytea) TO slopboy_test_web`});
+    const path = 'src/game.ts';
+    const bytes = 'export default function setup() {}';
+    const sha256 = createHash('sha256').update(bytes).digest('hex');
+    const pngPath = 'assets/sprite.png';
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aP1sAAAAASUVORK5CYII=','base64');
+    const pngHash = createHash('sha256').update(png).digest('hex');
+    const capacity = Buffer.byteLength(bytes)+png.length;
+    const manifest = {files:[
+      {path,bytes:Buffer.byteLength(bytes),sha256,mime:'text/typescript'},
+      {path:pngPath,bytes:png.length,sha256:pngHash,mime:'image/png'},
+    ]};
+    const stageKey = randomUUID();
+    const stagedCall = async (op:string, input:object={}, project:string|null=null, caller=alice, body:string|Buffer|null=null) => {
+      const quote = (v:string) => "'" + v.replaceAll("'", "''") + "'";
+      const args = [quote(caller),quote(gameUuid),project ? quote(project) : 'NULL',quote(op),
+        quote(JSON.stringify(input)),body === null ? 'NULL' : `decode('${Buffer.from(body).toString('hex')}','hex')`];
+      const r = await executePsql(config,{sql:`SET ROLE slopboy_test_web;
+        SELECT public.staged_game_artifact(${args.join(',')})`});
+      return JSON.parse(r.stdout.trim().split('\n').at(-1)!);
+    };
+    const input = {key:stageKey,manifest,quota:capacity};
+    const [reserved,replayed] = await Promise.all([stagedCall('initiate',input),stagedCall('initiate',input)]);
+    assert.ok(reserved.id && reserved.id === replayed.id);
+    const stage = reserved.id;
+    assert.equal((await stagedCall('initiate',{...input, key:randomUUID()})).error,'QUOTA');
+    assert.equal((await stagedCall('initiate',{...input,manifest:{files:[{...manifest.files[0],mime:'wrong'},manifest.files[1]]}})).error,'CONFLICT');
+    assert.equal((await stagedCall('finalize',{},stage,bob)).error,'NOT_FOUND');
+    assert.equal((await stagedCall('read',{path},stage)).error,'NOT_FOUND');
+    assert.equal((await stagedCall('finalize',{},stage)).error,'INCOMPLETE');
+    assert.equal((await stagedCall('upload',{path},stage,alice,bytes.replace('setup','other'))).error,'DIGEST_MISMATCH');
+    for (const result of await Promise.all([
+      stagedCall('upload',{path},stage,alice,bytes),stagedCall('upload',{path},stage,alice,bytes),
+    ])) assert.equal(result.stored,true);
+    assert.equal((await stagedCall('finalize',{},stage)).error,'INCOMPLETE','A missing asset blocks finalization');
+    assert.equal((await stagedCall('upload',{path:pngPath},stage,alice,png)).stored,true);
+    const finalized = await stagedCall('finalize',{},stage);
+    assert.ok(finalized.finalizedAt);
+    assert.deepEqual(await stagedCall('finalize',{},stage),finalized);
+    assert.equal((await stagedCall('upload',{path},stage,alice,bytes)).error,'FINALIZED');
+    assert.equal((await stagedCall('read',{path},stage,bob)).error,'NOT_FOUND');
+    const artifact = await stagedCall('read',{path},stage);
+    assert.equal(artifact.sha256,sha256);
+    const sprite = await stagedCall('read',{path:pngPath},stage);
+    assert.equal(sprite.sha256,pngHash);
+    assert.deepEqual(Buffer.from(sprite.body,'base64'),png);
+    assert.equal(Buffer.from(artifact.body,'base64').toString(),bytes);
+    await assert.rejects(() => executePsql(config,{sql:
+      'SET ROLE slopboy_test_web; SELECT body FROM public.staged_game_files'}));
+    await assert.rejects(() => executePsql(config,{sql:
+      `UPDATE public.staged_game_files SET body='modified' WHERE project_id='${stage}'`}));
+    const abandoned = await stagedCall('initiate',{...input,key:randomUUID(),quota:1024});
+    await executePsql(config,{sql:`UPDATE public.staged_game_projects SET expires_at=clock_timestamp()-interval '1 second'
+      WHERE id='${abandoned.id}'`});
+    assert.equal((await stagedCall('upload',{path},abandoned.id,alice,bytes)).error,'EXPIRED');
+    assert.ok((await stagedCall('initiate',{...input,key:randomUUID(),quota:capacity*2})).id);
+    assert.equal((await stagedCall('describe',{},abandoned.id)).error,'NOT_FOUND');
+
+    assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[6,5]);
+    assert.match((await executePsql(config,{sql:`SELECT source_text FROM game_source_drafts WHERE id='${revisionUuid}'`})).stdout,/export default/);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6]);
 
   } finally {
     // Stop server and clean up temporary cluster
