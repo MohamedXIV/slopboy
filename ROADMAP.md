@@ -1,12 +1,12 @@
 # Slopboy — Agent-Native Platform Roadmap
 
-**Updated:** 2026-11-16 · **Status:** Sprint 2 integration gate [#77](https://github.com/MohamedXIV/slopboy/issues/77) is complete; its integration PR and ownership work in [Draft PR #91](https://github.com/MohamedXIV/slopboy/pull/91) remain unmerged. No production cutover has been merged.
+**Updated:** 2026-11-22 · **Status:** Sprint 2 integration is complete. The canonical routes and game ownership work are on main. Private source drafts, revision history and staged source uploads are on main.
 
 **GitHub Project:** [Slopboy — Agent-Native Platform Roadmap](https://github.com/users/MohamedXIV/projects/7)  
 **Long-term product register:** [Long-Term Vision](docs/product/long-term-vision.md) · [Agents' entrypoint](AGENTS.md)
 **Architecture:** [ADR-002](docs/architecture/adr-002-production-cutover.md) (UUIDs/Legacy) · [ADR-003](docs/architecture/adr-003-agent-native-platform.md) (ChatGPT/Claude MCP, SaaS roles, hosting) · [ADR-004](docs/architecture/adr-004-approved-game-frameworks.md) (approved frameworks/cartridge runtime)
 
-**AI game-idea entry point:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) adds a public `/ai` prompt/guide experience with versioned Markdown/JSON and **optional Genre**. This discoverability track complements #46/#49; it does not bypass OAuth, account-owned drafts, adapter approval, sandboxing or public-review gates. Pending separate Draft PR review; no production cutover.
+**AI game-idea entry point:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) adds a public `/ai` prompt/guide experience with versioned Markdown/JSON and **optional Genre**. This discoverability track complements #46/#49; it does not bypass OAuth, account-owned drafts, adapter approval, sandboxing or public-review gates. Merged in [PR #106](https://github.com/MohamedXIV/slopboy/pull/106).
 
 ## Locked product direction
 
@@ -47,20 +47,16 @@ The MVP roadmap above is **not** the full planned platform. The persistent futur
 | IP/rights, privacy, backups, cost governance | [#54](https://github.com/MohamedXIV/slopboy/issues/54) | [#64](https://github.com/MohamedXIV/slopboy/issues/64), [#65](https://github.com/MohamedXIV/slopboy/issues/65) | P1: minimums before public UGC |
 | Physical shutdown/boot, personalization, future 3D | [#55](https://github.com/MohamedXIV/slopboy/issues/55) | [#66](https://github.com/MohamedXIV/slopboy/issues/66), [#67](https://github.com/MohamedXIV/slopboy/issues/67) | P1 lifecycle, P2 cosmetics/3D |
 
-**The current implementation order does not change:** #23 → #22 → #24, with #44 SDK and #25/#28 readiness in parallel. Future tracks are preserved as architecture and documentation requirements, not as a reason to block or inflate the first launch.
+The canonical-route sequence #23 → #22 → #24 and the #44 engine contract are complete. The long-term tracks remain deferred.
 
 ## Active Sprint 2 — Integration and account-backed platform
 
-**Coordination:** Issue #77 is closed after its integration acceptance. Its branch is historical; inspect current issue and PR claims before working on shared files. PR #91 carries the game ownership/catalog work and is being integrated with the newer main-branch auth UI.
+- **Merged baseline:** Integration #77 and PRs #78, #91 and #97 are complete on main. Keep #26/#27/#34/#90 acceptance tracked separately. A prior production checkpoint verified a signed-in player creating and reloading a private draft and receiving an admin denial. A second authenticated account, real admin actions, and hosted publication and revocation still need verification. See [#90](https://github.com/MohamedXIV/slopboy/issues/90) for that evidence and its limits.
+- **Manual source ingestion:** #98 added private validation and persistence, #106 added AI handoff and immutable revision history, and #107 added private staged uploads. #110 makes new projects source-only and preserves owner access to previously uploaded files. Track hosted and live migration evidence separately from repository merges.
+- **MCP contracts and OAuth:** [PR #100](https://github.com/MohamedXIV/slopboy/pull/100) covers versioned tool inputs and errors. Keep deployed writes disabled until OAuth identity and ownership-aware persistence are verified. [Draft PR #101](https://github.com/MohamedXIV/slopboy/pull/101) has a read-only dev OAuth Preview. Real ChatGPT and Claude consent, identity, refresh and disconnect remain acceptance gates under #28/#30.
+- **Playable private cartridges:** #108 supplies deterministic build inputs, and #109 adds fixture-only build jobs. #111 demonstrates a repository-owned game with procedural graphics, audio and offline saves. Player builds and preview stay gated on #32/#45/#33/#4. Public release requires separate moderation under #38.
 
-1. **Integration gate #77:** completed on PR #78, which remains unmerged. The current PR #91 integration requires its own repository tests on the combined SHA; previous CI or Preview evidence does not prove that combined result.
-2. **Real dev/backend #25 → #26:** PR #91 records an existing isolated Neon Development setup, migration 004, scoped Preview grants and anonymous Preview checks. Those are historical external observations, not verification of this repository integration. Verified owner/stranger/admin sessions and safe publication/revocation checks remain open; never treat the MCP JWT test spike as production authentication.
-3. **Catalog #27 → My Games #34 → Paste Code #49:** real UUID ownership, reviewed public revisions and private drafts from verified identities. Storage of private source must not execute it; game preview awaits #31/#32/#33/#4.
-4. **Parallel agent lanes:** #29 provider-neutral MCP schemas/validation *only*, and #33/#4 hostile iframe browser fixtures *only*, with separate branch/file claims. Both are allowed to progress before Neon, but neither may enable unauthorized writes, weaken sandbox security or edit the integration branch.
-
-**Single-writer rule:** claim the Issue and base SHA/files in a GitHub Issue comment before coding. One agent per Issue/branch; submit focused PRs. Check current issue and PR claims before touching shared files. Passing an isolated PR's CI does **not** prove combined integration or live account authorization.
-
-**Exit criterion:** integrated branch and PR, disposable PostgreSQL + browser/security/offline checks on the same exact commit, and separately verified live owner/stranger/admin authorization and publication/revocation behavior before release. Repository-only validation does not establish live Preview or production readiness; production cutover requires owner approval.
+Follow the single-writer rule in [AGENTS.md](AGENTS.md) and check current issue and PR claims before starting. Repository checks on a commit and live account acceptance are separate evidence.
 
 ## Sprint 1 — historical starting plan (completed on review branches)
 
@@ -68,9 +64,9 @@ The MVP roadmap above is **not** the full planned platform. The persistent futur
 
 **Engine work runs in parallel:** [#44](https://github.com/MohamedXIV/slopboy/issues/44) should design the engine-neutral manifest/host API alongside #23 without blocking the canonical route cutover. [#45](https://github.com/MohamedXIV/slopboy/issues/45) + [#46](https://github.com/MohamedXIV/slopboy/issues/46) are gates for the first end-to-end AI-created KAPLAY game (#30). Phaser #47 and PixiJS #48 are **not launch blockers** for that first vertical slice.
 
-**Manual creator path:** design [#49](https://github.com/MohamedXIV/slopboy/issues/49) now; implement private source-only draft as soon as #26/#27 and #31/#44 provide real accounts and safe ingestion. This creates useful games without waiting for ChatGPT/Claude connector availability; preview still waits for #4/#32/#33.
+**Manual creator path:** [#49](https://github.com/MohamedXIV/slopboy/issues/49) supports saving private source drafts. Preview still depends on #4/#32/#33 and the engine adapter gate.
 
-**Parallel research/implementation:** [#25](https://github.com/MohamedXIV/slopboy/issues/25) Neon isolated development schema and [#28](https://github.com/MohamedXIV/slopboy/issues/28) OAuth provider / ChatGPT + Claude MCP compatibility, before real [#26](https://github.com/MohamedXIV/slopboy/issues/26) authentication and [#29](https://github.com/MohamedXIV/slopboy/issues/29) MCP tools.
+**Backend and connector follow-up:** #25 is complete. #26 tracks live account isolation and #28 tracks OAuth compatibility for the MCP write path.
 
 **Sprint exit:** UUID routes, guest saves preserved, root new UI + legacy route, running dynamic Vercel Preview and real Chromium/mobile controls. No fake cloud or OAuth connected indicators.
 
@@ -95,9 +91,9 @@ This path can validate real data persistence and ownership **before official AI 
 
 ## Existing work and release constraints
 
-- [PR #14](https://github.com/MohamedXIV/slopboy/pull/14) is Draft and carries real V2 UI, HeroUI drawers, screen FX, offline guest saves and curated runtime. Do **not** merge unchanged; canonical-route/UUID/backend/offline migration is still missing.
+- [PR #14](https://github.com/MohamedXIV/slopboy/pull/14) is merged. The canonical UI serves the new routes and the original prototype lives under `/legacy`. Published-game eligibility and guest saves remain separate.
 - Existing issues [#2](https://github.com/MohamedXIV/slopboy/issues/2), [#3](https://github.com/MohamedXIV/slopboy/issues/3) and legacy PRs are completed history. [#4](https://github.com/MohamedXIV/slopboy/issues/4) remains a security blocker. Legacy [#5](https://github.com/MohamedXIV/slopboy/issues/5) and [#6](https://github.com/MohamedXIV/slopboy/issues/6) need separate reconciliation rather than duplicate tickets.
 - Every issue closes with tested code, typecheck/lint/build and relevant browser/security evidence, migration and rollback notes, and a small PR. Avoid unnecessary ongoing CI minutes and unapproved paid infrastructure.
-- **GitHub Project #7 exists; its items have not yet been added into the Project board.** The linked Epics and their Issue checklists are the authoritative work hierarchy until a GitHub Project add-item operation is available. Don't claim the board is populated.
+- Use the linked GitHub issues and pull requests to verify current work status.
 
 No calendar dates or production-ready status are implied by this roadmap.
