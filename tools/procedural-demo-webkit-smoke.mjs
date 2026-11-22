@@ -12,6 +12,13 @@ try {
  const ctx = await browser.newContext({viewport:{width:390,height:844}});
  await ctx.addInitScript(() => {
   window.probe={tones:0,closed:0};
+  window.addEventListener('message', event => {
+    if (window.dropDemoFrames &&
+        event.source === document.querySelector('iframe')?.contentWindow &&
+        event.data?.scope === 'slopboy-v1' && event.data.type === 'frame') {
+      event.stopImmediatePropagation();
+    }
+  }, true);
   const start=OscillatorNode.prototype.start;
   OscillatorNode.prototype.start=function(...args){window.probe.tones++;return start.apply(this,args)};
   const close=AudioContext.prototype.close;
@@ -31,33 +38,28 @@ try {
  await pixel(115,117);
  await p.waitForFunction(()=>window.probe.tones===1);
  await click('Save position');
+ await click('Stop demo');
+ await p.waitForFunction(()=>window.probe.closed===1&&!document.querySelector('iframe'));
  await p.waitForFunction(()=>localStorage.getItem('slopboy-procedural-lab-v1')==='[7,8]'&&window.probe.tones===2);
+ await click('Start demo');
+ await pixel(115,117);
  await click('Mute');
  await click('Up');
  await pixel(115,103);
  assert.equal(await p.evaluate(()=>window.probe.tones),2);
  await click('Stop demo');
- await p.waitForFunction(()=>window.probe.closed===1&&!document.querySelector('iframe'));
+ await p.waitForFunction(()=>window.probe.closed===2&&!document.querySelector('iframe'));
  await click('Start demo');
  await pixel(115,117);
- await p.evaluate(() => {
-  window.dropDemoFrames = true;
-  window.addEventListener('message', event => {
-    if (window.dropDemoFrames &&
-        event.source === document.querySelector('iframe')?.contentWindow &&
-        event.data?.scope === 'slopboy-v1' && event.data.type === 'frame') {
-      event.stopImmediatePropagation();
-    }
-  }, true);
- });
+ await p.evaluate(()=>{window.dropDemoFrames=true;});
  await p.getByText('Sandbox timed out',{exact:true}).waitFor({timeout:7000});
- await p.waitForFunction(()=>window.probe.closed===2&&!document.querySelector('iframe'));
+ await p.waitForFunction(()=>window.probe.closed===3&&!document.querySelector('iframe'));
  assert.equal(await p.evaluate(()=>localStorage.getItem('slopboy-procedural-lab-v1')),'[7,8]');
  await p.evaluate(()=>{window.dropDemoFrames=false;});
  await click('Start demo');
  await pixel(115,117);
  await click('Stop demo');
- await p.waitForFunction(()=>window.probe.closed===3);
+ await p.waitForFunction(()=>window.probe.closed===4);
  console.log('WebKit '+browser.version()+' passed offline input, opaque iframe, Web Audio, mute, local save, timeout recovery and restart');
 } finally {
  await browser.close(); await server?.stop();

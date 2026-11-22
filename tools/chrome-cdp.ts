@@ -19,7 +19,7 @@ function chromeBinary():string{
   throw Error('Chrome/Chromium binary not available on this runner');
 }
 interface CdpResponse { id?:number; sessionId?:string; result?:Record<string,unknown>; error?:{message:string} }
-export async function openChromePage(url:string,profile:string){
+export async function openChromePage(url:string,profile:string,initScript?:string){
   const process=spawn(chromeBinary(),[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
     '--disable-extensions','--disable-background-networking','--no-first-run',
@@ -65,7 +65,7 @@ export async function openChromePage(url:string,profile:string){
       pending.set(id,{resolve,reject});
       socket!.send(JSON.stringify({id,method,params,...(sessionId?{sessionId}:{})}));
     });
-    const created=await send('Target.createTarget',{url});
+    const created=await send('Target.createTarget',{url:initScript ? 'about:blank' : url});
     const targetId=created.targetId;
     if(typeof targetId!=='string')throw Error('Chrome did not create browser page');
     const attached=await send('Target.attachToTarget',{targetId,flatten:true});
@@ -73,6 +73,12 @@ export async function openChromePage(url:string,profile:string){
     if(typeof sessionId!=='string')throw Error('Chrome did not attach browser page');
     const validatedSessionId=sessionId;
     await send('Runtime.enable',{},validatedSessionId);
+    if(initScript){
+      await send('Page.enable',{},validatedSessionId);
+      await send('Page.addScriptToEvaluateOnNewDocument',{source:initScript},validatedSessionId);
+      const navigation=await send('Page.navigate',{url},validatedSessionId);
+      if(navigation.errorText)throw Error(String(navigation.errorText));
+    }
     async function evaluate(expression:string,userGesture=false):Promise<unknown>{
       const response=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:false,userGesture},validatedSessionId);
       const result=response.result as Record<string,unknown>|undefined;

@@ -63,3 +63,8 @@ Web Audio even if the iframe cannot report its own watchdog error. A new
 session starts from the prior local snapshot. Both demo smoke tests simulate
 missing frame responses in the host test harness and check this recovery.
 This does not measure host responsiveness under browser process exhaustion.
+
+If Stop is pressed while a local save is pending, the host waits for the
+save result before removing the iframe. Storage failures and save timeouts
+are reported in the demo. The two offline smoke tests press Save and Stop
+back to back, then confirm the persisted position after restarting.
