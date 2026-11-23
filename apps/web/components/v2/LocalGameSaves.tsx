@@ -3,8 +3,7 @@ import {useState} from 'react';
 import {Button} from '@heroui/react';
 import {listLocalSnapshots,saveLocalSnapshot,restoreLocalSnapshot,deleteLocalSnapshot,LOCAL_SNAPSHOT_SLOTS,type LocalSnapshot} from './local-save-slots';
 import OfflineInstallControl from './OfflineInstallControl';
-import CloudGameBackups from './CloudGameBackups';
-export default function LocalGameSaves({gameId,onInstallChanged,showInstall=true,showCloudBackups=false}:{gameId:string;onInstallChanged?:()=>void;showInstall?:boolean;showCloudBackups?:boolean}){
+export default function LocalGameSaves({gameId,onInstallChanged,showInstall=true}:{gameId:string;onInstallChanged?:()=>void;showInstall?:boolean}){
   const [open,setOpen]=useState(false),[slots,setSlots]=useState<LocalSnapshot[]>([]),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
   async function run(action:()=>Promise<unknown>,message:string){
     setBusy(true);setNotice('');try{await action();setSlots(await listLocalSnapshots(gameId));setNotice(message);}
@@ -19,6 +18,5 @@ export default function LocalGameSaves({gameId,onInstallChanged,showInstall=true
       <Button size="sm" isDisabled={busy} onPress={()=>{if(window.confirm('Replace the current autosave?'))void run(()=>restoreLocalSnapshot(gameId,slot.slot),'Save restored');}}>Restore</Button>
       <Button size="sm" isDisabled={busy} onPress={()=>{if(window.confirm('Delete this backup?'))void run(()=>deleteLocalSnapshot(gameId,slot.slot),'Backup deleted');}}>Delete</Button>
     </div>)}
-  {showCloudBackups && <CloudGameBackups gameId={gameId}/>}
   </div>}{notice&&<p role="status">{notice}</p>}</div>;
 }

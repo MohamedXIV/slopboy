@@ -6,6 +6,7 @@ import {Button} from '@heroui/react';
 import {listOfflineGames,type InstalledGame} from './offline-install';
 import {listLocalSaveGameIds} from './local-save-discovery';
 import LocalGameSaves from './LocalGameSaves';
+import CloudGameBackups from './CloudGameBackups';
 import {getBrowserHistory,formatActiveTime,type GameHistory} from './library-history';
 import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
@@ -126,6 +127,7 @@ export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled
               {openSaves===game.gameId&&<div id={'v2-save-'+game.gameId} className="v2-local-saves">
                 <div className="v2-local-save-head"><strong>Offline backup slots</strong><span>{snapshots[game.gameId]?.length??0} / {LOCAL_SNAPSHOT_SLOTS}</span></div>
                 <p>These are local IndexedDB snapshots, not cloud saves. Clearing browser storage may erase them.</p>
+                {cloudBackupsEnabled && game.playable && <CloudGameBackups gameId={game.gameId}/>}
                 <Button className="sb-control sb-control-primary" size="sm" variant="primary" isDisabled={pending===game.gameId}
                   onPress={()=>void withSlots(game.gameId,()=>saveLocalSnapshot(game.gameId),'Local snapshot saved.')}>
                   Back up current save
@@ -160,7 +162,7 @@ export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled
         {!offlineState&&offline.length===0&&<p>No games are installed on this device.</p>}
         <ul>{offline.map(item=><li key={item.gameId}>
           <a href={'/play/'+item.gameId} data-testid={'installed-link-'+item.gameId}>{item.title}</a>
-          <LocalGameSaves gameId={item.gameId} showCloudBackups={cloudBackupsEnabled && games.some(game=>game.gameId===item.gameId&&game.playable)} showInstall={!games.some(game=>game.gameId===item.gameId&&game.playable)} onInstallChanged={()=>void refreshOffline()}/></li>)}</ul>
+          <LocalGameSaves gameId={item.gameId} showInstall={!games.some(game=>game.gameId===item.gameId&&game.playable)} onInstallChanged={()=>void refreshOffline()}/></li>)}</ul>
         {saveState&&<p role="status">{saveState}</p>}
         {savedIds.filter(id=>!offline.some(item=>item.gameId===id)&&!games.some(game=>game.gameId===id)).map(id=><div key={id}>
           <p>Local save · {id}</p><LocalGameSaves gameId={id} onInstallChanged={()=>void refreshOffline()}/></div>)}
