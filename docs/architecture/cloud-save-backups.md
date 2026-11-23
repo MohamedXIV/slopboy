@@ -8,15 +8,14 @@ Both actions require a verified account with an activated Slopboy profile. This 
 metadata. Restore, deletion, conflict resolution and automatic sync are future
 work. Offline gameplay and local backups do not depend on this feature.
 
-## Database rollout
+## Disposable database only
 
 On a disposable PostgreSQL database, apply migrations through version 008.
-For a hosted dev test, apply 008 only with separate authorization and grant
-the existing restricted web role execution on these two functions:
+This Draft prototypes payload storage in PostgreSQL. ADR-002 requires private object storage for cloud save payloads. Keep this migration and feature flag off hosted environments until the storage design is reconciled. To validate the privilege boundary locally, grant a disposable restricted role execution on these two functions:
 
 ```sql
 GRANT EXECUTE ON FUNCTION public.list_cloud_save_backups(uuid,uuid),
-  public.create_cloud_save_backup(uuid,uuid,text) TO slopboy_web_preview;
+  public.create_cloud_save_backup(uuid,uuid,text) TO slopboy_test_web;
 ```
 
 Keep the backup table inaccessible to the web role. The security-definer
