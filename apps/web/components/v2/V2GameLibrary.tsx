@@ -16,7 +16,7 @@ import './v2-library.css';
 
 type PublicGame={gameId:string;title:string;genre:string;description:string;playable:boolean};
 type CatalogRow={id:string;title:string;genre:string;description:string|null};
-export default function V2GameLibrary(){
+export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled:boolean}){
   const [games,setGames]=useState<PublicGame[]>([]),[offline,setOffline]=useState<InstalledGame[]>([]);
   const [savedIds,setSavedIds]=useState<string[]>([]),[myGames,setMyGames]=useState<CatalogRow[]|null|undefined>(undefined);
   const [offlineState,setOfflineState]=useState('Checking installed games…');
@@ -160,7 +160,7 @@ export default function V2GameLibrary(){
         {!offlineState&&offline.length===0&&<p>No games are installed on this device.</p>}
         <ul>{offline.map(item=><li key={item.gameId}>
           <a href={'/play/'+item.gameId} data-testid={'installed-link-'+item.gameId}>{item.title}</a>
-          <LocalGameSaves gameId={item.gameId} showInstall={!games.some(game=>game.gameId===item.gameId&&game.playable)} onInstallChanged={()=>void refreshOffline()}/></li>)}</ul>
+          <LocalGameSaves gameId={item.gameId} showCloudBackups={cloudBackupsEnabled && games.some(game=>game.gameId===item.gameId&&game.playable)} showInstall={!games.some(game=>game.gameId===item.gameId&&game.playable)} onInstallChanged={()=>void refreshOffline()}/></li>)}</ul>
         {saveState&&<p role="status">{saveState}</p>}
         {savedIds.filter(id=>!offline.some(item=>item.gameId===id)&&!games.some(game=>game.gameId===id)).map(id=><div key={id}>
           <p>Local save · {id}</p><LocalGameSaves gameId={id} onInstallChanged={()=>void refreshOffline()}/></div>)}
