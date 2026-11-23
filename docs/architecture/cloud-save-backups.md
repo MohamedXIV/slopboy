@@ -4,7 +4,7 @@ Issue #36 starts with an explicit backup of the current local autosave for
 playable public cartridges using the Slopboy 1000 compatibility save format
 (schema 1). It retains the existing IndexedDB reader and UUID-based slot.
 The Library offers upload and listing when `CLOUD_SAVE_BACKUPS_ENABLED=1`.
-Both actions require a verified application account. Listing only returns
+Both actions require a verified account with an activated Slopboy profile. This slice accepts PostgreSQL-compatible UTF-8 text without NUL bytes. Launch a cartridge first to migrate any legacy-only save that the Library cannot resolve. Listing only returns
 metadata. Restore, deletion, conflict resolution and automatic sync are future
 work. Offline gameplay and local backups do not depend on this feature.
 

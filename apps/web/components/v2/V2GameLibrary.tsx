@@ -95,10 +95,12 @@ export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled
       <div className="v2-library-intro">
         <div><p className="v2-library-eyebrow">YOUR CARTRIDGE SHELF / FIRST COLLECTION</p>
         <h1>Pick a world.<br/><em>Insert a cartridge.</em></h1>
-        <p>Discover reviewed public games. Your play history and game backups stay on this device.</p></div>
-        <div className="v2-cloud-state"><strong>Cloud saves</strong><span>Not connected</span>
-          <p>Account sync is planned with a small per-player quota. Nothing uploads without sign-in and your permission.</p>
-          <small>Proposed allowance: 10 MiB / account</small>
+        <p>Discover reviewed public games. Play history and local saves stay on this device.</p></div>
+        <div className="v2-cloud-state"><strong>Cloud saves</strong>
+          {cloudBackupsEnabled ? <><span>Manual backups</span>
+            <p>Open Local saves on a cartridge to back up your autosave or list backups. Sign-in required.</p>
+            <small>10 MiB per account</small></> :
+            <><span>Unavailable</span><p>Local saves are available offline.</p></>}
         </div>
       </div>
       <section aria-labelledby="shelf-heading" className="v2-shelf">

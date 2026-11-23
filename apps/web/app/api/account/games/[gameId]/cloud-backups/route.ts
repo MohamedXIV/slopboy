@@ -1,5 +1,6 @@
 import {neon} from '@neondatabase/serverless';
 import {isGameUuid} from '@slopboy/catalog';
+import {readProfile} from '@/lib/auth/database';
 import {currentSubject} from '@/lib/auth/server';
 import {sameOriginMutation} from '@/lib/auth/auth-contract';
 import {CLOUD_SAVE_REQUEST_MAX_BYTES,parseCloudSave} from '@/lib/cloud-save';
@@ -34,6 +35,7 @@ async function backups(request:Request,{params}:Context,create:boolean) {
   }
 
   try {
+    if (!await readProfile(actor)) return json({error:'PROFILE_NOT_READY'},403);
     const sql = neon(database);
     const [row] = create
       ? await sql`SELECT public.create_cloud_save_backup(${actor.id}::uuid,${gameId}::uuid,${save}) AS result`

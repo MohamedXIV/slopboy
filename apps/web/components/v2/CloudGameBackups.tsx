@@ -14,13 +14,13 @@ export default function CloudGameBackups({gameId}:{gameId:string}) {
   const [list,setList] = useState<BackupList|null>(null);
   const [busy,setBusy] = useState(false);
   const [notice,setNotice] = useState('');
-  const [signIn,setSignIn] = useState(false);
+  const [action,setAction] = useState<'sign-in'|'activate'|null>(null);
 
   async function request(create:boolean) {
     if (busy) return;
     setBusy(true);
     setNotice('');
-    setSignIn(false);
+    setAction(null);
     try {
       let options:RequestInit = {cache:'no-store'};
       if (create) {
@@ -35,8 +35,11 @@ export default function CloudGameBackups({gameId}:{gameId:string}) {
       const response = await fetch(`/api/account/games/${encodeURIComponent(gameId)}/cloud-backups`,options);
       if (!response.ok) {
         setList(null);
-        setSignIn(response.status === 401);
+        const error = await response.json().catch(()=>null) as {error?:string}|null;
+        setAction(response.status === 401 ? 'sign-in' : error?.error === 'PROFILE_NOT_READY' ? 'activate' : null);
         setNotice(response.status === 401 ? 'Sign in to use cloud backups.'
+          : error?.error === 'PROFILE_NOT_READY' ? 'Activate your Slopboy profile before using cloud backups.'
+          : error?.error === 'INVALID_SAVE' ? 'This autosave format cannot be backed up to the cloud.'
           : response.status === 409 ? 'Cloud backup limit reached.'
           : 'Cloud backups unavailable.');
         return;
@@ -65,6 +68,7 @@ export default function CloudGameBackups({gameId}:{gameId:string}) {
         {' · '}{backup.bytes.toLocaleString()} bytes
       </li>)}</ul>
     </div>}
-    {notice && <p role="status">{notice} {signIn && <Link className="underline" href="/auth/sign-in">Sign in</Link>}</p>}
+    {notice && <p role="status">{notice} {action === 'sign-in' && <Link className="underline" href="/auth/sign-in">Sign in</Link>}
+      {action === 'activate' && <Link className="underline" href="/dashboard">Open dashboard</Link>}</p>}
   </div>;
 }
