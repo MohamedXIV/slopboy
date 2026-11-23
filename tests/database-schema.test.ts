@@ -1004,7 +1004,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       await cloud(`SELECT public.confirm_cloud_save_backup('${alice}','${reviewed.gameId}','${item.backupId}');`);
     }
     assert.equal((await list(alice)).backups.length,5);
-    await cloud(`SELECT public.release_cloud_save_backup('${alice}','${reviewed.gameId}','${first.backupId}');`);
+    await executePsql(config,{sql:`SET ROLE slopboy_test_web;SELECT public.release_cloud_save_backup('${alice}','${reviewed.gameId}','${first.backupId}');`});
     assert.equal((await list(alice)).backups.length,5,'releasing cannot delete ready save');
 
     // Trusted test-only metadata inserts cover the 10 MiB cap across distinct games.
