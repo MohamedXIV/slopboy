@@ -100,7 +100,7 @@ export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled
           {cloudBackupsEnabled ? <><span>Manual backups</span>
             <p>Open Local saves on a cartridge to back up your autosave or list backups. Sign-in required.</p>
             <small>10 MiB per account</small></> :
-            <><span>Unavailable</span><p>Local saves are available offline.</p></>}
+            <><span>Not connected</span><p>Local saves are available offline.</p></>}
         </div>
       </div>
       <section aria-labelledby="shelf-heading" className="v2-shelf">
