@@ -5,7 +5,7 @@ import {readProfile} from '@/lib/auth/database';
 import {currentSubject} from '@/lib/auth/server';
 import {sameOriginMutation} from '@/lib/auth/auth-contract';
 import {CLOUD_SAVE_REQUEST_MAX_BYTES,parseCloudSave} from '@/lib/cloud-save';
-import {cloudStorageReady,uploadCloudSave,removeUnconfirmedCloudSave} from '@/server/cloud-backup-storage';
+import {cloudStorageReady,uploadCloudSave,completeCloudBackup} from '@/server/cloud-backup-storage';
 import {readBoundedJson} from '@/server/bounded-json';
 
 export const dynamic='force-dynamic';
@@ -58,20 +58,22 @@ async function backups(request:Request,{params}:Context,create:boolean){
     if(reservation.outcome!=='reserved'||!reservation.backupId||!reservation.storageKey)
       return json({error:'UNAVAILABLE'},503);
     try{
-      await uploadCloudSave(reservation.storageKey,actor.id,gameId,reservation.backupId,digest,bytes);
-      const [confirmed]=await sql`SELECT public.confirm_cloud_save_backup(${actor.id}::uuid,${gameId}::uuid,${reservation.backupId}::uuid) AS result`;
+      const {storageKey,backupId}=reservation;
+      const confirmed=await completeCloudBackup(
+        ()=>uploadCloudSave(storageKey,actor.id,gameId,backupId,digest,bytes),
+        async()=>{
+          const [row]=await sql`SELECT public.confirm_cloud_save_backup(${actor.id}::uuid,${gameId}::uuid,${backupId}::uuid) AS result`;
+          return row;
+        },
+      );
       if(!['stored','replayed'].includes(confirmed?.result?.outcome??''))
         throw new Error('BACKUP_CONFIRMATION_FAILED');
       return json({backups:confirmed.result.backups,usedBytes:confirmed.result.usedBytes},
         confirmed.result.outcome==='stored'?201:200);
     }catch{
-      // Interrupted calls need an orphan sweep before broad rollout.
-      try{
-        await sql`SELECT public.release_cloud_save_backup(${actor.id}::uuid,${gameId}::uuid,${reservation.backupId}::uuid)`;
-      }catch{}
-      try{
-        await removeUnconfirmedCloudSave(reservation.storageKey,actor.id,gameId,reservation.backupId,digest);
-      }catch{}
+      // A lost response does not establish that the DB transaction rolled back.
+      // Never delete uploaded bytes or release a potentially committed reservation here.
+      // Retain the pending row for reconciliation; a retry may see a ready replay.
       return json({error:'UNAVAILABLE'},503);
     }
   }catch{return json({error:'UNAVAILABLE'},503);}

@@ -15,7 +15,7 @@ function owned(key:string,account:string,game:string,id:string,digest:string):bo
     && /^[a-f0-9]{64}$/.test(digest)
     && key===[PREFIX.slice(0,-1),account,game,id,digest+'.json'].join('/');
 }
-async function signed(method:'PUT'|'GET'|'DELETE',key:string,body?:Uint8Array,
+async function signed(method:'PUT'|'GET',key:string,body?:Uint8Array,
   conditional=false):Promise<Response> {
   if(!key.startsWith(PREFIX)||!/^[a-z0-9/-]+\.json$/.test(key))
     throw new Error('INVALID_STORAGE_KEY');
@@ -48,7 +48,7 @@ async function signed(method:'PUT'|'GET'|'DELETE',key:string,body?:Uint8Array,
     ...outgoing,
     authorization:'AWS4-HMAC-SHA256 Credential='+process.env.AWS_ACCESS_KEY_ID+
       '/'+scope+', SignedHeaders='+names.join(';')+', Signature='+signature,
-  },body:method==='PUT'?Buffer.from(bytes):undefined,redirect:'error',cache:'no-store'});
+  },body:method==='PUT'?Buffer.from(bytes):undefined,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10_000)});
 }
 export async function uploadCloudSave(key:string,account:string,game:string,id:string,
   digest:string,bytes:Uint8Array):Promise<void>{
@@ -62,9 +62,13 @@ export async function uploadCloudSave(key:string,account:string,game:string,id:s
   if(received.byteLength!==bytes.byteLength||hash(received)!==digest||
     !received.equals(Buffer.from(bytes))) throw new Error('STORAGE_DIGEST_MISMATCH');
 }
-export async function removeUnconfirmedCloudSave(key:string,account:string,game:string,
-  id:string,digest:string):Promise<void>{
-  if(!cloudStorageReady()||!owned(key,account,game,id,digest)) return;
-  const result=await signed('DELETE',key);
-  if(!result.ok&&result.status!==404)throw new Error('STORAGE_CLEANUP_FAILED');
+// Storage and Postgres are separate systems. If confirmation committed but its
+// response was lost, a second confirmation is idempotent. Never compensate
+// by deleting the object or releasing its reservation on an ambiguous error.
+export async function completeCloudBackup<T>(
+  upload:()=>Promise<void>,confirm:()=>Promise<T>,
+):Promise<T>{
+  await upload();
+  try{return await confirm();}
+  catch{return await confirm();}
 }
