@@ -6,6 +6,7 @@ import {Button} from '@heroui/react';
 import {listOfflineGames,type InstalledGame} from './offline-install';
 import {listLocalSaveGameIds} from './local-save-discovery';
 import LocalGameSaves from './LocalGameSaves';
+import CloudGameBackups from './CloudGameBackups';
 import {getBrowserHistory,formatActiveTime,type GameHistory} from './library-history';
 import V2CartridgeArt from './V2CartridgeArt';
 import {useV2Theme} from './V2AppShell';
@@ -16,7 +17,7 @@ import './v2-library.css';
 
 type PublicGame={gameId:string;title:string;genre:string;description:string;playable:boolean};
 type CatalogRow={id:string;title:string;genre:string;description:string|null};
-export default function V2GameLibrary(){
+export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled:boolean}){
   const [games,setGames]=useState<PublicGame[]>([]),[offline,setOffline]=useState<InstalledGame[]>([]);
   const [savedIds,setSavedIds]=useState<string[]>([]),[myGames,setMyGames]=useState<CatalogRow[]|null|undefined>(undefined);
   const [offlineState,setOfflineState]=useState('Checking installed games…');
@@ -94,10 +95,12 @@ export default function V2GameLibrary(){
       <div className="v2-library-intro">
         <div><p className="v2-library-eyebrow">YOUR CARTRIDGE SHELF / FIRST COLLECTION</p>
         <h1>Pick a world.<br/><em>Insert a cartridge.</em></h1>
-        <p>Discover reviewed public games. Your play history and game backups stay on this device.</p></div>
-        <div className="v2-cloud-state"><strong>Cloud saves</strong><span>Not connected</span>
-          <p>Account sync is planned with a small per-player quota. Nothing uploads without sign-in and your permission.</p>
-          <small>Proposed allowance: 10 MiB / account</small>
+        <p>Discover reviewed public games. Play history and local saves stay on this device.</p></div>
+        <div className="v2-cloud-state"><strong>Cloud saves</strong>
+          {cloudBackupsEnabled ? <><span>Manual backups</span>
+            <p>Open Local saves on a cartridge to back up your autosave or list backups. Sign-in required.</p>
+            <small>10 MiB per account</small></> :
+            <><span>Not connected</span><p>Local saves are available offline.</p></>}
         </div>
       </div>
       <section aria-labelledby="shelf-heading" className="v2-shelf">
@@ -126,6 +129,7 @@ export default function V2GameLibrary(){
               {openSaves===game.gameId&&<div id={'v2-save-'+game.gameId} className="v2-local-saves">
                 <div className="v2-local-save-head"><strong>Offline backup slots</strong><span>{snapshots[game.gameId]?.length??0} / {LOCAL_SNAPSHOT_SLOTS}</span></div>
                 <p>These are local IndexedDB snapshots, not cloud saves. Clearing browser storage may erase them.</p>
+                {cloudBackupsEnabled && game.playable && <CloudGameBackups gameId={game.gameId}/>}
                 <Button className="sb-control sb-control-primary" size="sm" variant="primary" isDisabled={pending===game.gameId}
                   onPress={()=>void withSlots(game.gameId,()=>saveLocalSnapshot(game.gameId),'Local snapshot saved.')}>
                   Back up current save

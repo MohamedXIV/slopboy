@@ -49,6 +49,9 @@ The MVP roadmap above is **not** the full planned platform. The persistent futur
 
 The canonical-route sequence #23 → #22 → #24 and the #44 engine contract are complete. The long-term tracks remain deferred.
 
+## Experimental deployment policy (owner-approved)
+Production-first until public launch: retain PRs, exact-head CI and disposable local database tests; use the canonical production deployment for hosted acceptance. Do not provision or troubleshoot separate hosted Preview environments by default. Keep experimental features disabled until their service and authorization checks pass. Keep existing dev resources, preserve data and rollback paths, and revisit environment separation before opening the platform to users.
+
 ## Active Sprint 2 — Integration and account-backed platform
 
 - **Merged baseline:** Integration #77 and PRs #78, #91 and #97 are complete on main. Keep #26/#27/#34/#90 acceptance tracked separately. A prior production checkpoint verified a signed-in player creating and reloading a private draft and receiving an admin denial. A second authenticated account, real admin actions, and hosted publication and revocation still need verification. See [#90](https://github.com/MohamedXIV/slopboy/issues/90) for that evidence and its limits.

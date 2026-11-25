@@ -25,7 +25,7 @@
 - Never commit to another agent's branch or force-push integration branches. Avoid shared API/CI/schema files concurrently; split tasks and use PRs with explicit dependencies.
 - Integration branch `integrate/sprint-2-baseline` belongs to the completed #77 gate. PRs #91 and #97 are merged. Live account authorization has its own acceptance checks.
 - Gemini can independently handle #29 MCP **schemas/tests only** or #33 browser **hostile security fixtures only**, after separate Issue claims. No unapproved real write tools or relaxation of sandbox security.
-- `main` and Vercel Production are **never** targets for unattended agents without explicit owner approval.
+- `main` and Vercel Production remain release targets, not direct work branches. During the owner-approved experimental/pre-public-launch period, use **production-first**: land focused PRs after exact-head checks, then perform hosted acceptance on the canonical Production deployment. No dedicated hosted Preview environment is required; existing Preview deployments may remain. Destructive changes, paid upgrades, and expanding permissions still require explicit approval. Revisit environment separation before public launch.
 - Separate experimental work (KAPLAY adapter, OAuth mock verification, migration schema) from verified real external services and account access.
 
 ## Workflow
