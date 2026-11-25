@@ -1,12 +1,44 @@
 import {createHash,createHmac} from 'node:crypto';
 
 const PREFIX='backups/';
-export function cloudStorageReady():boolean {
-  return process.env.CLOUD_SAVE_BACKUPS_ENABLED==='1'
-    && process.env.CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED==='1'
-    && Boolean(process.env.CLOUD_SAVE_BUCKET?.startsWith('slopboy-cloud-backups-'))
-    && Boolean(process.env.AWS_ENDPOINT_URL_S3 && process.env.AWS_REGION &&
-      process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY);
+type Env = Readonly<Record<string,string|undefined>>;
+
+// A reviewed, non-secret deployment binding prevents mixing DB/Auth/storage
+// branches or accidentally using an owner connection. Never log the URLs.
+export function cloudStorageTargetMatches(env:Env):boolean {
+  try {
+    const target=JSON.parse(env.CLOUD_SAVE_EXPECTED_TARGET ?? '') as Record<string,unknown>;
+    if(!target||typeof target!=='object')return false;
+    const db=new URL(env.DATABASE_URL ?? '');
+    const auth=new URL(env.NEON_AUTH_BASE_URL ?? '');
+    const storage=new URL(env.AWS_ENDPOINT_URL_S3 ?? '');
+    const host=target.databaseHost;
+    if(typeof host!=='string'||!host.includes('.')||
+      !['postgres:','postgresql:'].includes(db.protocol)||
+      ![host,host.replace('.','-pooler.')].includes(db.hostname)||
+      decodeURIComponent(db.username)!==target.databaseRole||
+      db.pathname!=='/'+target.databaseName||
+      auth.protocol!=='https:'||storage.protocol!=='https:'||
+      auth.username||auth.password||storage.username||storage.password||
+      auth.search||auth.hash||storage.search||storage.hash)return false;
+    return auth.href.replace(/\/$/,'')===target.authUrl &&
+      storage.href.replace(/\/$/,'')===target.storageEndpoint &&
+      env.AWS_REGION===target.region && env.CLOUD_SAVE_BUCKET===target.bucket;
+  }catch{return false;}
+}
+export function cloudStorageReady(env:Env=process.env):boolean {
+  return env.CLOUD_SAVE_BACKUPS_ENABLED==='1'
+    && env.CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED==='1'
+    && Boolean(env.CLOUD_SAVE_BUCKET?.startsWith('slopboy-cloud-backups-'))
+    && Boolean(env.AWS_ENDPOINT_URL_S3 && env.AWS_REGION &&
+      env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY)
+    && cloudStorageTargetMatches(env);
+}
+
+// Pre-launch QA only. Do not widen to other profiles before reconciliation,
+// rate limits and hosted acceptance are complete. Database role, not client input.
+export function canUseCloudBackups(profileRole:unknown):boolean {
+  return profileRole==='admin';
 }
 const hash=(bytes:Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const hmac=(key:Buffer|string,value:string)=>createHmac('sha256',key).update(value).digest();
