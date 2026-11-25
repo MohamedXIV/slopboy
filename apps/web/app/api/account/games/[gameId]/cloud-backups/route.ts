@@ -5,7 +5,7 @@ import {readProfile} from '@/lib/auth/database';
 import {currentSubject} from '@/lib/auth/server';
 import {sameOriginMutation} from '@/lib/auth/auth-contract';
 import {CLOUD_SAVE_REQUEST_MAX_BYTES,parseCloudSave} from '@/lib/cloud-save';
-import {cloudStorageReady,uploadCloudSave,completeCloudBackup} from '@/server/cloud-backup-storage';
+import {cloudStorageReady,canUseCloudBackups,uploadCloudSave,completeCloudBackup} from '@/server/cloud-backup-storage';
 import {readBoundedJson} from '@/server/bounded-json';
 
 export const dynamic='force-dynamic';
@@ -38,7 +38,9 @@ async function backups(request:Request,{params}:Context,create:boolean){
     if(save===null) return json({error:'INVALID_SAVE'},400);
   }
   try{
-    if(!await readProfile(actor)) return json({error:'PROFILE_NOT_READY'},403);
+    const profile=await readProfile(actor);
+    if(!profile) return json({error:'PROFILE_NOT_READY'},403);
+    if(!canUseCloudBackups(profile.role)) return json({error:'NOT_FOUND'},404);
     const sql=neon(database);
     if(!create){
       const [row]=await sql`SELECT public.list_cloud_save_backups(${actor.id}::uuid,${gameId}::uuid) AS result`;

@@ -40,6 +40,7 @@ export default function CloudGameBackups({gameId}:{gameId:string}) {
         setNotice(response.status === 401 ? 'Sign in to use cloud backups.'
           : error?.error === 'PROFILE_NOT_READY' ? 'Activate your Slopboy profile before using cloud backups.'
           : error?.error === 'INVALID_SAVE' ? 'This autosave format cannot be backed up to the cloud.'
+          : error?.error === 'BACKUP_IN_PROGRESS' ? 'A backup is pending. Try again later.'
           : response.status === 409 ? 'Cloud backup limit reached.'
           : 'Cloud backups unavailable.');
         return;
