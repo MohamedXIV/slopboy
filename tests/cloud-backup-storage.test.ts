@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cloudStorageReady,cloudStorageTargetMatches,canUseCloudBackups,completeCloudBackup} from '../apps/web/server/cloud-backup-storage.ts';
+import {cloudStorageReady,cloudStorageIssue,cloudStorageTargetMatches,canUseCloudBackups,completeCloudBackup} from '../apps/web/server/cloud-backup-storage.ts';
 
 test('cloud saves stay off without provider-verified create-only writes',()=>{
   const old=process.env.CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED;
@@ -68,4 +68,33 @@ test('prelaunch QA requires a matching reviewed backend target and both feature 
 test('only verified admin profiles are eligible for prelaunch QA',()=>{
   assert.equal(canUseCloudBackups('admin'),true);
   for(const role of ['player','creator','system',undefined,null])assert.equal(canUseCloudBackups(role),false);
+});
+
+test('readiness diagnoses a mismatched service without returning configuration values',()=>{
+  assert.equal(cloudStorageIssue(qaEnv),null);
+  const cases=[
+    ['CLOUD_SAVE_BACKUPS_ENABLED','0','disabled'],
+    ['CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED','0','provider_unverified'],
+    ['CLOUD_SAVE_EXPECTED_TARGET','not-json','target_invalid'],
+    ['CLOUD_SAVE_EXPECTED_TARGET','[]','target_invalid'],
+    ['CLOUD_SAVE_EXPECTED_TARGET','{}','target_invalid'],
+    ['DATABASE_URL','not-a-url','database_url_invalid'],
+    ['DATABASE_URL',qaEnv.DATABASE_URL.replace('ep-qa','ep-other'),'database_host_mismatch'],
+    ['DATABASE_URL',qaEnv.DATABASE_URL.replace('restricted_role','owner_role'),'database_role_mismatch'],
+    ['DATABASE_URL',qaEnv.DATABASE_URL.replace('/qa?','/other?'),'database_name_mismatch'],
+    ['NEON_AUTH_BASE_URL','https://other.example.test/qa/auth','auth_target_mismatch'],
+    ['NEON_AUTH_BASE_URL','http://auth.example.test/qa/auth','auth_url_invalid'],
+    ['AWS_ENDPOINT_URL_S3','','storage_endpoint_missing'],
+    ['AWS_ENDPOINT_URL_S3','https://storage.example.test/?credential=fixture','storage_url_invalid'],
+    ['AWS_ENDPOINT_URL_S3','https://different.example.test','storage_target_mismatch'],
+    ['AWS_REGION','','storage_region_missing'],
+    ['AWS_REGION','us-east-1','storage_region_mismatch'],
+    ['AWS_SECRET_ACCESS_KEY','','storage_credentials_missing'],
+    ['CLOUD_SAVE_BUCKET','slopboy-cloud-backups-other','bucket_mismatch'],
+  ] as const;
+  for(const [key,value,expected] of cases){
+    const env={...qaEnv,[key]:value};
+    assert.equal(cloudStorageIssue(env),expected,key);
+    assert.equal(cloudStorageReady(env),false,key);
+  }
 });
