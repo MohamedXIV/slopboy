@@ -3,36 +3,68 @@ import {createHash,createHmac} from 'node:crypto';
 const PREFIX='backups/';
 type Env = Readonly<Record<string,string|undefined>>;
 
-// A reviewed, non-secret deployment binding prevents mixing DB/Auth/storage
-// branches or accidentally using an owner connection. Never log the URLs.
-export function cloudStorageTargetMatches(env:Env):boolean {
+// Fixed diagnostic codes only: never log a URL, username, credential, save or
+// exception message. They remain server-side, not in the public API response.
+export type CloudStorageIssue =
+  'disabled'|'provider_unverified'|'bucket_missing'|'storage_endpoint_missing'|
+  'storage_region_missing'|'storage_credentials_missing'|'target_invalid'|
+  'database_url_invalid'|'database_host_mismatch'|'database_role_mismatch'|
+  'database_name_mismatch'|'auth_url_invalid'|'auth_target_mismatch'|
+  'storage_url_invalid'|'storage_target_mismatch'|'storage_region_mismatch'|'bucket_mismatch';
+
+function targetIssue(env:Env):CloudStorageIssue|null {
+  let target:Record<string,unknown>;
   try {
-    const target=JSON.parse(env.CLOUD_SAVE_EXPECTED_TARGET ?? '') as Record<string,unknown>;
-    if(!target||typeof target!=='object')return false;
+    target=JSON.parse(env.CLOUD_SAVE_EXPECTED_TARGET ?? '');
+    if(!target||typeof target!=='object'||Array.isArray(target)||
+      !['databaseHost','databaseRole','databaseName','authUrl','storageEndpoint','region','bucket'].every(
+        key=>typeof target[key]==='string' && Boolean(target[key])))return 'target_invalid';
+  }catch{return 'target_invalid';}
+  const host=target.databaseHost as string;
+  if(!host.includes('.'))return 'target_invalid';
+  try{
     const db=new URL(env.DATABASE_URL ?? '');
-    const auth=new URL(env.NEON_AUTH_BASE_URL ?? '');
-    const storage=new URL(env.AWS_ENDPOINT_URL_S3 ?? '');
-    const host=target.databaseHost;
-    if(typeof host!=='string'||!host.includes('.')||
-      !['postgres:','postgresql:'].includes(db.protocol)||
-      ![host,host.replace('.','-pooler.')].includes(db.hostname)||
-      decodeURIComponent(db.username)!==target.databaseRole||
-      db.pathname!=='/'+target.databaseName||
-      auth.protocol!=='https:'||storage.protocol!=='https:'||
-      auth.username||auth.password||storage.username||storage.password||
-      auth.search||auth.hash||storage.search||storage.hash)return false;
-    return auth.href.replace(/\/$/,'')===target.authUrl &&
-      storage.href.replace(/\/$/,'')===target.storageEndpoint &&
-      env.AWS_REGION===target.region && env.CLOUD_SAVE_BUCKET===target.bucket;
-  }catch{return false;}
+    if(!['postgres:','postgresql:'].includes(db.protocol))return 'database_url_invalid';
+    if(![host,host.replace('.','-pooler.')].includes(db.hostname))return 'database_host_mismatch';
+    if(decodeURIComponent(db.username)!==target.databaseRole)return 'database_role_mismatch';
+    if(db.pathname!=='/'+target.databaseName)return 'database_name_mismatch';
+  }catch{return 'database_url_invalid';}
+  const matchHttps=(value:string|undefined,expected:unknown,invalid:CloudStorageIssue,mismatch:CloudStorageIssue):CloudStorageIssue|null=>{
+    try{
+      const url=new URL(value??'');
+      if(url.protocol!=='https:'||url.username||url.password||url.search||url.hash)return invalid;
+      return url.href.replace(/\/$/,'')===expected?null:mismatch;
+    }catch{return invalid;}
+  };
+  return matchHttps(env.NEON_AUTH_BASE_URL,target.authUrl,'auth_url_invalid','auth_target_mismatch')
+    ?? matchHttps(env.AWS_ENDPOINT_URL_S3,target.storageEndpoint,'storage_url_invalid','storage_target_mismatch')
+    ?? (env.AWS_REGION!==target.region?'storage_region_mismatch':null)
+    ?? (env.CLOUD_SAVE_BUCKET!==target.bucket?'bucket_mismatch':null);
 }
+
+export function cloudStorageTargetMatches(env:Env):boolean {
+  return targetIssue(env)===null;
+}
+export function cloudStorageIssue(env:Env):CloudStorageIssue|null {
+  if(env.CLOUD_SAVE_BACKUPS_ENABLED!=='1')return 'disabled';
+  if(env.CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED!=='1')return 'provider_unverified';
+  if(!env.CLOUD_SAVE_BUCKET?.startsWith('slopboy-cloud-backups-'))return 'bucket_missing';
+  if(!env.AWS_ENDPOINT_URL_S3)return 'storage_endpoint_missing';
+  if(!env.AWS_REGION)return 'storage_region_missing';
+  if(!env.AWS_ACCESS_KEY_ID||!env.AWS_SECRET_ACCESS_KEY)return 'storage_credentials_missing';
+  return targetIssue(env);
+}
+const reportedIssues=new Set<CloudStorageIssue>();
 export function cloudStorageReady(env:Env=process.env):boolean {
-  return env.CLOUD_SAVE_BACKUPS_ENABLED==='1'
-    && env.CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED==='1'
-    && Boolean(env.CLOUD_SAVE_BUCKET?.startsWith('slopboy-cloud-backups-'))
-    && Boolean(env.AWS_ENDPOINT_URL_S3 && env.AWS_REGION &&
-      env.AWS_ACCESS_KEY_ID && env.AWS_SECRET_ACCESS_KEY)
-    && cloudStorageTargetMatches(env);
+  const issue=cloudStorageIssue(env);
+  // Report each category at most once per warm runtime. Explicitly disabled
+  // features are normal and should not fill logs. No client-visible diagnostics.
+  if(issue && issue!=='disabled' && env===process.env && env.VERCEL_ENV==='production' &&
+     !reportedIssues.has(issue)){
+    reportedIssues.add(issue);
+    console.warn('[cloud-save] configuration unavailable: '+issue);
+  }
+  return issue===null;
 }
 
 // Pre-launch QA only. Do not widen to other profiles before reconciliation,
