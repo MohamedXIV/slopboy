@@ -4,7 +4,7 @@ The local IndexedDB autosave remains the primary offline save. The Library offer
 
 ## Design: private objects and metadata-only SQL
 
-Migration 008 holds **metadata only**: verified account, game UUID, pinned hardware/save schema, digest, bytes, private storage key and pending/ready state. No save content is stored in PostgreSQL. Next.js Node server uploads private bytes to the dedicated Neon dev bucket `slopboy-cloud-backups-dev` under `backups/<account>/<game>/<backup>/<digest>.json`. The server checks the exact key/owner/game/digest contract; storage credentials stay server-only.
+Migration 008 holds **metadata only**: verified account, game UUID, pinned hardware/save schema, digest, bytes, private storage key and pending/ready state. No save content is stored in PostgreSQL. Next.js Node server uploads private bytes to the dedicated private Neon bucket (`slopboy-cloud-backups-prod` for the canonical experimental Production deployment; `slopboy-cloud-backups-dev` for historical dev tests) under `backups/<account>/<game>/<backup>/<digest>.json`. The server checks the exact key/owner/game/digest contract; storage credentials stay server-only.
 
 Neon credentials support branch-wide `storage:write`, **not** provider-enforced object-key prefix permissions. Owner explicitly approved this trade-off for a dedicated private dev bucket with application-enforced prefix. Never hand S3 credentials to the browser, or expose a presigned object URL without a fresh authorization check.
 
@@ -20,8 +20,8 @@ Neon credentials support branch-wide `storage:write`, **not** provider-enforced 
 
 ## Schema rollout and test plan
 
-The original 008 storing payload text must NEVER be run on hosted dev. The revised 008 keeps metadata only. Apply merged 007 (trusted fixture jobs) first if missing in `schema_migrations`; use the exact file checksum when recording 008. Do not enable backup flags until the S3 gate is verified and server credentials are scoped to **dev**.
+The original 008 storing payload text must NEVER be run on hosted dev. The revised 008 keeps metadata only. Apply every preceding missing migration in order (006 staged game artifacts, 007 trusted fixture jobs) if missing in `schema_migrations`; use the exact file checksum when recording 008. Do not enable backup flags until the S3 gate is verified, the application role is restricted and DB/Auth/Storage targets are the same intended Neon branch. Owner-approved production-first policy applies until public launch; historical dev migrations remain unchanged.
 
-Test on a disposable Postgres instance and a non-production Neon branch; verify SQL auth/quotas and no payload column. Hosted QA after activation: account A uploads, second browser account A lists it, account B and guests cannot list/read it, direct anonymous S3 GET denied, offline IndexedDB still works and there is no automatic sync.
+Test on disposable PostgreSQL in CI; the pre-public-launch hosted acceptance target is the canonical Production deployment rather than a separate hosted preview. verify SQL auth/quotas and no payload column. Hosted QA after activation: account A uploads, second browser account A lists it, account B and guests cannot list/read it, direct anonymous S3 GET denied, offline IndexedDB still works and there is no automatic sync.
 
 Safe rollback: disable both feature flags. Down migration removes metadata and should never run against retained hosted saves without explicit data-retention and object-deletion approval.
