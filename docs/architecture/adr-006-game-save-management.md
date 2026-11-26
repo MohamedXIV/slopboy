@@ -24,3 +24,7 @@ Existing migration 008 and private objects stay unchanged until additive slot/sn
 4. Version provenance and explicit compatibility UX; adapter-specific migration only when proven.
 5. Additive cloud metadata, private restore and conflict handling, reconciliation and hosted A/B/offline acceptance.
 6. Publish creator SDK and maintained AI guide only for implemented/approved capabilities.
+
+## Local storage foundation slice
+
+The new host-only `save-slots` module uses one versioned record per game UUID and hardware version (not revision/schema), with atomic IndexedDB read-modify-write, a fenced session token, one replaceable autosave head, immutable manual/backup/fork snapshots, user labels and SHA-256 provenance. Opening a prior snapshot forks; same-schema revision changes are allowed, unknown legacy provenance is retained but not auto-loaded. A one-time opt-in import copies the old schema-1 autosave without altering its bytes; numbered legacy backups remain available through the existing UI until their dedicated migration. New host operational policies: 256 KiB per payload and 10 MiB encoded record per game/device, 80-character labels; quota errors preserve existing data, no silent eviction. This is a deliberately bounded record design; measure IndexedDB write amplification before wider use. No gameplay integration or UI change in this slice. Adapter capture and restore acknowledgment, browser transaction tests, historical backup migration and cloud synchronization remain follow-up acceptance.

@@ -153,7 +153,33 @@ async function transaction<T>(mode:IDBTransactionMode,operation:(store:IDBObject
     });
   }finally{db.close();}
 }
-export const browserSaveDriver:SaveDriver={
+/** All read-modify-write decisions execute synchronously inside one transaction.
+ * Never emulate this with separate get/put calls in the browser. */
+export interface AtomicSaveDriver extends SaveDriver {
+  update<T>(key:string,change:(raw:unknown)=>{value:string;result:T}):Promise<T>;
+}
+export const browserSaveDriver:AtomicSaveDriver={
+  update:async <T>(key:string,change:(raw:unknown)=>{value:string;result:T})=>{
+    const db=await connect();
+    try{
+      return await new Promise<T>((resolve,reject)=>{
+        const tx=db.transaction(SAVE_STORE_NAME,'readwrite');
+        const store=tx.objectStore(SAVE_STORE_NAME);
+        const request=store.get(key);
+        let result:T;
+        request.onsuccess=()=>{
+          try{
+            const next=change(request.result);
+            result=next.result;
+            store.put(next.value,key);
+          }catch(error){tx.abort();reject(error);}
+        };
+        tx.oncomplete=()=>resolve(result);
+        tx.onerror=()=>reject(tx.error??Error('Local save update failed'));
+        tx.onabort=()=>reject(tx.error??Error('Local save update aborted'));
+      });
+    }finally{db.close();}
+  },
   get:key=>transaction('readonly',store=>store.get(key)),
   put:async(key,value)=>{await transaction('readwrite',store=>store.put(value,key));},
   delete:async key=>{await transaction('readwrite',store=>store.delete(key));},
