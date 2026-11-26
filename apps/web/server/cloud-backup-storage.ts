@@ -1,4 +1,5 @@
 import {createHash,createHmac} from 'node:crypto';
+import {CLOUD_SAVE_MAX_BYTES} from '../lib/cloud-save.ts';
 
 const PREFIX='backups/';
 type Env = Readonly<Record<string,string|undefined>>;
@@ -114,17 +115,43 @@ async function signed(method:'PUT'|'GET',key:string,body?:Uint8Array,
       '/'+scope+', SignedHeaders='+names.join(';')+', Signature='+signature,
   },body:method==='PUT'?Buffer.from(bytes):undefined,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(10_000)});
 }
+/** Verify exact DB-authorized size and digest while reading, rather than
+ * allocating an unbounded arrayBuffer from a corrupt storage response. */
+export async function readVerifiedCloudObject(response:Response,size:number,digest:string):Promise<Buffer>{
+  if(!response.ok||!response.body||!Number.isSafeInteger(size)||size<0||size>CLOUD_SAVE_MAX_BYTES||!/^[a-f0-9]{64}$/.test(digest)){
+    await response.body?.cancel().catch(()=>{});
+    throw Error('STORAGE_READBACK_FAILED');
+  }
+  const reader=response.body.getReader(),chunks:Uint8Array[]=[];
+  let total=0;
+  try{
+    while(true){
+      const {done,value}=await reader.read();if(done)break;
+      total+=value.byteLength;
+      if(total>size)throw Error('STORAGE_DIGEST_MISMATCH');
+      chunks.push(value);
+    }
+  }finally{await reader.cancel().catch(()=>{});}
+  const bytes=Buffer.concat(chunks,total);
+  if(total!==size||hash(bytes)!==digest)throw Error('STORAGE_DIGEST_MISMATCH');
+  return bytes;
+}
+/** Server-only. Caller MUST first authorize the ready row for this exact
+ * account/game/backup via restricted SQL. Never take a key from the client. */
+export async function downloadCloudSave(key:string,account:string,game:string,id:string,
+  digest:string,size:number):Promise<Buffer>{
+  if(!cloudStorageReady()||!owned(key,account,game,id,digest)||
+    !Number.isSafeInteger(size)||size<0||size>CLOUD_SAVE_MAX_BYTES)throw Error('STORAGE_GATE_CLOSED');
+  return readVerifiedCloudObject(await signed('GET',key),size,digest);
+}
 export async function uploadCloudSave(key:string,account:string,game:string,id:string,
   digest:string,bytes:Uint8Array):Promise<void>{
   if(!cloudStorageReady()||!owned(key,account,game,id,digest))
     throw new Error('STORAGE_GATE_CLOSED');
   const write=await signed('PUT',key,bytes,true);
   if(!write.ok&&write.status!==412) throw new Error('STORAGE_WRITE_FAILED');
-  const verification=await signed('GET',key);
-  if(!verification.ok) throw new Error('STORAGE_READBACK_FAILED');
-  const received=Buffer.from(await verification.arrayBuffer());
-  if(received.byteLength!==bytes.byteLength||hash(received)!==digest||
-    !received.equals(Buffer.from(bytes))) throw new Error('STORAGE_DIGEST_MISMATCH');
+  const received=await downloadCloudSave(key,account,game,id,digest,bytes.byteLength);
+  if(!received.equals(Buffer.from(bytes))) throw new Error('STORAGE_DIGEST_MISMATCH');
 }
 // Storage and Postgres are separate systems. If confirmation committed but its
 // response was lost, a second confirmation is idempotent. Never compensate

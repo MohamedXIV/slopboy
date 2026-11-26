@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cloudStorageReady,cloudStorageIssue,cloudStorageTargetMatches,canUseCloudBackups,completeCloudBackup} from '../apps/web/server/cloud-backup-storage.ts';
+import {createHash} from 'node:crypto';
+import {cloudStorageReady,cloudStorageIssue,cloudStorageTargetMatches,canUseCloudBackups,completeCloudBackup,readVerifiedCloudObject} from '../apps/web/server/cloud-backup-storage.ts';
 
 test('cloud saves stay off without provider-verified create-only writes',()=>{
   const old=process.env.CLOUD_SAVE_CONDITIONAL_PUT_VERIFIED;
@@ -97,4 +98,16 @@ test('readiness diagnoses a mismatched service without returning configuration v
     assert.equal(cloudStorageIssue(env),expected,key);
     assert.equal(cloudStorageReady(env),false,key);
   }
+});
+
+test('private storage readback verifies exact size and digest, including empty bytes',async()=>{
+  for(const value of ['','named snapshot','معلش']){
+    const bytes=Buffer.from(value),digest=createHash('sha256').update(bytes).digest('hex');
+    assert.deepEqual(await readVerifiedCloudObject(new Response(bytes),bytes.length,digest),bytes);
+    await assert.rejects(readVerifiedCloudObject(new Response(bytes),bytes.length+1,digest),/STORAGE_DIGEST_MISMATCH/);
+  }
+  const digest=createHash('sha256').update('correct').digest('hex');
+  await assert.rejects(readVerifiedCloudObject(new Response('corrupt'),7,digest),/STORAGE_DIGEST_MISMATCH/);
+  await assert.rejects(readVerifiedCloudObject(new Response('correct and too long'),7,digest),/STORAGE_DIGEST_MISMATCH/);
+  await assert.rejects(readVerifiedCloudObject(new Response('correct',{status:403}),7,digest),/STORAGE_READBACK_FAILED/);
 });
