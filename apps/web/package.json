@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@neon/oauth": "0.3.0",
     "@slopboy/hardware": "workspace:*",
     "next": "^16.4.5",
     "react": "^19.0.0",
