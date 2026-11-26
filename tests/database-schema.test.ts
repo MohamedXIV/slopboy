@@ -1078,7 +1078,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // Persistent rate limits apply across requests/instances, not across identities.
     await assert.rejects(()=>executePsql(config,{sql:`SET ROLE slopboy_test_web; SELECT public.consume_named_cloud_request('${admin}')`}));
     await executePsql(config,{sql:'GRANT EXECUTE ON FUNCTION public.consume_named_cloud_request(uuid) TO slopboy_test_web'});
-    const consume=(actor:string)=>cloud(`SELECT public.consume_named_cloud_request('${actor}');`);
+    const consume=(actor:string)=>cloud(`SELECT to_jsonb(public.consume_named_cloud_request('${actor}'));`);
     assert.equal(await consume(alice),false);
     assert.equal(await consume(admin),true);
     await assert.rejects(()=>executePsql(config,{sql:'SET ROLE slopboy_test_web;SELECT * FROM public.named_cloud_request_budget'}));

@@ -28,16 +28,16 @@ BEGIN
  INSERT INTO public.named_cloud_request_budget AS budget(account_id,minute_window,minute_count,day_window,day_count)
  VALUES(account,current_minute,1,current_day,1)
  ON CONFLICT(account_id) DO UPDATE SET
- minute_window=current_minute,minute_count=CASE WHEN budget.minute_window=current_minute THEN budget.minute_count+1 ELSE 1 END,
- day_window=current_day,day_count=CASE WHEN budget.day_window=current_day THEN budget.day_count+1 ELSE 1 END
- WHERE (budget.minute_window<>current_minute OR budget.minute_count<30)
- AND (budget.day_window<>current_day OR budget.day_count<200);
+ minute_window=greatest(budget.minute_window,current_minute),minute_count=CASE WHEN budget.minute_window>=current_minute THEN budget.minute_count+1 ELSE 1 END,
+ day_window=greatest(budget.day_window,current_day),day_count=CASE WHEN budget.day_window>=current_day THEN budget.day_count+1 ELSE 1 END
+ WHERE (budget.minute_window<current_minute OR budget.minute_count<30)
+ AND (budget.day_window<current_day OR budget.day_count<200);
  IF NOT FOUND THEN RETURN false; END IF;
  INSERT INTO public.named_cloud_global_budget AS budget(singleton,day_window,day_count)
  VALUES(true,current_day,1)
- ON CONFLICT(singleton) DO UPDATE SET day_window=current_day,
- day_count=CASE WHEN budget.day_window=current_day THEN budget.day_count+1 ELSE 1 END
- WHERE budget.day_window<>current_day OR budget.day_count<1000;
+ ON CONFLICT(singleton) DO UPDATE SET day_window=greatest(budget.day_window,current_day),
+ day_count=CASE WHEN budget.day_window>=current_day THEN budget.day_count+1 ELSE 1 END
+ WHERE budget.day_window<current_day OR budget.day_count<1000;
  RETURN FOUND;
 END;
 $$;
