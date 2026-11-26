@@ -14,6 +14,7 @@
     "./host-api": "./src/host-api.ts",
     "./kaplay-adapter": "./src/kaplay-adapter.ts",
     ".": "./src/host-api.ts",
-    "./save-capabilities": "./src/save-capabilities.ts"
+    "./save-capabilities": "./src/save-capabilities.ts",
+    "./save-slots": "./src/save-slots.ts"
   }
 }
