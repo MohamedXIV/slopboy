@@ -40,3 +40,7 @@ For a newly reviewed, immutable digest-addressed pixel-v1 cartridge, the validat
 ## Named cloud snapshot transport
 
 The cloud transport is implemented separately from gameplay and account authorization: canonical named snapshot export, inner digest verification, strict identity/schema metadata, conservative conflict comparison, and atomic import as a new local playthrough without activation. The server storage adapter now supports bounded verified reads. Legacy raw backups and existing tables are unchanged. Remote account metadata, API and in-player cloud actions remain separate follow-up work; do not present this contract as live sync.
+
+## Named cloud metadata foundation
+
+Migration 009 separates legacy and named snapshot metadata, while sharing the account byte quota and lock. Restricted admin-QA functions reserve, list, confirm and resolve private ready objects; no payload is stored in PostgreSQL. Retain pending named records for future reconciliation, and refuse destructive rollback with retained records. This is SQL groundwork only; authorized web routes, grants, hosted migration, conflict UI and real storage acceptance remain separate.

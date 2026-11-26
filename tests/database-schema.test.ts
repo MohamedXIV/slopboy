@@ -49,8 +49,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 8);
-  assert.equal(down.length, 8);
+  assert.equal(up.length, 9);
+  assert.equal(down.length, 9);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -62,7 +62,7 @@ test('migration files load cleanly with matching checksums', async () => {
 
   assert.equal(up[3].version, 4);
   assert.equal(up[3].name, 'source_drafts');
-  assert.deepEqual(down.map(file => file.version), [8, 7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(down.map(file => file.version), [9, 8, 7, 6, 5, 4, 3, 2, 1]);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -109,8 +109,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 8);
-    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert.equal(upResult.applied, 9);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -428,8 +428,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 6);
-    assert.deepEqual(rollback3.versions, [8, 7, 6, 5, 4, 3]);
+    assert.equal(rollback3.rolledBack, 7);
+    assert.deepEqual(rollback3.versions, [9, 8, 7, 6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -461,8 +461,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 8);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert.equal(reMigrate.applied, 9);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -743,8 +743,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
-    assert.deepEqual(downgrade4.versions,[8,7,6,5,4]);
-    assert.equal((await migrateUp(config,migrationsDir)).applied,5);
+    assert.deepEqual(downgrade4.versions,[9,8,7,6,5,4]);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,6);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
     const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
@@ -1027,9 +1027,48 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.deepEqual(await list(bob),{usedBytes:10485760,backups:[]});
     assert.equal((await reserve(bob,"'new position'")).outcome,'quota');
 
-    assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[8,7,6,5]);
+
+    // Named snapshots stay separate from legacy listings and share account quota.
+    await assert.rejects(()=>executePsql(config,{sql:`SET ROLE slopboy_test_web;SELECT public.list_named_cloud_snapshots('${admin}','${reviewed.gameId}')`}));
+    await executePsql(config,{sql:`GRANT EXECUTE ON FUNCTION public.list_named_cloud_snapshots(uuid,uuid),
+      public.reserve_named_cloud_snapshot(uuid,uuid,text,integer,jsonb),
+      public.confirm_named_cloud_snapshot(uuid,uuid,uuid),
+      public.lookup_named_cloud_snapshot(uuid,uuid,uuid) TO slopboy_test_web;`});
+    const meta=JSON.stringify({slotId:'11111111-1111-4111-8111-111111111111',slotName:'Adventure',
+      snapshotId:'22222222-2222-4222-8222-222222222222',snapshotName:'Before boss',
+      kind:'manual',revisionId:reviewed.revisionId,releaseVersion:null,schemaVersion:2,
+      hardwareId:'slopboy-1000@0.1.0',snapshotCreatedAt:1234,payloadBytes:10,payloadDigest:'c'.repeat(64)});
+    const namedReserve=(actor:string,digest='d',metadata=meta)=>cloud(`SELECT public.reserve_named_cloud_snapshot('${actor}','${reviewed.gameId}',repeat('${digest}',64),500,'${metadata}'::jsonb);`);
+    const namedList=(actor:string)=>cloud(`SELECT coalesce(public.list_named_cloud_snapshots('${actor}','${reviewed.gameId}'),'null'::jsonb);`);
+    const namedLookup=(actor:string,id:string)=>cloud(`SELECT coalesce(public.lookup_named_cloud_snapshot('${actor}','${reviewed.gameId}','${id}'),'null'::jsonb);`);
+    assert.equal(await namedList(alice),null);
+    assert.equal((await namedReserve(alice)).outcome,'not_found');
+    assert.equal((await namedReserve(admin,'e',JSON.stringify({...JSON.parse(meta),data:'not metadata'}))).outcome,'invalid');
+    assert.equal((await namedReserve(admin,'e',JSON.stringify({...JSON.parse(meta),revisionId:collisionRevision}))).outcome,'invalid');
+    const named=await namedReserve(admin);
+    assert.equal(named.outcome,'reserved');
+    assert.equal((await namedList(admin)).usedBytes,500);
+    assert.deepEqual((await namedList(admin)).snapshots,[]);
+    assert.equal(await namedLookup(admin,named.backupId),null);
+    assert.equal((await namedReserve(admin)).outcome,'in_progress');
+    assert.equal((await cloud(`SELECT public.confirm_named_cloud_snapshot('${alice}','${reviewed.gameId}','${named.backupId}');`)).outcome,'not_found');
+    assert.equal((await cloud(`SELECT public.confirm_named_cloud_snapshot('${admin}','${reviewed.gameId}','${named.backupId}');`)).outcome,'stored');
+    const namedListing=await namedList(admin);
+    assert.equal(namedListing.snapshots[0].snapshotName,'Before boss');
+    assert.equal(namedListing.snapshots[0].schemaVersion,2);
+    assert.ok(!JSON.stringify(namedListing).includes('storageKey'));
+    assert.equal((await namedLookup(admin,named.backupId)).storageKey,named.storageKey);
+    assert.equal(await namedLookup(bob,named.backupId),null);
+    assert.deepEqual(await list(admin),{usedBytes:500,backups:[]});
+    assert.equal((await namedReserve(admin)).outcome,'replayed');
+    await assert.rejects(()=>executePsql(config,{sql:'SET ROLE slopboy_test_web;SELECT storage_key FROM public.named_cloud_snapshots'}));
+    await assert.rejects(()=>migrateDown(config,migrationsDir,8),/Named cloud snapshots retained/);
+    // Disposable fixture cleanup only, not an application or hosted deletion path.
+    await executePsql(config,{sql:'DELETE FROM public.named_cloud_snapshots'});
+
+    assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[9,8,7,6,5]);
     assert.match((await executePsql(config,{sql:`SELECT source_text FROM game_source_drafts WHERE id='${revisionUuid}'`})).stdout,/export default/);
-    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8]);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9]);
 
   } finally {
     // Stop server and clean up temporary cluster
