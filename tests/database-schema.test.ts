@@ -49,8 +49,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 9);
-  assert.equal(down.length, 9);
+  assert.equal(up.length, 10);
+  assert.equal(down.length, 10);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -110,7 +110,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
     assert.equal(upResult.applied, 9);
-    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -429,7 +429,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
     assert.equal(rollback3.rolledBack, 7);
-    assert.deepEqual(rollback3.versions, [9, 8, 7, 6, 5, 4, 3]);
+    assert.deepEqual(rollback3.versions, [10, 9, 8, 7, 6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -462,7 +462,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
     assert.equal(reMigrate.applied, 9);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -743,7 +743,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
-    assert.deepEqual(downgrade4.versions,[9,8,7,6,5,4]);
+    assert.deepEqual(downgrade4.versions,[10,9,8,7,6,5,4]);
     assert.equal((await migrateUp(config,migrationsDir)).applied,6);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
@@ -1051,6 +1051,19 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.deepEqual((await namedList(admin)).snapshots,[]);
     assert.equal(await namedLookup(admin,named.backupId),null);
     assert.equal((await namedReserve(admin)).outcome,'in_progress');
+    await executePsql(config,{sql:`UPDATE public.named_cloud_snapshots SET last_attempt_at=clock_timestamp()-interval '61 seconds' WHERE id='${named.backupId}'`});
+    const resumed=await namedReserve(admin);
+    assert.equal(resumed.outcome,'resumed');
+    assert.equal(resumed.backupId,named.backupId);
+    assert.equal(resumed.storageKey,named.storageKey);
+    assert.equal((await namedList(admin)).usedBytes,500);
+    assert.equal((await namedReserve(admin)).outcome,'in_progress');
+    assert.equal(await namedLookup(admin,named.backupId),null);
+    // Only one concurrent retry obtains a lease for the same immutable object.
+    await executePsql(config,{sql:`UPDATE public.named_cloud_snapshots SET last_attempt_at=clock_timestamp()-interval '61 seconds' WHERE id='${named.backupId}'`});
+    const retries=await Promise.all([namedReserve(admin),namedReserve(admin),namedReserve(admin)]);
+    assert.equal(retries.filter(x=>x.outcome==='resumed').length,1);
+    assert.equal(retries.filter(x=>x.outcome==='in_progress').length,2);
     assert.equal((await cloud(`SELECT public.confirm_named_cloud_snapshot('${alice}','${reviewed.gameId}','${named.backupId}');`)).outcome,'not_found');
     assert.equal((await cloud(`SELECT public.confirm_named_cloud_snapshot('${admin}','${reviewed.gameId}','${named.backupId}');`)).outcome,'stored');
     const namedListing=await namedList(admin);
@@ -1062,13 +1075,31 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.deepEqual(await list(admin),{usedBytes:500,backups:[]});
     assert.equal((await namedReserve(admin)).outcome,'replayed');
     await assert.rejects(()=>executePsql(config,{sql:'SET ROLE slopboy_test_web;SELECT storage_key FROM public.named_cloud_snapshots'}));
+    // Persistent rate limits apply across requests/instances, not across identities.
+    await assert.rejects(()=>executePsql(config,{sql:`SET ROLE slopboy_test_web; SELECT public.consume_named_cloud_request('${admin}')`}));
+    await executePsql(config,{sql:'GRANT EXECUTE ON FUNCTION public.consume_named_cloud_request(uuid) TO slopboy_test_web'});
+    const consume=(actor:string)=>cloud(`SELECT public.consume_named_cloud_request('${actor}');`);
+    assert.equal(await consume(alice),false);
+    assert.equal(await consume(admin),true);
+    await assert.rejects(()=>executePsql(config,{sql:'SET ROLE slopboy_test_web;SELECT * FROM public.named_cloud_request_budget'}));
+    await executePsql(config,{sql:`UPDATE public.named_cloud_request_budget SET minute_window=-1,day_count=198 WHERE account_id='${admin}'`});
+    const budget=await Promise.all([consume(admin),consume(admin),consume(admin),consume(admin)]);
+    assert.equal(budget.filter(Boolean).length,2);
+    assert.equal(await consume(admin),false);
+    await executePsql(config,{sql:`UPDATE public.named_cloud_request_budget SET minute_window=-1,day_window=-1 WHERE account_id='${admin}';
+      UPDATE public.named_cloud_global_budget SET day_count=1000 WHERE singleton;`});
+    assert.equal(await consume(admin),false);
+    await executePsql(config,{sql:'UPDATE public.named_cloud_global_budget SET day_window=-1 WHERE singleton'});
+    assert.equal(await consume(admin),true);
+    // Each migration rolls back independently. 010 removes only budget/attempt metadata;
+    // 009 must still refuse to drop a retained named snapshot.
     await assert.rejects(()=>migrateDown(config,migrationsDir,8),/Named cloud snapshots retained/);
     // Disposable fixture cleanup only, not an application or hosted deletion path.
     await executePsql(config,{sql:'DELETE FROM public.named_cloud_snapshots'});
 
     assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[9,8,7,6,5]);
     assert.match((await executePsql(config,{sql:`SELECT source_text FROM game_source_drafts WHERE id='${revisionUuid}'`})).stdout,/export default/);
-    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9]);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9,10]);
 
   } finally {
     // Stop server and clean up temporary cluster

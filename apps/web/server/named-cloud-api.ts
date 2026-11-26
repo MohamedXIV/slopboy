@@ -19,6 +19,7 @@ export interface NamedCloudDependencies {
   subject():Promise<{id:string;emailVerified:boolean}|null>;
   role(actor:{id:string;emailVerified:boolean}):Promise<unknown>;
   game(gameId:string):Promise<CloudGame|null>;
+  consumeRequest(account:string):Promise<boolean>;
   list(account:string,game:string):Promise<Listing|null>;
   reserve(account:string,game:string,digest:string,bytes:number,meta:ReturnType<typeof snapshotMetadata>):Promise<Reservation|null>;
   confirm(account:string,game:string,id:string):Promise<Reservation|null>;
@@ -79,6 +80,9 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
     if(!isGameUuid(gameId)||!isGameUuid(actor.id))return error('NOT_FOUND',404);
     const account=actor.id.toLowerCase(),gameKey=gameId.toLowerCase();
     if(await deps.role(actor)!=='admin')return error('NOT_FOUND',404);
+    if(!await deps.consumeRequest(account))return Response.json({error:'CLOUD_RATE_LIMIT'},{status:429,headers:{
+      'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
+    }});
     const game=await deps.game(gameKey);
     if(!game||game.gameId!==gameKey||!supportsProgressSave(reviewedPixelSaveCapabilities(game.gameId,game.revisionId)))
       return error('NOT_FOUND',404);
@@ -122,7 +126,7 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
     if(reserved.outcome==='quota')return error('BACKUP_QUOTA',409);
     if(reserved.outcome==='in_progress')return error('BACKUP_IN_PROGRESS',409);
     if(reserved.outcome==='replayed')return listing(reserved);
-    if(reserved.outcome!=='reserved'||!reserved.backupId||!reserved.storageKey)return error('UNAVAILABLE',503);
+    if(!['reserved','resumed'].includes(reserved.outcome)||!reserved.backupId||!reserved.storageKey)return error('UNAVAILABLE',503);
     const {storageKey,backupId}=reserved;
     const confirmed=await completeCloudBackup(
       ()=>deps.upload(storageKey,account,gameKey,backupId,digest,bytes),

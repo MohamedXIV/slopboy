@@ -19,6 +19,10 @@ function dependencies():NamedCloudDependencies{
     subject:async()=>{verified=await currentSubject();return verified;},
     role:async actor=>verified&&verified.id===actor.id?(await readProfile(verified))?.role:null,
     game:readPlayableGame,
+    consumeRequest:async account=>{
+      const [row]=await sql()`SELECT public.consume_named_cloud_request(${account}::uuid) AS allowed`;
+      return row?.allowed===true;
+    },
     list:async(account,game)=>{
       const [row]=await sql()`SELECT public.list_named_cloud_snapshots(${account}::uuid,${game}::uuid) AS result`;
       return row?.result??null;

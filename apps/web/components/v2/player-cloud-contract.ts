@@ -55,10 +55,11 @@ export async function verifyDownloadedSnapshot(value:unknown,row:CloudRow,identi
   return value.snapshot;
 }
 export function cloudErrorMessage(status:number,code?:string):string{
+  if(status===429)return 'Cloud request limit reached. Try again later. Your local save is safe.';
   if(status===401)return 'Sign in to use cloud saves.';
   if(status===403)return 'Cloud saves are not available to this account.';
   if(status===404)return 'Cloud saves are unavailable or this save is no longer accessible.';
-  if(code==='BACKUP_IN_PROGRESS')return 'A cloud upload is pending confirmation. Your local save is safe.';
+  if(code==='BACKUP_IN_PROGRESS')return 'A cloud upload is pending confirmation. Retry the same unchanged snapshot after a minute. Your local save is safe.';
   if(code==='BACKUP_QUOTA')return 'Cloud storage limit reached. Your local save is safe.';
   if(code==='INVALID_SAVE')return 'This save cannot be uploaded in its current format.';
   return 'Cloud request failed. Your local saves remain on this device.';
