@@ -16,6 +16,7 @@
 - AI creates games using approved **game framework templates**, not standalone HTML/CSS/JS websites; manual Paste Code and OAuth MCP share the same source ingestion, build and safety checks.
 - Games are **private by default**. Explicit friend permissions and separately reviewed public release; no untrusted game code executing in privileged Next, Neon, CI or MCP contexts. A private draft is not automatically safe to preview.
 - Device emulator constraints: **logical display resolution, indexed colors, aspect ratio, physical input mapping only**. Do not invent hardware CPU, RAM, ROM, save, audio voice or FPS caps. Host security/storage quotas are separate.
+- [ADR-006](docs/architecture/adr-006-game-save-management.md): respect reviewed per-game save capabilities; distinguish live manual capture from backing up an autosave; keep old saves and explicit compatibility.
 - Keep offline guest gameplay/saves. Cloud sync is opt-in and cannot silently overwrite local saves or claim success without backend confirmation.
 - **Vercel** hosts Next.js now; **Render** is only a possible alternative for frontend hosting later. **Neon** is the separate candidate for database/auth/storage/MCP functions.
 - No paid infrastructure or model API assumed. Do not add permanent multiplayer servers or expensive dependencies because a distant feature is on the roadmap.
