@@ -475,6 +475,11 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
     }catch{setSaveNotice('Save action could not complete. Existing saves were retained.');return false;}
     finally{saveActionBusy.current=false;setSaveBusy(false);}
   };
+  const withCloudLock=async(work:()=>Promise<void>)=>{
+    if(!slotStore||saveActionBusy.current)throw Error('SAVE_BUSY');
+    saveActionBusy.current=true;setSaveBusy(true);
+    try{await work();}finally{saveActionBusy.current=false;setSaveBusy(false);}
+  };
   const restart=async()=>{
     if(saveActionBusy.current)return;
     if(!slotStore){restartWith();return;}
@@ -753,7 +758,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             </div>
           </div>
           <p className="v2-security">
-            Reviewed cartridge with isolated execution. Local saves work offline; named cloud saves are not available yet.
+            Reviewed cartridge with isolated execution. Local saves work offline. Cloud backups are optional for supported games.
           </p>
         </aside>
   );
@@ -971,7 +976,19 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             {saveManagerOpen&&slotStore&&<PlayerSaveManager listing={saveListing} currentSlotId={saved?.session?.slotId??null}
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
               autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
-              onAction={saveAction} onClose={closeSaveManager}/>}
+              onAction={saveAction} onClose={closeSaveManager}
+              cloud={game.status==='published'&&supportsProgressSave(reviewedCapability)?{
+                identity:{gameId:game.gameId,hardwareId:DEVICE.id,hardwareVersion:DEVICE.version},withLock:withCloudLock,
+                exportSnapshot:async(slotId,snapshotId)=>{await flushSaves();return slotStore.exportCloudSnapshot(slotId,snapshotId);},
+                importSnapshot:async(raw,name,activate,signal)=>{
+                  if(activate)await flushSaves();signal.throwIfAborted();
+                  const target=await slotStore.importCloudCopy(raw,name);
+                  setSaveListing(await slotStore.list());
+                  if(activate){signal.throwIfAborted();const opened=await slotStore.open(target);
+                    restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
+                    setSaveNotice('Cloud save restored as a separate playthrough.');}
+                },
+              }:undefined}/>}
             {status !== 'running' && (
               <div className="v2-status" role="status">
                 {status === 'error'

@@ -2,6 +2,7 @@
 import {useState} from 'react';
 import {Button,Input,Label,TextField} from '@heroui/react';
 import type {SlotListing} from '@slopboy/runtime/save-slots';
+import PlayerCloudSaves,{type PlayerCloudActions} from './PlayerCloudSaves';
 
 export type SaveManagerAction=
   | {kind:'create';name:string}
@@ -13,11 +14,12 @@ export type SaveManagerAction=
   | {kind:'manual';name:string}
   | {kind:'fork';slotId:string;snapshotId:string;name:string};
 type NamedAction=Exclude<SaveManagerAction,{kind:'load'}|{kind:'legacy'}>;
-export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose}:{
+export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud}:{
   listing:SlotListing|null;currentSlotId:string|null;legacyAvailable:boolean;schema:number;
-  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;
+  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;
 }){
   const [editor,setEditor]=useState<NamedAction|null>(null);
+  const [tab,setTab]=useState<'local'|'cloud'>('local');
   const current=listing?.slots.find(slot=>slot.id===currentSlotId);
   const compatible=(s:{revisionId:string|null;schemaVersion:number})=>s.schemaVersion===schema&&s.revisionId!==null;
   return <section className="v2-save-manager sb-heroui-live" aria-label="Game saves" data-testid="player-save-manager">
@@ -26,7 +28,11 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
       <small>{manualSupported&&autoSupported?'Manual + autosave':manualSupported?'Manual save':'Autosave supported'} · Local storage · Save schema {schema}</small></div>
       <Button size="sm" variant="secondary" isDisabled={busy} onPress={onClose}>Resume</Button></header>
     {notice&&<p role="status">{notice}</p>}
-    {!listing?<p>Reading local saves…</p>:<>
+    {cloud&&<div className="v2-save-manager-actions" aria-label="Save locations">
+      <Button size="sm" variant={tab==='local'?'primary':'secondary'} aria-pressed={tab==='local'} isDisabled={busy} onPress={()=>setTab('local')}>Local saves</Button>
+      <Button size="sm" variant={tab==='cloud'?'primary':'secondary'} aria-pressed={tab==='cloud'} isDisabled={busy} data-testid="open-cloud-saves" onPress={()=>{setEditor(null);setTab('cloud');}}>Cloud saves</Button>
+    </div>}
+    {tab==='cloud'&&cloud?<PlayerCloudSaves cloud={cloud} local={listing} schema={schema} busy={busy}/>:!listing?<p>Reading local saves…</p>:<>
       <div className="v2-save-manager-actions">
         <Button size="sm" variant="primary" isDisabled={busy} data-testid="new-playthrough" onPress={()=>setEditor({kind:'create',name:'New playthrough'})}>New playthrough</Button>
         {manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>setEditor({kind:'manual',name:'Manual save'})}>Save game</Button>}
@@ -59,6 +65,6 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
         </article>;
       })}
     </>}
-    <small>{manualSupported?'Manual saves capture the current game state.':'This game does not support live manual capture.'} {autoSupported?'Backups copy the last autosave. ':''}Cloud sync for named saves is not available yet.</small>
+    <small>{manualSupported?'Manual saves capture the current game state.':'This game does not support live manual capture.'} {autoSupported?'Backups copy the last autosave. ':''}{cloud?'Cloud backups are optional.':'Cloud backups are not available for this revision.'}</small>
   </section>;
 }
