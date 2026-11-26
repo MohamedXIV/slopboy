@@ -1,5 +1,6 @@
 import {V2_DEVICE_1000} from '../../../../packages/hardware/src/v2.ts';
 import {ENGINE_REGISTRY} from '../../../../packages/cartridge/src/engine-registry.ts';
+import {SAVE_AUTHORING_CONTRACT,SAVE_AUTHORING_GUIDELINES} from '../../../../packages/cartridge/src/save-authoring.ts';
 
 /** Public documentation contract. No account details, experimental features or secrets. */
 export const GAME_GUIDE_VERSION = 1;
@@ -31,6 +32,7 @@ export function getGameGuideContract() {
     genreRequired: false,
     mediaPolicy: {visuals: 'procedural', audio: 'procedural', assetUploads: false},
     publishAutomatically: false,
+    saveAuthoring: SAVE_AUTHORING_CONTRACT,
     delivery: {
       sourcePath: 'src/game.ts',
       dashboardPath: GAME_IMPORT_PATH,
@@ -89,6 +91,10 @@ ${engineRows}
 5. Generate backgrounds, sprites, effects, music and sound procedurally from code. Keep the project source-only: no image/audio files, sample packs, or embedded encoded media. Use documented engine and host APIs for drawing and audio. If the selected template has no supported audio API, leave it silent and say why.
 6. Explain how to run the real source/manifest validation. If no tooling was run, say **"not validated"**. Do not claim a build, safe preview, account connection, private upload or published game succeeded without corresponding evidence.
 
+## Save capabilities and persistence
+
+${SAVE_AUTHORING_GUIDELINES.map(line=>'- '+line).join('\n')}
+
 ## How to deliver the generated game
 
 - Return the proposed title, two-sentence gameplay explanation, controls, pinned engine choice/status, and the **complete \`src/game.ts\` source** in one clearly labelled \`typescript\` code block. Include a matching draft manifest only if the receiving workflow requires it; never fabricate authenticated server IDs. Give the player clear instructions for what to copy and what to do next.
@@ -107,6 +113,7 @@ ${engineRows}
 - \`packages/cartridge/src/manifest-v2.ts\` — V2 manifest and source validation.
 - \`docs/architecture/adr-004-approved-game-frameworks.md\` — engine decisions.
 - \`docs/architecture/adr-005-manual-source-ingestion.md\` — private source-only draft safety boundary.
+- \`docs/architecture/adr-006-game-save-management.md\` — save capability and compatibility contract.
 
 Machine-readable version: \`${GAME_GUIDE_JSON_PATH}\`. This page is a specification; it does **not** perform OAuth, MCP submission, source upload, code execution or publication.
 `;

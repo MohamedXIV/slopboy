@@ -1,3 +1,4 @@
+import {SAVE_AUTHORING_GUIDELINES} from './save-authoring.ts';
 /**
  * AI-Facing Engine Templates, Coding Instructions, and MCP Capability Discovery.
  *
@@ -610,6 +611,7 @@ export function getEngineCapabilities(options: { engineId: string; deviceProfile
     `Allowed imports: ${desc.allowedImports.join(', ')}. Remote CDN scripts and unapproved packages are strictly rejected.`,
     'No DOM access (window, document) and no network calls (fetch, WebSocket).',
     'Persistence must use the Host Storage API envelope.',
+    ...SAVE_AUTHORING_GUIDELINES,
   ].join('\n');
 
   return {
@@ -701,6 +703,7 @@ export function getGameTemplate(options: {
       '- Do not access window, document, fetch, or localStorage.',
       '- Generate visuals, music and sound effects procedurally from source. Keep assets empty.',
       '- Render all visuals inside the 160x144 coordinate space.',
+      ...SAVE_AUTHORING_GUIDELINES.map(line=>'- '+line),
     ].join('\n') + '\n',
   };
 
@@ -744,6 +747,9 @@ ${engineText}
 - NO Arbitrary packages: Only approved engine imports ('kaplay', '@slopboy/sdk', 'phaser', 'pixi.js') are allowed.
 - NO Dynamic code evaluation: 'eval()' and 'Function()' constructors are forbidden.
 - Persistence: Use the Host Storage API ('hostContext.storage.save(json)' / 'hostContext.storage.load()'). Never use 'localStorage'.
+
+## Save capabilities and persistence
+${SAVE_AUTHORING_GUIDELINES.map(line=>'- '+line).join('\n')}
 
 ## Development Guidelines
 - Always export a default game setup function or GameModule.
