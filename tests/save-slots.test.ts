@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {createSlotSaveStore,type SlotGame} from '../packages/runtime/src/save-slots.ts';
 import {createGameSaveService,gameSlotKey,type AtomicSaveDriver} from '../packages/runtime/src/save-store.ts';
 import {SLOPBOY_1000} from '../packages/hardware/src/index.ts';
+import {decodeCloudSnapshot,encodeCloudSnapshot,compareCloudSnapshot,CLOUD_SNAPSHOT_MAX_BYTES} from '../packages/runtime/src/cloud-snapshot.ts';
 
 function driver(){
   const records=new Map<string,string>();
@@ -91,4 +92,52 @@ test('invalid names and payloads do not alter existing data; corrupt records fai
   const key=[...records.keys()][0];records.set(key,'broken JSON');
   await assert.rejects(store.create('Do not overwrite'),/INVALID_SAVE_RECORD/);
   assert.equal(records.get(key),'broken JSON');
+});
+
+test('named cloud snapshot transfers exact metadata and keeps both local playthroughs without activation',async()=>{
+  const a=createSlotSaveStore(driver().d,game);
+  const original=await a.create('Original run'),{session}=await a.open(original);
+  const snapshotId=await a.manualSave(session,'Before boss','live state');
+  const raw=await a.exportCloudSnapshot(original,snapshotId);
+  const envelope=await decodeCloudSnapshot(raw,game);
+  assert.equal(envelope.slotName,'Original run');assert.equal(envelope.snapshot.name,'Before boss');
+  assert.equal(envelope.snapshot.revisionId,game.revisionId);assert.equal(envelope.snapshot.data,'live state');
+  assert.equal(await encodeCloudSnapshot(envelope,game),raw);
+  assert.equal(raw.includes(session.token),false);
+  const b=createSlotSaveStore(driver().d,game);
+  const local=await b.create('Other device'),active=(await b.open(local)).session;
+  await b.autosave(active,'local progress');
+  const copy=await b.importCloudCopy(raw,'Cloud copy');
+  assert.notEqual(copy,original);
+  assert.equal((await b.list()).selectedSlotId,local);
+  assert.equal((await b.open(copy)).data,'live state');
+  assert.equal((await b.open(local)).data,'local progress');
+  assert.equal((await b.list()).slots.find(s=>s.id===copy)!.snapshots[0].revisionId,game.revisionId);
+});
+test('cloud import rejects corruption and wrong game; incompatible data is preserved but cannot load',async()=>{
+  const a=createSlotSaveStore(driver().d,game),slot=await a.create('Source'),{session}=await a.open(slot);
+  const snap=await a.manualSave(session,'Capture','original');
+  const raw=await a.exportCloudSnapshot(slot,snap),value=await decodeCloudSnapshot(raw);
+  const b=createSlotSaveStore(driver().d,{...game,capabilities:{mode:'auto',schemaVersion:2}});
+  await assert.rejects(b.importCloudCopy(raw.replace('original','tampered'),'Invalid'),/SAVE_DIGEST_MISMATCH/);
+  await assert.rejects(b.importCloudCopy(raw.replace(game.gameId,'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),'Wrong'),/IDENTITY_MISMATCH/);
+  await assert.rejects(b.importCloudCopy(raw+' ','Extra'),/NONCANONICAL/);
+  assert.equal((await b.list()).slots.length,0);
+  const copy=await b.importCloudCopy(raw,'Old schema');
+  await assert.rejects(b.open(copy),/INCOMPATIBLE_SAVE/);
+  assert.equal((await b.list()).slots[0].snapshots[0].schemaVersion,1);
+  assert.equal(compareCloudSnapshot(value,{...value,slotName:'Renamed'}),'metadata-changed');
+  assert.equal(compareCloudSnapshot(value,{...value,snapshot:{...value.snapshot,id:crypto.randomUUID()}}),'conflict');
+  assert.equal(compareCloudSnapshot(value,{...value,slotId:crypto.randomUUID()}),'different-slot');
+  assert.equal(compareCloudSnapshot(value,value),'same');
+});
+test('cloud envelope has a bounded canonical encoding and cannot contain extra secrets',async()=>{
+  const a=createSlotSaveStore(driver().d,game),slot=await a.create('Source'),{session}=await a.open(slot);
+  const snap=await a.manualSave(session,'Capture','x'.repeat(CLOUD_SNAPSHOT_MAX_BYTES));
+  await assert.rejects(a.exportCloudSnapshot(slot,snap),/CLOUD_SNAPSHOT_TOO_LARGE/);
+  const small=await a.manualSave(session,'Small','value');
+  const raw=await a.exportCloudSnapshot(slot,small);
+  await assert.rejects(encodeCloudSnapshot({...JSON.parse(raw),sessionToken:session.token}),/INVALID_CLOUD_SNAPSHOT/);
+  await assert.rejects(decodeCloudSnapshot(raw.replace('"format":','"format":"ignored","format":')),/NONCANONICAL/);
+  assert.equal((await a.list()).slots[0].snapshots.length,2);
 });

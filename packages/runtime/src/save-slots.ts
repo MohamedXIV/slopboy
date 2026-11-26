@@ -1,6 +1,7 @@
 /** Host-owned named playthroughs. No game code receives this store or its session token. */
 import type {HardwareProfile} from '../../hardware/src/index.ts';
 import {createGameSaveService,type AtomicSaveDriver} from './save-store.ts';
+import {CLOUD_SNAPSHOT_FORMAT,encodeCloudSnapshot,decodeCloudSnapshot} from './cloud-snapshot.ts';
 import {parseSaveCapabilities,supportsProgressSave,supportsAutosave,supportsManualSave,type SaveCapabilities} from './save-capabilities.ts';
 
 const FORMAT='slopboy-save-slots-v1';
@@ -206,6 +207,28 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
         const source=findSnapshot(findSlot(r,slotId),snapshotId);assertCompatible(source,game);
         const slot=newSlot(nextName),next:SlotSnapshot={...source,id:id(),kind:'fork'};
         slot.snapshots.push(next);slot.headId=next.id;r.slots.push(slot);return slot.id;
+      });
+    },
+    /** Explicit immutable snapshot export. The current autosave may advance
+     * concurrently, but an export of the chosen ID never substitutes its head. */
+    async exportCloudSnapshot(slotId:string,snapshotId:string):Promise<string>{
+      enabled();
+      const slot=findSlot(decode(await driver.get(key),game),slotId);
+      const snapshot=findSnapshot(slot,snapshotId);
+      return encodeCloudSnapshot({format:CLOUD_SNAPSHOT_FORMAT,gameId:game.gameId,hardwareId:game.hardwareId,
+        hardwareVersion:game.hardwareVersion,slotId:slot.id,slotName:slot.name,snapshot},game);
+    },
+    /** Keep both: import as a new, independent playthrough. Do not activate it,
+     * modify existing slots, or claim cloud content is compatible on import. */
+    async importCloudCopy(raw:string,name:string):Promise<string>{
+      enabled();
+      const envelope=await decodeCloudSnapshot(raw,game);
+      const nextName=label(name);
+      return mutate(r=>{
+        const slot=newSlot(nextName);
+        const snapshot:SlotSnapshot={...envelope.snapshot,id:id(),kind:'fork'};
+        slot.snapshots.push(snapshot);slot.headId=snapshot.id;r.slots.push(slot);
+        return slot.id;
       });
     },
     /** Opt-in, once per game/device record. Original legacy keys remain intact.
