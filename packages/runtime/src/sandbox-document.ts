@@ -14,6 +14,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
   let saveTimer = 0;
   let phase = 'idle';
   let channel = null;
+  let flushRequest = null;
   const MAX_CODE = 65536;
   const MAX_PIXELS = 512 * 512;
   const MAX_SAVE = 8192;
@@ -30,6 +31,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     clearTimeout(watchdog);
     clearTimeout(saveTimer);
     pendingSave=undefined;
+    flushRequest=null;
     if(channel){channel.port1.close();channel=null;}
     if(worker){ worker.terminate(); worker=null; }
     releaseWorkerUrl();
@@ -108,6 +110,9 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
             if(typeof moduleGame.init==='function')moduleGame.init(api);
             send({type:'ready'});
           }finally{ URL.revokeObjectURL(url); }
+        } else if(m?.type==='flush-save' && moduleGame){
+          // Worker message ordering makes this a barrier after prior ticks.
+          send({type:'save-flushed',requestId:m.requestId});
         } else if(m?.type==='tick' && moduleGame){
           down=new Set(m.down);pressed=new Set(m.pressed);
           tone=undefined;ticking=true;
@@ -156,6 +161,14 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
             }
             return;
           }
+          if(data?.type==='save-flushed'){
+            if(phase!=='running'||flushRequest===null||data.requestId!==flushRequest)return;
+            clearTimeout(saveTimer);saveTimer=0;
+            if(pendingSave!==undefined)post('save',{value:pendingSave});
+            pendingSave=undefined;
+            const requestId=flushRequest;flushRequest=null;
+            post('save-flushed',{requestId});return;
+          }
           if(data?.type!=='frame'||!busy||phase!=='running')return;
           const pixels=data.pixels;
           if(!(pixels instanceof Uint8Array)||pixels.length!==m.width*m.height){fail('Malformed frame');return;}
@@ -176,6 +189,10 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       clearTimeout(watchdog);
       watchdog=setTimeout(()=>fail('Game frame timeout'),MAX_FRAME_MS);
       worker.postMessage({type:'tick',down:m.down,pressed:m.pressed,dt:m.dt});
+    } else if(m.type==='flush-save' && key===m.key && worker && phase==='running'){
+      if(flushRequest!==null||typeof m.requestId!=='string'||! /^[a-f0-9-]{36}$/.test(m.requestId))return;
+      flushRequest=m.requestId;
+      worker.postMessage({type:'flush-save',requestId:flushRequest});
     } else if(m.type==='stop' && key===m.key){
       if(phase==='stopped')return;
       phase='stopped';

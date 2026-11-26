@@ -1641,3 +1641,13 @@
  .v2-mobile-drawer .v2-side-intro h1{font-size:25px}
 }
 @media(prefers-reduced-motion:reduce){.v2-quick-cartridge{transition:none}}
+
+/* Host-owned save manager lives inside the fullscreen stage, not inside the game iframe. */
+.v2-save-manager{position:absolute;inset:12px;z-index:30;overflow:auto;overscroll-behavior:contain;padding:20px;border-radius:16px;background:#182e27;color:#edf3e8;border:1px solid #71927b;display:flex;flex-direction:column;gap:12px;text-align:left}
+.v2-player[data-v2-theme='light'] .v2-save-manager{background:#f3f0e7;color:#29453c;border-color:#b7cbb8}
+.v2-save-manager-head,.v2-save-manager-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.v2-save-manager-actions{justify-content:flex-start}
+.v2-save-manager-slot,.v2-save-manager-snapshot{border-top:1px solid currentColor;padding:12px 0}
+.v2-save-manager-slot p,.v2-save-manager-snapshot p{margin:4px 0;font-size:.85rem}
+.v2-save-current{padding:10px 0;font-size:.85rem}
+.v2-fullscreen-saves{position:absolute;top:16px;right:16px;z-index:25}

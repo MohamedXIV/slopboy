@@ -98,7 +98,7 @@ export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled
         <p>Discover reviewed public games. Play history and local saves stay on this device.</p></div>
         <div className="v2-cloud-state"><strong>Cloud saves</strong>
           {cloudBackupsEnabled ? <><span>Manual backups</span>
-            <p>Open Local saves on a cartridge to back up your autosave or list backups. Sign-in required.</p>
+            <p>Legacy backup tools back up the original single autosave only. Named playthroughs are managed in the game player and are not cloud-synced yet.</p>
             <small>10 MiB per account</small></> :
             <><span>Not connected</span><p>Local saves are available offline.</p></>}
         </div>
@@ -128,7 +128,7 @@ export default function V2GameLibrary({cloudBackupsEnabled}:{cloudBackupsEnabled
               </div>
               {openSaves===game.gameId&&<div id={'v2-save-'+game.gameId} className="v2-local-saves">
                 <div className="v2-local-save-head"><strong>Offline backup slots</strong><span>{snapshots[game.gameId]?.length??0} / {LOCAL_SNAPSHOT_SLOTS}</span></div>
-                <p>These are local IndexedDB snapshots, not cloud saves. Clearing browser storage may erase them.</p>
+                <p>These are legacy IndexedDB snapshots of the original autosave, not named playthroughs. Manage named saves inside the game player. Clearing browser storage may erase local saves.</p>
                 {cloudBackupsEnabled && game.playable && <CloudGameBackups gameId={game.gameId}/>}
                 <Button className="sb-control sb-control-primary" size="sm" variant="primary" isDisabled={pending===game.gameId}
                   onPress={()=>void withSlots(game.gameId,()=>saveLocalSnapshot(game.gameId),'Local snapshot saved.')}>

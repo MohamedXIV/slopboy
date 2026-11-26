@@ -1,6 +1,6 @@
 'use client';
 
-import {useCallback,useEffect,useRef,useState,type CSSProperties,type PointerEvent as ReactPointerEvent} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties,type PointerEvent as ReactPointerEvent} from 'react';
 import Link from 'next/link';
 import {Button,Drawer} from '@heroui/react';
 import {trackBrowserLaunch,trackBrowserPlaytime} from './library-history';
@@ -20,6 +20,9 @@ import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_PRESET_META,SCREEN_FX_LEVE
   sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
   type ScreenFxSettings,type ScreenRefresh} from './screen-fx-config';
 import OfflineInstallControl from './OfflineInstallControl';
+import {reviewedPixelSaveCapabilities,supportsAutosave} from '@slopboy/runtime/save-capabilities';
+import {createSlotSaveStore,type SaveSession,type SlotListing} from '@slopboy/runtime/save-slots';
+import PlayerSaveManager,{type SaveManagerAction} from './PlayerSaveManager';
 import './v2-player.css';
 
 const DEVICE=SLOPBOY_1000; // Explicit v1 compatibility adapter; not a new KAPLAY sandbox.
@@ -63,7 +66,22 @@ const PRESET_ORDER=['clean','lcd','phosphor'] as const;
 
 export default function V2DevicePlayer({game}:{game:PlayableGame}){
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
-  const [saved,setSaved]=useState<{epoch:number;value:string|null}|null>(null);
+  const [saved,setSaved]=useState<{epoch:number;value:string|null;session?:SaveSession}|null>(null);
+  const capability=useMemo(()=>reviewedPixelSaveCapabilities(game.gameId,game.revisionId),[game.gameId,game.revisionId]);
+  const slotStore=useMemo(()=>capability&&supportsAutosave(capability)?createSlotSaveStore(browserSaveDriver,{
+    gameId:game.gameId,revisionId:game.revisionId,releaseVersion:null,hardwareId:DEVICE.id,
+    hardwareVersion:DEVICE.version,capabilities:capability
+  }):null,[game.gameId,game.revisionId,capability]);
+  const [saveManagerOpen,setSaveManagerOpen]=useState(false);
+  const [saveListing,setSaveListing]=useState<SlotListing|null>(null);
+  const [legacyAvailable,setLegacyAvailable]=useState(false);
+  const [saveNotice,setSaveNotice]=useState('');
+  const [saveBusy,setSaveBusy]=useState(false);
+  const savePaused=useRef(false);
+  const saveActionBusy=useRef(false);
+  const saveWriteFailed=useRef(false);
+  const preparedBoot=useRef<{epoch:number;value:string|null;session?:SaveSession}|null>(null);
+  const pendingFlush=useRef<{id:string;resolve:()=>void;reject:(error:Error)=>void;timer:number}|null>(null);
   const [epoch,setEpoch]=useState(0);
   const [status,setStatus]=useState<Status>('loading');
   const [reason,setReason]=useState('');
@@ -207,12 +225,30 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
     if(!cartridge)return;
     let active=true;
     setSaved(null);
-    const store=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
-    writeChain.current.then(()=>store.read()).catch(()=>null).then(value=>{
-      if(active)setSaved({epoch,value});
-    });
+    const legacy=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
+    const start=writeChain.current.then(async()=>{
+      if(!active)return;
+      if(preparedBoot.current?.epoch===epoch){setSaved(preparedBoot.current);return;}
+      if(capability?.mode==='none'){setSaved({epoch,value:null});return;}
+      if(!slotStore){const value=await legacy.read().catch(()=>null);if(active)setSaved({epoch,value});return;}
+      const value=await legacy.read(),listing=await slotStore.list();
+      if(!active)return;
+      setLegacyAvailable(value!==null);
+      let selected=listing.selectedSlotId;
+      // Preserve historical behavior for existing saves; fresh games use named slots.
+      if(!selected&&value===null&&listing.slots.length===0)selected=await slotStore.create('Playthrough 1');
+      if(!active)return;
+      if(!selected&&value===null&&listing.slots.length>0){
+        setSaveListing(listing);
+        throw Error('Select a saved playthrough before starting.');
+      }
+      const opened=selected?await slotStore.open(selected):null;
+      const refreshed=await slotStore.list();
+      if(active){setSaveListing(refreshed);setSaved({epoch,value:opened?opened.data:value,...(opened?{session:opened.session}:{})});}
+    }).catch(()=>{if(active){setSaveNotice('Local saves could not be opened. Your existing data has not been replaced.');updateStatus('error','Local save unavailable');}});
+    writeChain.current=start;
     return()=>{active=false;};
-  },[cartridge,epoch,game.gameId]);
+  },[cartridge,epoch,game,capability,slotStore,updateStatus]);
 
   useEffect(()=>{
     if(!cartridge||!saved||saved.epoch!==epoch)return;
@@ -244,21 +280,41 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         lastImage.current=Uint8Array.from(pixels);
         draw(pixels,currentPalette.current);
       }
+      if(msg.type==='save-flushed'){
+        const waiting=pendingFlush.current;
+        if(waiting&&msg.requestId===waiting.id){
+          clearTimeout(waiting.timer);pendingFlush.current=null;waiting.resolve();
+        }
+        return;
+      }
       if(msg.type==='save'&&ready.current){
+        if(capability?.mode==='none')return;
         if(!validSave(msg.value,DEVICE)){ready.current=false;post('stop');updateStatus('error','Invalid save request');return;}
         const now=Date.now();
-        if(now-lastSave.current<250)return;
+        if(!slotStore&&now-lastSave.current<250)return;
         lastSave.current=now;
         const value=msg.value as string|null;
         const store=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
-        writeChain.current=writeChain.current.catch(()=>{}).then(()=>store.write(value)).catch(err=>console.warn('V2 local save error',err));
+        const bound=saved.session;
+        writeChain.current=writeChain.current.then(async()=>{
+          if(slotStore&&bound){
+            // Reviewed Circuit Slide never calls erase. Do not silently erase snapshots.
+            if(value===null)throw Error('Named autosave cannot be erased by a game');
+            await slotStore.autosave(bound,value);
+            setSaveListing(await slotStore.list());
+          }else{
+            await store.write(value);
+            if(slotStore)setLegacyAvailable(value!==null);
+          }
+          saveWriteFailed.current=false;
+        }).catch(()=>{saveWriteFailed.current=true;setSaveNotice('Autosave failed. Progress has not been saved; retry before changing saves.');});
       }
     };
     window.addEventListener('message',onMessage);
     let animation=0;
     const tick=(now:number)=>{
       animation=requestAnimationFrame(tick);
-      if(!ready.current||statusRef.current!=='running'||now-lastTick.current<1000/PRESENTATION_TICK_TARGET)return;
+      if(!ready.current||savePaused.current||statusRef.current!=='running'||now-lastTick.current<1000/PRESENTATION_TICK_TARGET)return;
       const dt=lastTick.current?Math.min((now-lastTick.current)/1000,0.05):1/60;
       lastTick.current=now;
       const pad=gamepadButtons();
@@ -273,10 +329,11 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       cancelAnimationFrame(animation);
       if(bootTimer.current)clearTimeout(bootTimer.current);
       window.removeEventListener('message',onMessage);
+      const waiting=pendingFlush.current;if(waiting){clearTimeout(waiting.timer);pendingFlush.current=null;waiting.reject(Error('Game stopped'));}
       ready.current=false;
       post('stop');
     };
-  },[cartridge,saved,epoch,post,draw,updateStatus,game.gameId]);
+  },[cartridge,saved,epoch,post,draw,updateStatus,game,capability,slotStore]);
 
   const syncKeys=useCallback(()=>{
     setKeyHeld([...physical.current]);
@@ -292,13 +349,13 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
   },[syncKeys]);
   useEffect(()=>{
     const down=(event:KeyboardEvent)=>{
-      if(libraryOpen||mobileSettingsOpen||event.altKey||event.ctrlKey||event.metaKey||isTextTarget(event.target))return;
+      if(savePaused.current||libraryOpen||mobileSettingsOpen||event.altKey||event.ctrlKey||event.metaKey||isTextTarget(event.target))return;
       const name=KEY_MAP[event.code];
       if(!name)return;
       event.preventDefault();press(name);
     };
     const up=(event:KeyboardEvent)=>{
-      if(libraryOpen||mobileSettingsOpen)return;
+      if(savePaused.current||libraryOpen||mobileSettingsOpen)return;
       const name=KEY_MAP[event.code];
       if(!name)return;
       event.preventDefault();release(name);
@@ -314,6 +371,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
   },[]);
 
   const pointerDown=(name:InputName)=>(event:ReactPointerEvent<HTMLButtonElement>)=>{
+    if(savePaused.current)return;
     event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);
     pointerButtons.current.set(event.pointerId,name);press(name);
   };
@@ -329,9 +387,75 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       aria-label={label} aria-pressed={active} onPointerDown={pointerDown(name)}
       onPointerUp={pointerUp} onPointerCancel={pointerUp} onLostPointerCapture={pointerUp}>{name}</button>;
   };
-  const restart=()=>{
-    post('stop');ready.current=false;physical.current.clear();pointerButtons.current.clear();pressed.current.clear();
-    syncKeys();setBootComplete(false);updateStatus('booting');setEpoch(n=>n+1);
+  const clearGameInput=()=>{physical.current.clear();pointerButtons.current.clear();pressed.current.clear();gamepadPrevious.current.clear();syncKeys();};
+  const flushSaves=async()=>{
+    if(ready.current){
+      if(pendingFlush.current)throw Error('Save flush already pending');
+      await new Promise<void>((resolve,reject)=>{
+        const id=crypto.randomUUID();
+        const timer=window.setTimeout(()=>{pendingFlush.current=null;reject(Error('Save flush timed out'));},2500);
+        pendingFlush.current={id,timer,resolve,reject};post('flush-save',{requestId:id});
+      });
+    }
+    await writeChain.current;
+    if(saveWriteFailed.current)throw Error('Previous autosave failed');
+  };
+  const restartWith=(next?:{value:string|null;session?:SaveSession})=>{
+    post('stop');ready.current=false;clearGameInput();
+    const nextEpoch=epoch+1;
+    preparedBoot.current=next?{...next,epoch:nextEpoch}:null;
+    setBootComplete(false);updateStatus('booting');setEpoch(nextEpoch);
+  };
+  const closeSaveManager=()=>{if(saveActionBusy.current)return;savePaused.current=false;lastTick.current=0;setSaveManagerOpen(false);};
+  const showSaveManager=()=>{
+    if(!slotStore||saveActionBusy.current)return;
+    savePaused.current=true;clearGameInput();setSaveManagerOpen(true);
+    void slotStore.list().then(setSaveListing).catch(()=>setSaveNotice('Could not read local saves.'));
+  };
+  const saveAction=async(action:SaveManagerAction):Promise<boolean>=>{
+    if(!slotStore||saveActionBusy.current)return false;
+    saveActionBusy.current=true;setSaveBusy(true);setSaveNotice('');
+    try{
+      await flushSaves();
+      let target:string|undefined;
+      switch(action.kind){
+        case 'create':target=await slotStore.create(action.name);break;
+        case 'load':target=action.slotId;break;
+        case 'fork':target=await slotStore.fork(action.slotId,action.snapshotId,action.name);break;
+        case 'rename-slot':await slotStore.renameSlot(action.slotId,action.name);break;
+        case 'rename-snapshot':await slotStore.renameSnapshot(action.slotId,action.snapshotId,action.name);break;
+        case 'backup':
+          if(!saved?.session)throw Error('Select a named save first');
+          await slotStore.backupHead(saved.session,action.name);break;
+        case 'legacy':{
+          const value=await createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game)).read();
+          if(value===null)throw Error('Legacy save unavailable');
+          if(saved?.session)await slotStore.close(saved.session);
+          restartWith({value});savePaused.current=false;setSaveManagerOpen(false);break;
+        }
+      }
+      if(target){
+        const opened=await slotStore.open(target);
+        restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
+      }
+      setSaveListing(await slotStore.list());
+      setSaveNotice('Save action completed on this device.');return true;
+    }catch{setSaveNotice('Save action could not complete. Existing saves were retained.');return false;}
+    finally{saveActionBusy.current=false;setSaveBusy(false);}
+  };
+  const restart=async()=>{
+    if(saveActionBusy.current)return;
+    if(!slotStore){restartWith();return;}
+    saveActionBusy.current=true;savePaused.current=true;setSaveBusy(true);clearGameInput();
+    try{
+      await flushSaves();
+      if(saved?.session){
+        const opened=await slotStore.open(saved.session.slotId);
+        restartWith({value:opened.data,session:opened.session});
+      }else restartWith();
+      setSaveNotice('');
+    }catch{setSaveNotice('Restart cancelled because progress could not be confirmed saved.');}
+    finally{saveActionBusy.current=false;savePaused.current=false;setSaveBusy(false);}
   };
   const fullscreenClick=async()=>{
     try{
@@ -593,11 +717,11 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             </div>
             <div>
               <span>SAVE</span>
-              <strong>Local · legacy adapter</strong>
+              <strong>{capability?.mode==='none'?'Not supported':slotStore?'Local · autosave':'Legacy adapter'}</strong>
             </div>
           </div>
           <p className="v2-security">
-            Reviewed cartridge with isolated execution. Local saves work offline; cloud sync requires a future authenticated service.
+            Reviewed cartridge with isolated execution. Local saves work offline; named cloud saves are not available yet.
           </p>
         </aside>
   );
@@ -617,6 +741,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             }}>
             ↧ Change cartridge
           </Button>
+          {slotStore&&<Button size="sm" variant="secondary" isDisabled={saveBusy||!saved} data-testid="open-game-saves" onPress={showSaveManager}>Saves</Button>}
           <Link href="/library" className="v2-full-library-link">Full library</Link>
           <OfflineInstallControl gameId={game.gameId}/>
           <Button size="sm" variant="secondary" className="sb-control v2-mobile-settings"
@@ -810,6 +935,10 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
               </div>
             )}
 
+            {fullscreen&&slotStore&&!saveManagerOpen&&<Button className="v2-fullscreen-saves" size="sm" variant="secondary" isDisabled={saveBusy||!saved} onPress={showSaveManager}>Saves</Button>}
+            {saveManagerOpen&&slotStore&&<PlayerSaveManager listing={saveListing} currentSlotId={saved?.session?.slotId??null}
+              legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
+              onAction={saveAction} onClose={closeSaveManager}/>}
             {status !== 'running' && (
               <div className="v2-status" role="status">
                 {status === 'error'
@@ -822,6 +951,10 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             )}
           </div>
 
+          {slotStore&&<div className="v2-save-current" role="status">
+            Current save: <strong>{saved?.session?saveListing?.slots.find(s=>s.id===saved.session?.slotId)?.name??'Named playthrough':legacyAvailable?'Legacy autosave':'Preparing save…'}</strong>
+            {saveNotice&&<span> · {saveNotice}</span>}
+          </div>}
           <div className="v2-controlbar">
             <button
               type="button"
@@ -833,7 +966,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             <button type="button" className={fullscreen ? 'is-active' : ''} onClick={fullscreenClick}>
               {fullscreen ? '↙ Exit fullscreen' : '⛶ Fullscreen'}
             </button>
-            <button type="button" onClick={restart}>
+            <button type="button" disabled={saveBusy||saveManagerOpen} onClick={()=>void restart()}>
               ↻ Restart
             </button>
           </div>
