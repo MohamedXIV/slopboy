@@ -15,16 +15,16 @@ async function envelope(){
       releaseVersion:null,schemaVersion:1,createdAt:1234,data:'progress',bytes:8,digest:await cloudSnapshotDigest('progress')}};
 }
 function harness(){
-  let actor:string|null=a,role='admin',verified=true,enabled=true,failUpload=false,failConfirm=false,corrupt=false;
+  let actor:string|null=a,role='admin',verified=true,enabled=true,failUpload=false,failConfirm=false,corrupt=false,allow=true,retry=false;
   let stored:Uint8Array|null=null,ready=false,digest='',size=0,owner='',uploads=0,reserves=0;
   const key='backups/private-object.json';
   const deps:NamedCloudDependencies={
     enabled:()=>enabled,subject:async()=>actor?{id:actor,emailVerified:verified}:null,role:async()=>role,
-    game:async()=>game,
+    game:async()=>game,consumeRequest:async()=>allow,
     list:async account=>({snapshots:ready&&owner===account?[{id,storageKey:key,slotName:'Adventure'}]:[],usedBytes:owner===account?size:0}),
     reserve:async(account,_game,d,n,meta)=>{
       reserves++;assert.equal(meta.slotName,'Adventure');assert.equal('data' in meta,false);
-      if(owner===account&&digest===d)return ready?{outcome:'replayed',snapshots:[{id}],usedBytes:size}:{outcome:'in_progress'};
+      if(owner===account&&digest===d)return ready?{outcome:'replayed',snapshots:[{id}],usedBytes:size}:retry?{outcome:'resumed',backupId:id,storageKey:key}:{outcome:'in_progress'};
       owner=account;digest=d;size=n;return {outcome:'reserved',backupId:id,storageKey:key};
     },
     confirm:async()=>{if(failConfirm)throw Error('lost');ready=true;return {outcome:'stored',snapshots:[{id}],usedBytes:size};},
@@ -34,6 +34,7 @@ function harness(){
   };
   return {deps,setActor:(x:string|null)=>actor=x,setRole:(x:string)=>role=x,setVerified:(x:boolean)=>verified=x,
     setEnabled:(x:boolean)=>enabled=x,failUpload:()=>failUpload=true,failConfirm:()=>failConfirm=true,corrupt:()=>corrupt=true,
+    allow:(x:boolean)=>allow=x,retry:()=>{retry=true;failUpload=false;failConfirm=false;},
     counts:()=>({uploads,reserves}),ready:()=>ready};
 }
 const post=(raw:string,origin='https://slopboy.test')=>new Request(url,{method:'POST',headers:{origin,'content-type':'application/json'},body:raw});
@@ -73,5 +74,21 @@ test('unconfirmed upload never reports success or becomes restorable',async()=>{
     assert.equal(h.ready(),false);
     assert.equal((await handleNamedCloud(get(id),game.gameId,h.deps)).status,404);
     assert.equal((await handleNamedCloud(post(raw),game.gameId,h.deps)).status,409);
+    h.retry();assert.equal((await handleNamedCloud(post(raw),game.gameId,h.deps)).status,201);
+    assert.equal(h.ready(),true);
+    assert.deepEqual(await (await handleNamedCloud(get(id),game.gameId,h.deps)).json(),{snapshot:raw});
   }
+});
+
+test('rate denial precedes game/storage access and fails closed',async()=>{
+  const h=harness(),raw=await encodeCloudSnapshot(await envelope());
+  h.allow(false);
+  for(const req of [get(),get(id),post(raw)]){
+    const result=await handleNamedCloud(req,game.gameId,h.deps);
+    assert.equal(result.status,429);assert.deepEqual(await result.json(),{error:'CLOUD_RATE_LIMIT'});
+  }
+  assert.deepEqual(h.counts(),{uploads:0,reserves:0});
+  h.deps.consumeRequest=async()=>{throw Error('database unavailable');};
+  assert.equal((await handleNamedCloud(post(raw),game.gameId,h.deps)).status,503);
+  assert.deepEqual(h.counts(),{uploads:0,reserves:0});
 });
