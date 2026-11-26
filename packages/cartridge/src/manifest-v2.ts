@@ -10,6 +10,7 @@
  */
 
 import ts from 'typescript';
+import {parseSaveCapabilities,type SaveCapabilities} from '../../runtime/src/save-capabilities.ts';
 import {
   V2_DEVICE_1000,
   type V2HardwareProfile,
@@ -52,6 +53,8 @@ export interface CartridgeManifestV2 {
   readonly entrypoint: string;
   /** Save payload compatibility lane; unspecified preserves original schema-1 saves. */
   readonly saveSchemaVersion?: number;
+  /** Explicit declaration for future managed progress capture. Historical omission stays unknown. */
+  readonly saveCapabilities?: SaveCapabilities;
   readonly assets: readonly ManifestAssetDeclaration[];
   readonly controls?: readonly V2Button[];
   readonly achievements?: readonly ManifestAchievementDeclaration[];
@@ -101,7 +104,7 @@ export function validateManifestV2(value: unknown): {
   check(isRecord(value), 'SCHEMA', 'Cartridge manifest must be a JSON object');
   onlyKeys(value, [
     'schemaVersion', 'gameId', 'revisionId', 'title', 'deviceProfile',
-    'engine', 'entrypoint', 'saveSchemaVersion', 'assets', 'controls', 'achievements'
+    'engine', 'entrypoint', 'saveSchemaVersion', 'saveCapabilities', 'assets', 'controls', 'achievements'
   ], 'Cartridge manifest');
 
   // Schema version
@@ -159,6 +162,14 @@ export function validateManifestV2(value: unknown): {
     check(typeof value.saveSchemaVersion==='number'&&Number.isSafeInteger(value.saveSchemaVersion)&&
       value.saveSchemaVersion>=1&&value.saveSchemaVersion<=9999,'SAVE_SCHEMA',
       'saveSchemaVersion must be an integer from 1 to 9999');
+  }
+
+  let saveCapabilities:SaveCapabilities|undefined;
+  if(value.saveCapabilities!==undefined){
+    try{saveCapabilities=parseSaveCapabilities(value.saveCapabilities);}
+    catch{throw new ManifestError('SAVE_CAPABILITIES','Invalid save capabilities or schema version');}
+    check(value.saveSchemaVersion===undefined||value.saveSchemaVersion===saveCapabilities.schemaVersion,
+      'SAVE_SCHEMA','Legacy saveSchemaVersion must agree with saveCapabilities');
   }
 
   // Assets
@@ -253,6 +264,7 @@ export function validateManifestV2(value: unknown): {
     },
     entrypoint: value.entrypoint,
     saveSchemaVersion: value.saveSchemaVersion as number | undefined,
+    ...(saveCapabilities===undefined?{}:{saveCapabilities}),
     assets: Object.freeze(validatedAssets),
     controls: controls ? Object.freeze(controls) : undefined,
     achievements: achievements ? Object.freeze(achievements) : undefined,

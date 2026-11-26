@@ -115,3 +115,7 @@ Related Epics: [#17](https://github.com/MohamedXIV/slopboy/issues/17) MCP, [#18]
 - Phaser 4: https://phaser.io/download/phaser4 and https://docs.phaser.io/
 - PixiJS 8: https://pixijs.com/versions and https://pixijs.com/8.x/guides/getting-started/intro
 - Existing live code evidence: [KAPLAY feasibility spike](../v2/kaplay-feasibility.md)
+
+## Optional save capability and slot policy
+
+[ADR-006](adr-006-game-save-management.md) extends the persistence design. Explicit capabilities and save-schema compatibility are independent of engine and game genre. Declaration validation alone does not implement runtime capture, slot management, or cloud sync.

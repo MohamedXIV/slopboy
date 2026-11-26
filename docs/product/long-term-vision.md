@@ -121,3 +121,7 @@ If the current scope does not require an answer, **document the uncertainty** in
 - Keep earlier spec history for audit, but supersede contradictory older language explicitly; no outdated “CPU/RAM/ROM restrictions” in current implementations.
 - A game runtime or device update must never silently reinterpret or corrupt published cartridges, published engine versions, user ownership or saves.
 - Make the document available to code agents via root [AGENTS.md](../../AGENTS.md), [CLAUDE.md](../../CLAUDE.md) and [README.md](../../README.md); it must be part of agent onboarding, not only conversational memory.
+
+## Game save management (#36)
+
+Owner-approved optional persistence: none, persistent profile data, auto, manual, or both; named playthroughs and snapshots, active save, in-player management, explicit compatibility and offline-first opt-in cloud sync. See [ADR-006](../architecture/adr-006-game-save-management.md). No arbitrary emulator RAM capture or silent overwrite.
