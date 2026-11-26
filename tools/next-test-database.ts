@@ -10,9 +10,11 @@ import {join,resolve} from 'node:path';
 import {migrateUp,executePsql} from '../packages/database/src/migrator.ts';
 import {planCuratedDraftImport,buildCuratedDraftImportSql} from './curated-draft-import.ts';
 import {GAMES} from '../packages/catalog/src/index.ts';
+import {packCartridge} from '../packages/cartridge/src/index.ts';
 const run=promisify(execFile);
 export const BROWSER_RUNTIME_FIXTURE={gameId:'c260881a-647d-43c1-bf24-81e7a5902908',
   revisionId:'7400f98c-e2f8-49a9-9c40-400923705580',title:'Late-arriving approved fixture',reviewedCartridgeSlug:'tiny-catcher'};
+export const MANUAL_SAVE_FIXTURE={gameId:'c3ce4e52-f355-46b8-a882-a8cc9ac1ba04',revisionId:'0a7d1a98-6b49-4a2e-90f0-77744106ce91',title:'Manual capture test fixture'};
 export async function startTestDatabase(port:number){
   const root=process.env.SLOPBOY_PG_BIN_DIR?null:'/usr/lib/postgresql';
   const versions=root?await readdir(root).catch(()=>[]):[];
@@ -25,6 +27,7 @@ export async function startTestDatabase(port:number){
   const env={...process.env,PATH:bin+':'+process.env.PATH};
   const config={host:directory,port,user:'slopboy_test',database:'postgres'};
   let started=false,privateFileCreated=false;
+  let manualFile:string|undefined;
   try{
     await writeFile(privateFile,privateBytes,{flag:'wx'});
     privateFileCreated=true;
@@ -69,7 +72,23 @@ export async function startTestDatabase(port:number){
     let stopped=false;
     const adminSql=async(sql:string)=>{await run(join(bin,'psql'),['-X','-q','-v','ON_ERROR_STOP=1',
       '-h',directory,'-p',String(port),'-U','slopboy_test','postgres','-c',sql],{env});};
-    return {privateDigest,
+    const publishManualFixture=async()=>{
+      if(manualFile)throw Error('Manual fixture already created');
+      const f=MANUAL_SAVE_FIXTURE;
+      const manifest={id:'manual-capture-fixture',title:f.title,hardware:GAMES[0].hardware,controls:['A'],achievements:[],saveCapabilities:{mode:'manual',schemaVersion:1}};
+      const bundle=packCartridge({format:'slopboy-cartridge-v0',manifest,assets:[],code:"let n=0;export default {init(ctx){const saved=ctx.storage.load();if(saved!==null)n=Number(saved);},update(ctx){if(ctx.input.pressed('A'))n++;},draw(ctx){ctx.screen.clear(n%4);},serialize(){return String(n);}};"});
+      const digest=createHash('sha256').update(bundle).digest('hex'),storage='static-public-v1:/cartridges/by-sha256/'+digest+'.slop';
+      const path=resolve('apps/web/private/cartridges/by-sha256',digest+'.slop');
+      await writeFile(path,bundle,{flag:'wx'});manualFile=path;
+      await adminSql(`
+        INSERT INTO games(id,owner_id,title,genre) SELECT '${f.gameId}',owner_id,'${f.title}',genre FROM games WHERE id='${GAMES[0].gameId}';
+        INSERT INTO game_revisions(id,game_id,revision_number,engine_id,engine_version,device_profile,manifest,content_digest,storage_key,byte_size,status,created_by)
+          SELECT '${f.revisionId}','${f.gameId}',1,engine_id,engine_version,device_profile,'${JSON.stringify(manifest).replaceAll("'","''")}'::jsonb,'${digest}','${storage}',${bundle.byteLength},'published',created_by FROM game_revisions WHERE id='${GAMES[0].revisionId}';
+        INSERT INTO cartridge_artifacts(revision_id,artifact_type,path,sha256,byte_size,mime_type,storage_key)
+          VALUES ('${f.revisionId}','bundle','manual-capture-fixture.slop','${digest}',${bundle.byteLength},'application/octet-stream','${storage}');
+        UPDATE games SET visibility='public',status='published',current_published_revision_id='${f.revisionId}' WHERE id='${f.gameId}';`);
+    };
+    return {privateDigest,publishManualFixture,
       setViewAccess:async(enabled:boolean)=>adminSql(`${enabled?'GRANT SELECT ON':'REVOKE SELECT ON'} public.published_playable_games ${enabled?'TO':'FROM'} slopboy_runtime`),
       setPrivatePublished:async(published:boolean)=>adminSql(published?`
         UPDATE game_revisions SET status='published' WHERE id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -81,6 +100,6 @@ export async function startTestDatabase(port:number){
       SLOPBOY_TEST_SOCKET:directory,SLOPBOY_TEST_PG_PORT:String(port),SLOPBOY_TEST_PSQL:join(bin,'psql'),
       NODE_OPTIONS:`${process.env.NODE_OPTIONS??''} --import=${resolve('tools/test-neon-fetch.mjs')}`.trim()},
       stop:async()=>{if(stopped)return;stopped=true;try{await run(join(bin,'pg_ctl'),['-D',data,'stop','-m','immediate'],{env});}
-        finally{await rm(directory,{recursive:true,force:true});await rm(privateFile,{force:true});}}};
+        finally{await rm(directory,{recursive:true,force:true});await rm(privateFile,{force:true});if(manualFile)await rm(manualFile,{force:true});}}};
   }catch(error){if(started)await run(join(bin,'pg_ctl'),['-D',data,'stop','-m','immediate'],{env}).catch(()=>{});await rm(directory,{recursive:true,force:true});if(privateFileCreated)await rm(privateFile,{force:true});throw error;}
 }

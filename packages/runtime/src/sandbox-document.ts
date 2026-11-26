@@ -15,6 +15,9 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
   let phase = 'idle';
   let channel = null;
   let flushRequest = null;
+  let captureRequest = null;
+  let captureTimer = 0;
+  let manualCapture = false;
   const MAX_CODE = 65536;
   const MAX_PIXELS = 512 * 512;
   const MAX_SAVE = 8192;
@@ -31,7 +34,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     clearTimeout(watchdog);
     clearTimeout(saveTimer);
     pendingSave=undefined;
-    flushRequest=null;
+    flushRequest=null;captureRequest=null;clearTimeout(captureTimer);
     if(channel){channel.port1.close();channel=null;}
     if(worker){ worker.terminate(); worker=null; }
     releaseWorkerUrl();
@@ -47,6 +50,8 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     let trustedPort=null;
     let tone;
     let ticking=false;
+    let manualEnabled=false;
+    let serializing=false;
     const send=(data,transfer)=>{if(trustedPort)trustedPort.postMessage(data,transfer||[]);};
     let down=new Set(), pressed=new Set();
     const clampShade = (shade) => {
@@ -58,11 +63,13 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       storage:{
         load:()=>storedSave,
         save:(value)=>{
+          if(serializing)throw Error('Cannot write storage during serialization');
           if(typeof value!=='string' || new TextEncoder().encode(value).byteLength>8192)throw Error('Save exceeds hardware budget');
           storedSave=value;
           send({type:'save',value});
         },
         erase:()=>{
+          if(serializing)throw Error('Cannot erase storage during serialization');
           storedSave=null;
           send({type:'save',value:null});
         }
@@ -98,6 +105,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
           width=m.width;height=m.height;shadeCount=m.shades;
           if(!Number.isInteger(width)||width<1||width>512||!Number.isInteger(height)||height<1||height>512||!Number.isInteger(shadeCount)||shadeCount<1||shadeCount>256)throw Error('Bad hardware');
           storedSave=typeof m.save==='string'?m.save:null;
+          manualEnabled=m.manualCapture===true;
           frame=new Uint8Array(width*height);
           if(m.audio===true)api.audio={tone:(note)=>{
             if(ticking && Number.isInteger(note) && note>=36 && note<=84 && tone===undefined)tone=note;
@@ -107,9 +115,20 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
             const imported=await import(url);
             if(!imported?.default||typeof imported.default.update!=='function'||typeof imported.default.draw!=='function')throw Error('Missing game lifecycle');
             moduleGame=imported.default;
+            if(manualEnabled&&(typeof moduleGame.serialize!=='function'||typeof moduleGame.init!=='function'))throw Error('Manual save hooks missing');
             if(typeof moduleGame.init==='function')moduleGame.init(api);
             send({type:'ready'});
           }finally{ URL.revokeObjectURL(url); }
+        } else if(m?.type==='capture-save' && moduleGame && manualEnabled){
+          // Capture runs after earlier worker ticks, never by reading storedSave.
+          serializing=true;
+          try{
+            const value=moduleGame.serialize(api);
+            if(typeof value!=='string'||value.includes('\0')||new TextEncoder().encode(value).byteLength>8192)
+              throw Error('Invalid capture');
+            send({type:'save-captured',requestId:m.requestId,value});
+          }catch{send({type:'capture-failed',requestId:m.requestId});}
+          finally{serializing=false;}
         } else if(m?.type==='flush-save' && moduleGame){
           // Worker message ordering makes this a barrier after prior ticks.
           send({type:'save-flushed',requestId:m.requestId});
@@ -133,6 +152,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
     if(m.type==='load' && key===null && phase==='idle'){
       if(typeof m.code!=='string'||m.code.length>MAX_CODE||!Number.isInteger(m.width)||!Number.isInteger(m.height)||m.width*m.height>MAX_PIXELS)return;
       key=m.key;
+      manualCapture=m.manualCapture===true;
       phase='starting';
       try {
         const source='('+workerMain.toString()+')()';
@@ -161,6 +181,15 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
             }
             return;
           }
+          if(data?.type==='save-captured'||data?.type==='capture-failed'){
+            if(!manualCapture||phase!=='running'||captureRequest===null||data.requestId!==captureRequest)return;
+            clearTimeout(captureTimer);captureTimer=0;
+            const requestId=captureRequest;captureRequest=null;
+            if(data.type==='save-captured'&&typeof data.value==='string'&&!data.value.includes('\0')&&new TextEncoder().encode(data.value).byteLength<=MAX_SAVE)
+              post('save-captured',{requestId,value:data.value});
+            else post('capture-failed',{requestId});
+            return;
+          }
           if(data?.type==='save-flushed'){
             if(phase!=='running'||flushRequest===null||data.requestId!==flushRequest)return;
             clearTimeout(saveTimer);saveTimer=0;
@@ -179,10 +208,10 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
         };
         const snapshot=(m.save===null||typeof m.save==='string'&&new TextEncoder().encode(m.save).byteLength<=MAX_SAVE)?m.save:null;
         worker.postMessage({type:'setup',port:channel.port2},[channel.port2]);
-        worker.postMessage({type:'load',code:m.code,width:m.width,height:m.height,shades:m.shades,save:snapshot,audio:m.audio===true});
+        worker.postMessage({type:'load',code:m.code,width:m.width,height:m.height,shades:m.shades,save:snapshot,audio:m.audio===true,manualCapture});
         watchdog=setTimeout(()=>fail('Game initialization timeout'),MAX_FRAME_MS);
       }catch(e){fail(e?.message||e);}
-    } else if(m.type==='tick' && key===m.key && worker && !busy && phase==='running'){
+    } else if(m.type==='tick' && key===m.key && worker && !busy && captureRequest===null && phase==='running'){
       const ok=(a)=>Array.isArray(a)&&a.length<=VALID_BUTTONS.length&&a.every(k=>VALID_BUTTONS.includes(k));
       if(!ok(m.down)||!ok(m.pressed)||typeof m.dt!=='number'||!Number.isFinite(m.dt))return;
       busy=true;
@@ -190,9 +219,14 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       watchdog=setTimeout(()=>fail('Game frame timeout'),MAX_FRAME_MS);
       worker.postMessage({type:'tick',down:m.down,pressed:m.pressed,dt:m.dt});
     } else if(m.type==='flush-save' && key===m.key && worker && phase==='running'){
-      if(flushRequest!==null||typeof m.requestId!=='string'||! /^[a-f0-9-]{36}$/.test(m.requestId))return;
+      if(captureRequest!==null||flushRequest!==null||typeof m.requestId!=='string'||! /^[a-f0-9-]{36}$/.test(m.requestId))return;
       flushRequest=m.requestId;
       worker.postMessage({type:'flush-save',requestId:flushRequest});
+    } else if(m.type==='capture-save' && key===m.key && worker && phase==='running' && manualCapture){
+      if(busy||flushRequest!==null||captureRequest!==null||typeof m.requestId!=='string'||! /^[a-f0-9-]{36}$/.test(m.requestId))return;
+      captureRequest=m.requestId;
+      captureTimer=setTimeout(()=>fail('Manual save capture timeout'),MAX_FRAME_MS);
+      worker.postMessage({type:'capture-save',requestId:captureRequest});
     } else if(m.type==='stop' && key===m.key){
       if(phase==='stopped')return;
       phase='stopped';
@@ -201,7 +235,7 @@ export const SANDBOX_DOCUMENT = String.raw`<!doctype html>
       if(worker)worker.terminate();worker=null;
       releaseWorkerUrl();
       if(channel){channel.port1.close();channel=null;}
-      clearTimeout(watchdog);clearTimeout(saveTimer);busy=false;
+      clearTimeout(watchdog);clearTimeout(saveTimer);clearTimeout(captureTimer);captureRequest=null;busy=false;
     }
   });
   parent.postMessage({scope:'slopboy-v1',type:'boot'},'*');

@@ -2,7 +2,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {openChromePage} from './chrome-cdp.ts';
-import {startNextTestServer,BROWSER_RUNTIME_FIXTURE} from './next-test-server.ts';
+import {startNextTestServer,BROWSER_RUNTIME_FIXTURE,MANUAL_SAVE_FIXTURE} from './next-test-server.ts';
 import {GAMES} from '../packages/catalog/src/index.ts';
 const STAR_GAME_ID=GAMES[1].gameId;
 
@@ -403,7 +403,50 @@ async function main(){
     const labIsolated=await evalJs("(()=>{const s=document.querySelector('.sb-v2-shell');return !s.classList.contains('sb-heroui-live')&&document.querySelectorAll('.sb-lab-frame.sb-lab-current').length>0&&document.querySelectorAll('.sb-lab-frame.sb-lab-proposed.sb-heroui-preview').length>0})()");
     if(labIsolated!==true)throw Error('Original vs approved Design Lab comparison regressed');
     await navigate('/library','/library',"document.querySelector('.sb-v2-shell.sb-heroui-live')&&document.querySelectorAll('.v2-library-game').length===4");
-    console.log('Canonical routes, offline guest continuity and approved HeroUI Lab smoke passed');
+    // Add a separate digest-verified fixture only to this disposable database.
+    // No production cartridge or curated immutable lock is changed.
+    if(!server.publishManualFixture)throw Error('Manual fixture setup unavailable');
+    await server.publishManualFixture();
+    const manualPath='/play/'+MANUAL_SAVE_FIXTURE.gameId;
+    await navigate(manualPath,manualPath,"!!document.querySelector('.v2-led.on')");
+    const pressA=async()=>{
+      await evalJs("window.dispatchEvent(new KeyboardEvent('keydown',{code:'KeyZ',bubbles:true}));true");
+      await sleep(120);
+      await evalJs("window.dispatchEvent(new KeyboardEvent('keyup',{code:'KeyZ',bubbles:true}));true");
+      await sleep(120);
+    };
+    const capture=async(count:number)=>{
+      await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
+      await waitSave("!!document.querySelector('[data-testid=manual-save]')&&!document.querySelector('[data-testid=manual-save]').disabled",'Manual capture unavailable');
+      await evalJs("document.querySelector('[data-testid=manual-save]').click();true");
+      await waitSave("!!document.querySelector('[data-testid=confirm-save-name]')",'Manual name editor missing');
+      await evalJs("document.querySelector('[data-testid=confirm-save-name]').click();true");
+      await waitSave("document.querySelectorAll('[data-testid=save-snapshot][data-kind=manual]').length==="+count,'Manual capture was not persisted');
+      await evalJs("Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Resume').click();true");
+    };
+    await pressA();await capture(1);
+    await pressA();await capture(2);
+    const readManual=async()=>{
+      await evalJs(`(()=>{window.__manualData=null;const req=indexedDB.open('slopboy-local-saves',1);
+        req.onsuccess=()=>{const db=req.result,tx=db.transaction('cartridges','readonly');
+          const get=tx.objectStore('cartridges').get('slopboy-save-slots-v1:slopboy-1000@0.1.0:${MANUAL_SAVE_FIXTURE.gameId}');
+          get.onsuccess=()=>{const r=JSON.parse(get.result);window.__manualData=JSON.stringify(r.slots.flatMap(s=>s.snapshots.map(x=>({kind:x.kind,data:x.data}))));};
+          tx.oncomplete=()=>db.close();
+        };})()`);
+      await waitSave("typeof window.__manualData==='string'",'Could not read actual IndexedDB manual captures');
+      return JSON.parse(String(await evalJs("window.__manualData"))) as {kind:string;data:string}[];
+    };
+    const first=await readManual();
+    if(JSON.stringify(first)!==JSON.stringify([{kind:'manual',data:'1'},{kind:'manual',data:'2'}]))
+      throw Error('Manual saves must capture live state rather than the previous save: '+JSON.stringify(first));
+    await pressA(); // unsaved state=3; reload must restore persisted state=2
+    await evalJs('window.location.reload();true');
+    await waitSave("!!document.querySelector('.v2-led.on')&&!!document.querySelector('[data-testid=open-game-saves]')",'Manual fixture did not reload');
+    await capture(3);
+    const restored=await readManual();
+    if(restored.length!==3||restored[2].kind!=='manual'||restored[2].data!=='2')
+      throw Error('Manual save did not restore after reload: '+JSON.stringify(restored));
+    console.log('Canonical routes, offline guest continuity, HeroUI and live manual save capture/restore smoke passed');
   }finally{
     browser?.close();
     await server.stop();

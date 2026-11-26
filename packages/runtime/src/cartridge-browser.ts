@@ -1,8 +1,9 @@
 import type { HardwareProfile } from '../../hardware/src/index.ts';
+import {parseSaveCapabilities,type SaveCapabilities} from './save-capabilities.ts';
 
 export interface BrowserCartridge {
   readonly format: 'slopboy-cartridge-v0';
-  readonly manifest: {readonly id:string;readonly title:string;readonly hardware:{readonly id:string;readonly version:string}};
+  readonly manifest: {readonly id:string;readonly title:string;readonly hardware:{readonly id:string;readonly version:string};readonly saveCapabilities?:SaveCapabilities};
   readonly code: string;
 }
 
@@ -60,5 +61,6 @@ export async function loadBundledCartridge(path: string, hardware: HardwareProfi
   if(!target||target.id!==hardware.id||target.version!==hardware.version)throw Error('Incompatible hardware');
   if(typeof obj.code!=='string'||new TextEncoder().encode(obj.code).byteLength>hardware.budgets.codeBytes)throw Error('Invalid game code');
   if(typeof manifest.title!=='string'||typeof manifest.id!=='string')throw Error('Missing metadata');
+  if(Object.hasOwn(manifest,'saveCapabilities'))parseSaveCapabilities(manifest.saveCapabilities);
   return obj as unknown as BrowserCartridge;
 }
