@@ -25,6 +25,7 @@ async function main(){
       await sleep(150);
     }
     if(!booted)throw Error('Canonical player runtime did not become ready');
+    if(await evalJs("!!document.querySelector('[data-testid=\"open-game-saves\"]')")===true)throw Error('No-save game exposed progress controls');
     const firstPath=String(await evalJs('location.pathname'));
     if(firstPath!=='/play/'+GAMES[0].gameId)throw Error('Legacy slug bookmark did not redirect to canonical game UUID: '+firstPath);
     const dimensions=String(await evalJs("document.querySelector('.v2-display canvas').width+'x'+document.querySelector('.v2-display canvas').height"));
@@ -299,6 +300,21 @@ async function main(){
     if(values[legacySave]!==gameProgress||values[oldBackup]!==backupValue||values[uuidBackup]!==backupValue
       ||migratedSave?.format!=='slopboy-save-v2'||migratedSave.gameId!==circuit.gameId||migratedSave.data!==gameProgress)
       throw Error('Guest autosave or backup was not copied exactly and non-destructively to UUID identity');
+    // Named slot acceptance on the actual browser and IndexedDB. Existing legacy bytes stay intact.
+    const waitSave=async(expression:string,message:string)=>{
+      for(let i=0;i<160;i++){try{if(await evalJs(expression)===true)return;}catch{}await sleep(80);}
+      throw Error(message);
+    };
+    await waitSave("!!document.querySelector('[data-testid=open-game-saves]')&&!document.querySelector('[data-testid=open-game-saves]').disabled",'Save manager trigger unavailable');
+    await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=new-playthrough]')",'Save manager did not list local slots');
+    await evalJs("document.querySelector('[data-testid=new-playthrough]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=confirm-save-name]')",'New playthrough editor missing');
+    await evalJs("document.querySelector('[data-testid=confirm-save-name]').click();true");
+    await waitSave("!document.querySelector('[data-testid=player-save-manager]')&&!!document.querySelector('.v2-led.on')&&document.querySelector('.v2-save-current')?.textContent.includes('New playthrough')",'Named playthrough did not boot');
+    await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=playthrough][data-active=true] [data-testid=save-snapshot]')",'Named autosave not acknowledged');
+    await evalJs("Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Resume').click();true");
     // Routing cutover: canonical app must not load the legacy layout.
     const navigate=async(path:string,expected:string,expression:string)=>{
       try{await evalJs('window.location.assign('+JSON.stringify(path)+');true');}catch{}

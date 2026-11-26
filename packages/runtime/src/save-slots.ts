@@ -155,13 +155,19 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
     },
     async open(slotId:string):Promise<{session:SaveSession;data:string|null}>{
       enabled();
-      const opened=await mutate(r=>{
+      // Verify before changing the active token, then compare in the atomic
+      // transaction to prevent a concurrent tab replacing the verified head.
+      const before=findSlot(decode(await driver.get(key),game),slotId);
+      const candidate=before.headId===null?null:findSnapshot(before,before.headId);
+      if(candidate)assertCompatible(candidate,game);
+      await verifySnapshot(candidate);
+      return mutate(r=>{
         const slot=findSlot(r,slotId),head=slot.headId===null?null:findSnapshot(slot,slot.headId);
+        if(head?.id!==candidate?.id||head?.digest!==candidate?.digest||head?.data!==candidate?.data)
+          throw Error('SAVE_HEAD_CHANGED');
         if(head)assertCompatible(head,game);
-        return {session:activate(r,slot),head};
+        return {session:activate(r,slot),data:head?.data??null};
       });
-      await verifySnapshot(opened.head);
-      return {session:opened.session,data:opened.head?.data??null};
     },
     async close(session:SaveSession):Promise<void>{
       await mutate(r=>{if(r.active?.token===session.token&&r.active.slotId===session.slotId)r.active=null;});
