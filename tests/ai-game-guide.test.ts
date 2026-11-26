@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {V2_DEVICE_1000} from '../packages/hardware/src/v2.ts';
 import {ENGINE_REGISTRY} from '../packages/cartridge/src/engine-registry.ts';
+import {SAVE_MODES} from '../packages/runtime/src/save-capabilities.ts';
+import {getAgentCodingInstructions,getGameTemplate,getEngineCapabilities} from '../packages/cartridge/src/agent-templates.ts';
 import {
   buildFullPrompt, buildLaunchPrompt, buildProviderUrl,
 } from '../apps/web/lib/ai/game-prompt.ts';
@@ -113,4 +115,22 @@ test('UI defaults to no Genre, supports both providers and never uploads an idea
   assert.match(component, /openIn\('chatgpt'\)/);
   assert.match(component, /openIn\('claude'\)/);
   assert.doesNotMatch(component, /fetch\('\/api\//);
+});
+
+test('public and agent guides share implemented save boundaries without advertising adapter or cloud readiness',()=>{
+  const contract=getGameGuideContract().saveAuthoring;
+  assert.deepEqual(contract.modes,SAVE_MODES);
+  assert.equal(contract.missingDeclaration,'unknown-legacy');
+  assert.equal(contract.manualCapture.method,'serialize');
+  assert.equal(contract.cloud.publicAvailability,false);
+  assert.equal(contract.inferFromGenre,false);
+  for(const text of [getGameGuideMarkdown(),getAgentCodingInstructions('kaplay'),
+    getGameTemplate({engineId:'pixel-v1'}).files['README.md'],getEngineCapabilities({engineId:'kaplay'}).guidelines]){
+    assert.match(text,/saveCapabilities/);
+    assert.match(text,/serialize\(ctx\): string returning CURRENT state/);
+    assert.match(text,/KAPLAY host storage is experimental/);
+    assert.match(text,/not publicly available/);
+    assert.match(text,/does not let creators choose custom saveCapabilities/);
+  }
+  assert.equal(getGameTemplate({engineId:'kaplay'}).manifest.saveCapabilities,undefined);
 });

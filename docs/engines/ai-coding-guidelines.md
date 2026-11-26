@@ -176,3 +176,8 @@ When validation fails, the server returns an `AgentDiagnostic` array. Use this g
 | `DYNAMIC_CODE_FORBIDDEN` | Code called `eval()` or `new Function()`. | Rewrite dynamic code into direct, statically analyzable TypeScript functions. |
 | `MISSING_EXPORT` | No `export default` was found in the entrypoint. | Add `export default createGame;` or `export default game;` at the end of the entrypoint file. |
 | `SYNTAX_ERROR` | TypeScript syntax error. | Inspect the reported line and column to fix the syntax error. |
+
+
+## Save capabilities and persistence (ADR-006)
+
+For the maintained authoring contract see `packages/cartridge/src/save-authoring.ts` and the public v1 Markdown/JSON game guide. Explicit declarations require a supported reviewed manifest workflow; the current source-only import does not expose custom capability selection. Reviewed Pixel-v1 supports managed auto/manual capture, with `serialize(ctx)` and `init(ctx)` for manual mode. The experimental KAPLAY storage bridge is not that progress/manual lifecycle. Cloud backups are host-owned and are not publicly available. Never infer save modes from genre, invent a hook, directly access cloud services, or advertise persistence approval from source validation alone.
