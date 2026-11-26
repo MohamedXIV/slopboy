@@ -314,6 +314,39 @@ async function main(){
     await waitSave("!document.querySelector('[data-testid=player-save-manager]')&&!!document.querySelector('.v2-led.on')&&document.querySelector('.v2-save-current')?.textContent.includes('New playthrough')",'Named playthrough did not boot');
     await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
     await waitSave("!!document.querySelector('[data-testid=playthrough][data-active=true] [data-testid=save-snapshot]')",'Named autosave not acknowledged');
+    // Disabled real API must not block local play or falsely acknowledge a cloud write.
+    await evalJs("document.querySelector('[data-testid=open-cloud-saves]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=refresh-cloud-saves]')",'Cloud tab not available');
+    await evalJs("document.querySelector('[data-testid=refresh-cloud-saves]').click();true");
+    await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent.includes('unavailable')===true",'Disabled cloud API did not fail closed');
+    // Mock only the HTTP boundary; export/import and IndexedDB remain real.
+    await evalJs(`(()=>{window.__originalCloudFetch=window.fetch;window.__cloudFixture=null;window.fetch=async(input,init)=>{
+      if(typeof input!=='string'||!input.includes('/cloud-snapshots'))return window.__originalCloudFetch(input,init);
+      const respond=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
+      const hash=async(raw)=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))),b=>b.toString(16).padStart(2,'0')).join('');
+      if(init?.method==='POST'){
+        const raw=init.body,v=JSON.parse(raw),s=v.snapshot;
+        const row={id:crypto.randomUUID(),slotId:v.slotId,slotName:v.slotName,snapshotId:s.id,snapshotName:s.name,kind:s.kind,
+          revisionId:s.revisionId,releaseVersion:s.releaseVersion,schemaVersion:s.schemaVersion,hardwareId:v.hardwareId+'@'+v.hardwareVersion,
+          snapshotCreatedAt:s.createdAt,payloadBytes:s.bytes,payloadDigest:s.digest,bytes:new TextEncoder().encode(raw).byteLength,
+          digest:await hash(raw),storedAt:new Date().toISOString()};
+        window.__cloudFixture={raw,row};
+        return respond({snapshots:[row],usedBytes:row.bytes},201);
+      }
+      const f=window.__cloudFixture;
+      if(input.includes('?backupId='))return f?respond({snapshot:f.raw}):respond({error:'NOT_FOUND'},404);
+      return respond({snapshots:f?[f.row]:[],usedBytes:f?.row.bytes??0});
+    };return true;})()`);
+    await evalJs("document.querySelector('[data-testid=refresh-cloud-saves]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=upload-local-snapshot]')",'Cloud local snapshot picker missing');
+    await evalJs("document.querySelector('[data-testid=upload-local-snapshot]').click();true");
+    await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent==='Cloud backup saved.'",'Cloud upload acknowledgement missing');
+    await evalJs("document.querySelector('[data-testid=select-cloud-restore]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=keep-both-cloud]')",'Explicit restore confirmation missing');
+    await evalJs("document.querySelector('[data-testid=keep-both-cloud]').click();true");
+    await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent.includes('active save is unchanged')===true",'Cloud copy not confirmed');
+    await evalJs("window.fetch=window.__originalCloudFetch;Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Local saves').click();true");
+    await waitSave("Array.from(document.querySelectorAll('[data-testid=playthrough]')).some(x=>x.textContent.includes('cloud copy'))&&document.querySelector('[data-testid=active-save-name]')?.textContent==='New playthrough'",'Keep both changed active save or failed to persist copy');
     await evalJs("Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Resume').click();true");
     // Routing cutover: canonical app must not load the legacy layout.
     const navigate=async(path:string,expected:string,expression:string)=>{
