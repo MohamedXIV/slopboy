@@ -6,8 +6,8 @@ import {createServer} from 'node:http';
 import {resolve} from 'node:path';
 
 const sleep=(duration:number)=>new Promise<void>(r=>setTimeout(r,duration));
-import {startTestDatabase,BROWSER_RUNTIME_FIXTURE} from './next-test-database.ts';
-export {BROWSER_RUNTIME_FIXTURE};
+import {startTestDatabase,BROWSER_RUNTIME_FIXTURE,MANUAL_SAVE_FIXTURE} from './next-test-database.ts';
+export {BROWSER_RUNTIME_FIXTURE,MANUAL_SAVE_FIXTURE};
 async function freePort():Promise<number>{
   return new Promise((resolvePort,reject)=>{
     const server=createServer();
@@ -39,7 +39,7 @@ export async function startNextTestServer(requestedPort?:number,options:{databas
         const response=await fetch(url+'/',{signal:AbortSignal.timeout(2500)});
         if(response.ok&&response.headers.get('content-type')?.includes('text/html'))
           return {port,url,privateDigest:database?.privateDigest,setViewAccess:database?.setViewAccess,
-            setPrivatePublished:database?.setPrivatePublished,logs:()=>errors,stop:async()=>{await stopNextServer(child);await database?.stop();}};
+            setPrivatePublished:database?.setPrivatePublished,publishManualFixture:database?.publishManualFixture,logs:()=>errors,stop:async()=>{await stopNextServer(child);await database?.stop();}};
       }catch{/* Service may still be booting. */}
       await sleep(180);
     }

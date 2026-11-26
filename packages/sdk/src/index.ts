@@ -11,7 +11,11 @@ export interface GameContext {
   };
 }
 export interface GameModule {
+  /** For reviewed manual-save cartridges, restore ctx.storage.load() in init. */
   init?(context: GameContext): void;
+  /** Synchronous, side-effect-free capture of CURRENT state; required by the
+   * pixel-v1 manual/manual-and-auto capability. Never copy an old autosave. */
+  serialize?(context: GameContext): string;
   update(context: GameContext,dt: number): void;
   draw(context: GameContext): void;
 }

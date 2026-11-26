@@ -20,7 +20,7 @@ import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_PRESET_META,SCREEN_FX_LEVE
   sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
   type ScreenFxSettings,type ScreenRefresh} from './screen-fx-config';
 import OfflineInstallControl from './OfflineInstallControl';
-import {reviewedPixelSaveCapabilities,supportsAutosave} from '@slopboy/runtime/save-capabilities';
+import {reviewedPixelSaveCapabilities,supportsAutosave,supportsManualSave,supportsProgressSave} from '@slopboy/runtime/save-capabilities';
 import {createSlotSaveStore,type SaveSession,type SlotListing} from '@slopboy/runtime/save-slots';
 import PlayerSaveManager,{type SaveManagerAction} from './PlayerSaveManager';
 import './v2-player.css';
@@ -67,8 +67,14 @@ const PRESET_ORDER=['clean','lcd','phosphor'] as const;
 export default function V2DevicePlayer({game}:{game:PlayableGame}){
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [saved,setSaved]=useState<{epoch:number;value:string|null;session?:SaveSession}|null>(null);
-  const capability=useMemo(()=>reviewedPixelSaveCapabilities(game.gameId,game.revisionId),[game.gameId,game.revisionId]);
-  const slotStore=useMemo(()=>capability&&supportsAutosave(capability)?createSlotSaveStore(browserSaveDriver,{
+  const reviewedCapability=useMemo(()=>reviewedPixelSaveCapabilities(game.gameId,game.revisionId),[game.gameId,game.revisionId]);
+  // Only the already-authorized, digest-verified published bundle may opt in.
+  // Legacy slug URLs and undeclared historical revisions remain unchanged.
+  const capability=reviewedCapability??(game.cartridge.startsWith('/cartridges/by-sha256/')?cartridge?.manifest.saveCapabilities:undefined);
+  const manualSupported=supportsManualSave(capability);
+  const autoSupported=supportsAutosave(capability);
+  const legacyLane=reviewedCapability?.mode==='auto';
+  const slotStore=useMemo(()=>capability&&supportsProgressSave(capability)?createSlotSaveStore(browserSaveDriver,{
     gameId:game.gameId,revisionId:game.revisionId,releaseVersion:null,hardwareId:DEVICE.id,
     hardwareVersion:DEVICE.version,capabilities:capability
   }):null,[game.gameId,game.revisionId,capability]);
@@ -82,6 +88,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
   const saveWriteFailed=useRef(false);
   const preparedBoot=useRef<{epoch:number;value:string|null;session?:SaveSession}|null>(null);
   const pendingFlush=useRef<{id:string;resolve:()=>void;reject:(error:Error)=>void;timer:number}|null>(null);
+  const pendingCapture=useRef<{id:string;resolve:(data:string)=>void;reject:(error:Error)=>void;timer:number}|null>(null);
   const [epoch,setEpoch]=useState(0);
   const [status,setStatus]=useState<Status>('loading');
   const [reason,setReason]=useState('');
@@ -231,7 +238,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       if(preparedBoot.current?.epoch===epoch){setSaved(preparedBoot.current);return;}
       if(capability?.mode==='none'){setSaved({epoch,value:null});return;}
       if(!slotStore){const value=await legacy.read().catch(()=>null);if(active)setSaved({epoch,value});return;}
-      const value=await legacy.read(),listing=await slotStore.list();
+      const value=legacyLane?await legacy.read():null,listing=await slotStore.list();
       if(!active)return;
       setLegacyAvailable(value!==null);
       let selected=listing.selectedSlotId;
@@ -248,7 +255,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
     }).catch(()=>{if(active){setSaveNotice('Local saves could not be opened. Your existing data has not been replaced.');updateStatus('error','Local save unavailable');}});
     writeChain.current=start;
     return()=>{active=false;};
-  },[cartridge,epoch,game,capability,slotStore,updateStatus]);
+  },[cartridge,epoch,game,capability,slotStore,updateStatus,legacyLane]);
 
   useEffect(()=>{
     if(!cartridge||!saved||saved.epoch!==epoch)return;
@@ -261,7 +268,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       const msg=event.data;
       if(!msg||msg.scope!=='slopboy-v1')return;
       if(msg.type==='boot'){
-        post('load',{code:cartridge.code,width:DEVICE.display.width,height:DEVICE.display.height,shades:DEVICE.display.indexedColors,save:saved.value});
+        post('load',{code:cartridge.code,width:DEVICE.display.width,height:DEVICE.display.height,shades:DEVICE.display.indexedColors,save:saved.value,manualCapture:manualSupported});
         return;
       }
       if(msg.key!==sessionKey.current)return;
@@ -271,7 +278,9 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         bootTimer.current=window.setTimeout(()=>setBootComplete(true),1100);
         return;
       }
-      if(msg.type==='error'){ready.current=false;updateStatus('error',String(msg.reason||'Game stopped').slice(0,120));return;}
+      if(msg.type==='error'){ready.current=false;
+        const capture=pendingCapture.current;if(capture){clearTimeout(capture.timer);pendingCapture.current=null;capture.reject(Error('Game stopped during capture'));}
+        updateStatus('error',String(msg.reason||'Game stopped').slice(0,120));return;}
       if(msg.type==='frame'&&ready.current){
         const pixels:unknown=msg.pixels;
         if(!validateFrame(pixels,DEVICE.display.width,DEVICE.display.height,DEVICE.display.indexedColors)){
@@ -287,8 +296,16 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         }
         return;
       }
+      if(msg.type==='save-captured'||msg.type==='capture-failed'){
+        const waiting=pendingCapture.current;
+        if(!manualSupported||!waiting||msg.requestId!==waiting.id)return;
+        clearTimeout(waiting.timer);pendingCapture.current=null;
+        if(msg.type==='save-captured'&&typeof msg.value==='string'&&validSave(msg.value,DEVICE)&&!msg.value.includes('\0'))waiting.resolve(msg.value);
+        else waiting.reject(Error('Manual capture failed'));
+        return;
+      }
       if(msg.type==='save'&&ready.current){
-        if(capability?.mode==='none')return;
+        if(capability?.mode==='none'||capability?.mode==='manual')return;
         if(!validSave(msg.value,DEVICE)){ready.current=false;post('stop');updateStatus('error','Invalid save request');return;}
         const now=Date.now();
         if(!slotStore&&now-lastSave.current<250)return;
@@ -330,10 +347,11 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       if(bootTimer.current)clearTimeout(bootTimer.current);
       window.removeEventListener('message',onMessage);
       const waiting=pendingFlush.current;if(waiting){clearTimeout(waiting.timer);pendingFlush.current=null;waiting.reject(Error('Game stopped'));}
+      const capture=pendingCapture.current;if(capture){clearTimeout(capture.timer);pendingCapture.current=null;capture.reject(Error('Game stopped'));}
       ready.current=false;
       post('stop');
     };
-  },[cartridge,saved,epoch,post,draw,updateStatus,game,capability,slotStore]);
+  },[cartridge,saved,epoch,post,draw,updateStatus,game,capability,slotStore,manualSupported]);
 
   const syncKeys=useCallback(()=>{
     setKeyHeld([...physical.current]);
@@ -400,6 +418,15 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
     await writeChain.current;
     if(saveWriteFailed.current)throw Error('Previous autosave failed');
   };
+  const captureLiveSave=async():Promise<string>=>{
+    if(!manualSupported||!ready.current||!savePaused.current||!saved?.session||pendingCapture.current)
+      throw Error('Manual save unavailable');
+    return new Promise<string>((resolve,reject)=>{
+      const id=crypto.randomUUID();
+      const timer=window.setTimeout(()=>{pendingCapture.current=null;reject(Error('Manual capture timed out'));},2500);
+      pendingCapture.current={id,timer,resolve,reject};post('capture-save',{requestId:id});
+    });
+  };
   const restartWith=(next?:{value:string|null;session?:SaveSession})=>{
     post('stop');ready.current=false;clearGameInput();
     const nextEpoch=epoch+1;
@@ -424,6 +451,11 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         case 'fork':target=await slotStore.fork(action.slotId,action.snapshotId,action.name);break;
         case 'rename-slot':await slotStore.renameSlot(action.slotId,action.name);break;
         case 'rename-snapshot':await slotStore.renameSnapshot(action.slotId,action.snapshotId,action.name);break;
+        case 'manual':{
+          if(!saved?.session||!manualSupported)throw Error('Manual save unsupported');
+          const value=await captureLiveSave();
+          await slotStore.manualSave(saved.session,action.name,value);break;
+        }
         case 'backup':
           if(!saved?.session)throw Error('Select a named save first');
           await slotStore.backupHead(saved.session,action.name);break;
@@ -439,7 +471,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
       }
       setSaveListing(await slotStore.list());
-      setSaveNotice('Save action completed on this device.');return true;
+      setSaveNotice(action.kind==='manual'?'Manual save saved on this device.':'Save action completed on this device.');return true;
     }catch{setSaveNotice('Save action could not complete. Existing saves were retained.');return false;}
     finally{saveActionBusy.current=false;setSaveBusy(false);}
   };
@@ -717,7 +749,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             </div>
             <div>
               <span>SAVE</span>
-              <strong>{capability?.mode==='none'?'Not supported':slotStore?'Local · autosave':'Legacy adapter'}</strong>
+              <strong>{capability?.mode==='none'?'Not supported':manualSupported&&autoSupported?'Local · manual + auto':manualSupported?'Local · manual':slotStore?'Local · autosave':'Legacy adapter'}</strong>
             </div>
           </div>
           <p className="v2-security">
@@ -741,7 +773,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             }}>
             ↧ Change cartridge
           </Button>
-          {slotStore&&<Button size="sm" variant="secondary" isDisabled={saveBusy||!saved} data-testid="open-game-saves" onPress={showSaveManager}>Saves</Button>}
+          {slotStore&&<Button size="sm" variant="secondary" isDisabled={saveBusy||(!saved&&!saveListing)} data-testid="open-game-saves" onPress={showSaveManager}>Saves</Button>}
           <Link href="/library" className="v2-full-library-link">Full library</Link>
           <OfflineInstallControl gameId={game.gameId}/>
           <Button size="sm" variant="secondary" className="sb-control v2-mobile-settings"
@@ -938,6 +970,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             {fullscreen&&slotStore&&!saveManagerOpen&&<Button className="v2-fullscreen-saves" size="sm" variant="secondary" isDisabled={saveBusy||!saved} onPress={showSaveManager}>Saves</Button>}
             {saveManagerOpen&&slotStore&&<PlayerSaveManager listing={saveListing} currentSlotId={saved?.session?.slotId??null}
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
+              autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
               onAction={saveAction} onClose={closeSaveManager}/>}
             {status !== 'running' && (
               <div className="v2-status" role="status">

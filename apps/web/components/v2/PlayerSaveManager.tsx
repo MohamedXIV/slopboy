@@ -10,11 +10,12 @@ export type SaveManagerAction=
   | {kind:'rename-slot';slotId:string;name:string}
   | {kind:'rename-snapshot';slotId:string;snapshotId:string;name:string}
   | {kind:'backup';name:string}
+  | {kind:'manual';name:string}
   | {kind:'fork';slotId:string;snapshotId:string;name:string};
 type NamedAction=Exclude<SaveManagerAction,{kind:'load'}|{kind:'legacy'}>;
-export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,onAction,onClose}:{
+export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose}:{
   listing:SlotListing|null;currentSlotId:string|null;legacyAvailable:boolean;schema:number;
-  busy:boolean;notice:string;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;
+  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;
 }){
   const [editor,setEditor]=useState<NamedAction|null>(null);
   const current=listing?.slots.find(slot=>slot.id===currentSlotId);
@@ -22,13 +23,14 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
   return <section className="v2-save-manager sb-heroui-live" aria-label="Game saves" data-testid="player-save-manager">
     <header className="v2-save-manager-head"><div><h2>Game saves</h2>
       <p>Current save: <strong data-testid="active-save-name">{current?.name??(currentSlotId?'Loading…':'Legacy autosave')}</strong></p>
-      <small>Autosave supported · Local storage · Save schema {schema}</small></div>
+      <small>{manualSupported&&autoSupported?'Manual + autosave':manualSupported?'Manual save':'Autosave supported'} · Local storage · Save schema {schema}</small></div>
       <Button size="sm" variant="secondary" isDisabled={busy} onPress={onClose}>Resume</Button></header>
     {notice&&<p role="status">{notice}</p>}
     {!listing?<p>Reading local saves…</p>:<>
       <div className="v2-save-manager-actions">
         <Button size="sm" variant="primary" isDisabled={busy} data-testid="new-playthrough" onPress={()=>setEditor({kind:'create',name:'New playthrough'})}>New playthrough</Button>
-        {current?.headId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor({kind:'backup',name:'Autosave backup'})}>Back up autosave</Button>}
+        {manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>setEditor({kind:'manual',name:'Manual save'})}>Save game</Button>}
+        {autoSupported&&current?.headId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor({kind:'backup',name:'Autosave backup'})}>Back up autosave</Button>}
         {legacyAvailable&&currentSlotId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>void onAction({kind:'legacy'})}>Load legacy autosave</Button>}
       </div>
       {editor&&<form onSubmit={async e=>{e.preventDefault();if(!busy&&editor.name.trim()&&await onAction(editor))setEditor(null);}}>
@@ -47,7 +49,7 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
               <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor({kind:'rename-slot',slotId:slot.id,name:slot.name})}>Rename</Button>
               {slot.id!==currentSlotId&&<Button size="sm" variant="secondary" isDisabled={busy||Boolean(head&&!compatible(head))} onPress={()=>void onAction({kind:'load',slotId:slot.id})}>Load</Button>}
             </div></div>
-          {slot.snapshots.map(s=><div key={s.id} className="v2-save-manager-snapshot" data-testid="save-snapshot">
+          {slot.snapshots.map(s=><div key={s.id} className="v2-save-manager-snapshot" data-testid="save-snapshot" data-kind={s.kind}>
             <div><strong>{s.name}</strong> · {s.kind}<p>{s.releaseVersion?'Game '+s.releaseVersion:'Release version not assigned'} · Schema {s.schemaVersion}</p>
               <small>{s.revisionId?'Revision '+s.revisionId.slice(0,8):'Unknown revision'} · {s.schemaVersion!==schema?'Incompatible':s.revisionId?'Compatible':'Unknown compatibility'}</small>
               <p>{s.createdAt?new Date(s.createdAt).toLocaleString():'Unknown date'} · {s.bytes} bytes</p></div>
@@ -57,6 +59,6 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
         </article>;
       })}
     </>}
-    <small>Backups copy the last autosave. This game does not support live manual capture. Cloud sync for named saves is not available yet.</small>
+    <small>{manualSupported?'Manual saves capture the current game state.':'This game does not support live manual capture.'} {autoSupported?'Backups copy the last autosave. ':''}Cloud sync for named saves is not available yet.</small>
   </section>;
 }

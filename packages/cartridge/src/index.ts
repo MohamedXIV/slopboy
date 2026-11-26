@@ -2,6 +2,7 @@
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { Buffer } from 'node:buffer';
 import ts from 'typescript';
+import {parseSaveCapabilities,type SaveCapabilities} from '../../runtime/src/save-capabilities.ts';
 import { getHardware, type HardwareProfile } from '../../hardware/src/index.ts';
 
 export interface Manifest {
@@ -9,6 +10,7 @@ export interface Manifest {
   title: string;
   hardware: { id: string; version: string };
   controls: string[];
+  saveCapabilities?: SaveCapabilities;
   achievements: { id: string; title: string; description: string }[];
 }
 export interface Asset { path: string; type: 'sprite' | 'text'; content: string }
@@ -53,7 +55,7 @@ function stableJSON(v: unknown): string { return JSON.stringify(canonical(v)); }
 
 export function validateManifest(value: unknown): {manifest: Manifest; hardware: HardwareProfile} {
   check(isRecord(value), 'SCHEMA', 'manifest must be an object');
-  onlyKeys(value, ['id','title','hardware','controls','achievements'], 'manifest');
+  onlyKeys(value, ['id','title','hardware','controls','achievements','saveCapabilities'], 'manifest');
   check(typeof value.id === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value.id) && value.id.length <= 64, 'SCHEMA', 'invalid id');
   check(typeof value.title === 'string' && value.title.trim().length > 0 && value.title.length <= 80, 'SCHEMA', 'invalid title');
   check(isRecord(value.hardware), 'SCHEMA', 'missing hardware');
@@ -74,6 +76,10 @@ export function validateManifest(value: unknown): {manifest: Manifest; hardware:
     check(typeof ach.description === 'string' && ach.description.length <= 160, 'SCHEMA', 'invalid achievement description');
     check(!ids.has(ach.id), 'SCHEMA', 'duplicate achievement');
     ids.add(ach.id);
+  }
+  if(Object.hasOwn(value,'saveCapabilities')){
+    try{parseSaveCapabilities(value.saveCapabilities);}
+    catch{throw new CartridgeError('SAVE_CAPABILITIES','Invalid save capability declaration');}
   }
   return {manifest: value as unknown as Manifest, hardware};
 }
