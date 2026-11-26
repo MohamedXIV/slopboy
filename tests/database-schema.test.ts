@@ -62,7 +62,7 @@ test('migration files load cleanly with matching checksums', async () => {
 
   assert.equal(up[3].version, 4);
   assert.equal(up[3].name, 'source_drafts');
-  assert.deepEqual(down.map(file => file.version), [9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(down.map(file => file.version), [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -109,7 +109,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 9);
+    assert.equal(upResult.applied, 10);
     assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
     // 4. Verify migration idempotency (re-running applies 0)
@@ -428,7 +428,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 7);
+    assert.equal(rollback3.rolledBack, 8);
     assert.deepEqual(rollback3.versions, [10, 9, 8, 7, 6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
@@ -461,7 +461,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 9);
+    assert.equal(reMigrate.applied, 10);
     assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
 
@@ -744,7 +744,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
     assert.deepEqual(downgrade4.versions,[10,9,8,7,6,5,4]);
-    assert.equal((await migrateUp(config,migrationsDir)).applied,6);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,7);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
     const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
