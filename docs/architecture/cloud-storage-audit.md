@@ -1,6 +1,6 @@
 # Read-only Cloud Storage inventory audit (#36)
 
-Use this operator-only offline audit to compare legacy and named metadata with a complete bounded object listing. It is intentionally not an API, cron, cleanup job, provider probe or authorization to delete. No application role grants or paid dependencies. It works on schema 009 and reads the optional 010 retry timestamp if present.
+Use this operator-only offline audit to compare legacy and named metadata with a complete bounded object listing. It is intentionally not an API, cron, cleanup job, provider probe or authorization to delete. No application role grants or paid dependencies. It works on schema 009 and reads the optional 010 named and 011 legacy retry timestamps if present.
 
 ## Capture on the reviewed target
 

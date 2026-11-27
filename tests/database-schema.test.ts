@@ -49,8 +49,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 10);
-  assert.equal(down.length, 10);
+  assert.equal(up.length, 11);
+  assert.equal(down.length, 11);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -62,7 +62,7 @@ test('migration files load cleanly with matching checksums', async () => {
 
   assert.equal(up[3].version, 4);
   assert.equal(up[3].name, 'source_drafts');
-  assert.deepEqual(down.map(file => file.version), [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(down.map(file => file.version), [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -109,8 +109,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 10);
-    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    assert.equal(upResult.applied, 11);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -428,8 +428,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 8);
-    assert.deepEqual(rollback3.versions, [10, 9, 8, 7, 6, 5, 4, 3]);
+    assert.equal(rollback3.rolledBack, 9);
+    assert.deepEqual(rollback3.versions, [11, 10, 9, 8, 7, 6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -461,8 +461,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 10);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    assert.equal(reMigrate.applied, 11);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -743,8 +743,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
-    assert.deepEqual(downgrade4.versions,[10,9,8,7,6,5,4]);
-    assert.equal((await migrateUp(config,migrationsDir)).applied,7);
+    assert.deepEqual(downgrade4.versions,[11,10,9,8,7,6,5,4]);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,8);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
     const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
@@ -987,6 +987,19 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.deepEqual((await list(alice)).backups,[],'pending save must stay hidden');
     assert.equal((await list(alice)).usedBytes,15,'pending quota is reserved');
     assert.equal((await reserve(alice,"'puzzle position'")).outcome,'in_progress');
+    // A stale reservation still owns its bytes and key. Release cannot race a delayed PUT.
+    await executePsql(config,{sql:`UPDATE public.cloud_save_backups SET created_at=clock_timestamp()-interval '2 hours',last_attempt_at=clock_timestamp()-interval '61 seconds' WHERE id='${first.backupId}'`});
+    await executePsql(config,{sql:`SET ROLE slopboy_test_web;SELECT public.release_cloud_save_backup('${alice}','${reviewed.gameId}','${first.backupId}');`});
+    assert.equal((await list(alice)).usedBytes,15);
+    await assert.rejects(()=>migrateDown(config,migrationsDir,10),/Pending legacy cloud reservations retained/);
+    const legacyRetries=await Promise.all([reserve(alice,"'puzzle position'"),reserve(alice,"'puzzle position'"),reserve(alice,"'puzzle position'")]);
+    assert.equal(legacyRetries.filter(x=>x.outcome==='reserved').length,1);
+    assert.equal(legacyRetries.filter(x=>x.outcome==='in_progress').length,2);
+    const retried=legacyRetries.find(x=>x.outcome==='reserved');
+    assert.equal(retried.backupId,first.backupId);
+    assert.equal(retried.storageKey,first.storageKey);
+    assert.equal((await list(alice)).usedBytes,15);
+    assert.equal((await cloud(`SELECT public.confirm_cloud_save_backup('${bob}','${reviewed.gameId}','${first.backupId}');`)).outcome,'not_found');
     const confirmed=await cloud(`SELECT public.confirm_cloud_save_backup('${alice}','${reviewed.gameId}','${first.backupId}');`);
     assert.equal(confirmed.outcome,'stored');
     assert.equal(confirmed.backups.length,1);
@@ -1099,7 +1112,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[9,8,7,6,5]);
     assert.match((await executePsql(config,{sql:`SELECT source_text FROM game_source_drafts WHERE id='${revisionUuid}'`})).stdout,/export default/);
-    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9,10]);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9,10,11]);
 
   } finally {
     // Stop server and clean up temporary cluster

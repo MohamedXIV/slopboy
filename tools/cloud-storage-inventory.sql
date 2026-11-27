@@ -3,8 +3,8 @@
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
 WITH inventory AS (
  SELECT 'legacy' AS lane,id,account_id,game_id,storage_key,byte_size,digest,status,
-        created_at,ready_at,NULL::text AS last_attempt_at
- FROM public.cloud_save_backups
+        b.created_at,b.ready_at,to_jsonb(b)->>'last_attempt_at' AS last_attempt_at
+ FROM public.cloud_save_backups b
  UNION ALL
  SELECT 'named',n.id,n.account_id,n.game_id,n.storage_key,n.byte_size,n.digest,n.status,
         n.created_at,n.ready_at,to_jsonb(n)->>'last_attempt_at'
