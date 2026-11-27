@@ -1153,7 +1153,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
       return JSON.stringify({format:'slopboy-cloud-snapshot-v1',gameId:reviewed.gameId,hardwareId:'slopboy-1000',hardwareVersion:'0.1.0',slotId:randomUUID(),slotName:'Run',
         snapshot:{id:randomUUID(),name:'Autosave',kind:'auto',revisionId:reviewed.revisionId,releaseVersion:null,schemaVersion:1,createdAt:1234+n,data,bytes:Buffer.byteLength(data),digest:createHash('sha256').update(data).digest('hex')}});
     };
-    const atomicStore=(raw:string,dev=atomicDevice,actor=admin)=>managed(`SELECT public.store_atomic_managed_autosave('${actor}','${reviewed.gameId}','${dev}',$fixture${raw}$fixture$)`);
+    const atomicStore=(raw:string,dev=atomicDevice,actor=admin)=>managed(`SELECT public.store_atomic_managed_autosave('${actor}','${reviewed.gameId}','${dev}',$fixture$${raw}$fixture$)`);
     const atomicRead=(id:string,dev=atomicDevice,actor=admin)=>managed(`SELECT coalesce(public.read_atomic_managed_autosave('${actor}','${reviewed.gameId}','${dev}','${id}'),'null'::jsonb)`);
     const raws=Array.from({length:7},(_,i)=>makeRaw(i));
     assert.equal((await atomicStore(raws[0],device)).outcome,'in_progress');
