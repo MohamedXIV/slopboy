@@ -4,7 +4,8 @@ import {createGameSaveService,type AtomicSaveDriver} from './save-store.ts';
 import {CLOUD_SNAPSHOT_FORMAT,encodeCloudSnapshot,decodeCloudSnapshot} from './cloud-snapshot.ts';
 import {parseSaveCapabilities,supportsProgressSave,supportsAutosave,supportsManualSave,type SaveCapabilities} from './save-capabilities.ts';
 
-const FORMAT='slopboy-save-slots-v1';
+const LEGACY_FORMAT='slopboy-save-slots-v1';
+const FORMAT='slopboy-save-slots-v2';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY_PART=/^[a-zA-Z0-9._-]{1,80}$/;
 // Host storage policies, not imaginary device limits. Reject, never evict named saves.
@@ -40,7 +41,7 @@ export interface SaveSession {
   readonly slotId:string;readonly token:string;readonly revisionId:string;readonly schemaVersion:number;
 }
 interface SlotRecord {
-  format:typeof FORMAT;gameId:string;hardwareId:string;hardwareVersion:string;
+  format:typeof FORMAT|typeof LEGACY_FORMAT;gameId:string;hardwareId:string;hardwareVersion:string;
   slots:SaveSlot[];active:SaveSession|null;legacyImported:boolean;
   /** Old records omit this; once written, IDs are in atomic insertion order. */
   autoOrder?:string[];
@@ -54,7 +55,7 @@ export interface SlotListing {
 function slotRecordKey(game:SlotGame):string{
   if(!validId(game.gameId)||!validId(game.revisionId)||!KEY_PART.test(game.hardwareId)||!KEY_PART.test(game.hardwareVersion)||
     !(game.releaseVersion===null||typeof game.releaseVersion==='string'&&game.releaseVersion.length<=80))throw Error('INVALID_SAVE_IDENTITY');
-  return FORMAT+':'+game.hardwareId+'@'+game.hardwareVersion+':'+game.gameId;
+  return LEGACY_FORMAT+':'+game.hardwareId+'@'+game.hardwareVersion+':'+game.gameId;
 }
 function empty(game:SlotGame):SlotRecord{
   return {format:FORMAT,gameId:game.gameId,hardwareId:game.hardwareId,hardwareVersion:game.hardwareVersion,
@@ -66,9 +67,10 @@ function decode(raw:unknown,game:SlotGame):SlotRecord{
   if(typeof raw!=='string'||bytes(raw)>LOCAL_SLOT_POLICY.maxRecordBytes)throw Error('INVALID_SAVE_RECORD');
   let value:unknown;
   try{value=JSON.parse(raw);}catch{throw Error('INVALID_SAVE_RECORD');}
-  if(!record(value)||value.format!==FORMAT||value.gameId!==game.gameId||value.hardwareId!==game.hardwareId||
+  if(!record(value)||(value.format!==FORMAT&&value.format!==LEGACY_FORMAT)||value.gameId!==game.gameId||value.hardwareId!==game.hardwareId||
     value.hardwareVersion!==game.hardwareVersion||!Array.isArray(value.slots)||typeof value.legacyImported!=='boolean')
     throw Error('INVALID_SAVE_RECORD');
+  if((value.format===FORMAT)!==Object.hasOwn(value,'autoOrder'))throw Error('INVALID_SAVE_RECORD');
   const slots=new Set<string>(),snapshots=new Set<string>(),autos=new Set<string>();
   for(const slot of value.slots){
     if(!record(slot)||!validId(slot.id)||slots.has(slot.id)||!validLabel(slot.name)||!positiveTime(slot.createdAt)||
@@ -121,6 +123,7 @@ function ensureAutoOrder(r:SlotRecord):string[]{
     slot.snapshots=slot.snapshots.map(s=>s.id===snapshot.id?preserved:s);
     if(slot.headId===snapshot.id)slot.headId=preserved.id;
   }
+  r.format=FORMAT;
   return r.autoOrder=previous.map(x=>x.snapshot.id);
 }
 function evictOldestAuto(r:SlotRecord,order:string[]):void{
@@ -200,6 +203,20 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
           throw Error('SAVE_HEAD_CHANGED');
         if(head)assertCompatible(head,game);
         return {session:activate(r,slot),data:head?.data??null};
+      });
+    },
+    /** Explicitly load a saved state without creating a redundant permanent
+     * copy. Subsequent auto/manual writes create new entries, never rewrite it. */
+    async openSnapshot(slotId:string,snapshotId:string):Promise<{session:SaveSession;data:string}>{
+      enabled();
+      const candidate=findSnapshot(findSlot(decode(await driver.get(key),game),slotId),snapshotId);
+      assertCompatible(candidate,game);await verifySnapshot(candidate);
+      return mutate(r=>{
+        const slot=findSlot(r,slotId),snapshot=findSnapshot(slot,snapshotId);
+        if(snapshot.digest!==candidate.digest||snapshot.data!==candidate.data)
+          throw Error('SAVE_SNAPSHOT_CHANGED');
+        assertCompatible(snapshot,game);slot.headId=snapshot.id;
+        return {session:activate(r,slot),data:snapshot.data};
       });
     },
     async close(session:SaveSession):Promise<void>{

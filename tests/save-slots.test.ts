@@ -186,7 +186,7 @@ test('legacy per-slot records upgrade on first autosave without discarding exist
   // Assemble authentic old-format per-slot snapshots from independent stores.
   await store.create('Placeholder');
   const key=[...records.keys()][0],old=JSON.parse(records.get(key)!);
-  old.slots=[];old.active=null;delete old.autoOrder;
+  old.slots=[];old.active=null;old.format='slopboy-save-slots-v1';delete old.autoOrder;
   for(let i=0;i<6;i++){
     const isolated=driver(),oldStore=createSlotSaveStore(isolated.d,game);
     const oldSlot=await oldStore.create('Old '+i),opened=await oldStore.open(oldSlot);
@@ -203,6 +203,9 @@ test('legacy per-slot records upgrade on first autosave without discarding exist
   assert.equal(after.filter(s=>s.name==='Recovered autosave').length,2);
   assert.equal(after.filter(s=>s.kind==='backup').length,2);
   assert.equal(after.length,7);
+  const migrated=JSON.parse(records.get(key)!);
+  assert.equal(migrated.format,'slopboy-save-slots-v2');
+  assert.equal(migrated.autoOrder.length,5);
 });
 test('invalid persisted auto order fails closed',async()=>{
   const {d,records}=driver(),store=createSlotSaveStore(d,game),slot=await store.create('Run');
@@ -212,4 +215,21 @@ test('invalid persisted auto order fails closed',async()=>{
   await assert.rejects(store.list(),/INVALID_SAVE_RECORD/);
   await assert.rejects(store.autosave(session,'new'),/INVALID_SAVE_RECORD/);
   assert.equal(records.get(key),corrupted);
+});
+
+test('load chosen save directly, fence old session, and keep both manual and autosave data',async()=>{
+  const {d}=driver(),store=createSlotSaveStore(d,game),slot=await store.create('Run');
+  const {session}=await store.open(slot);
+  const first=await store.autosave(session,'first');
+  const manual=await store.manualSave(session,'Keep','manual');
+  const last=await store.autosave(session,'last');
+  const loaded=await store.openSnapshot(slot,first);
+  assert.equal(loaded.data,'first');
+  assert.equal((await store.list()).slots[0].headId,first);
+  assert.equal((await store.list()).slots.length,1);
+  await assert.rejects(store.autosave(session,'stale'),/STALE_SAVE_SESSION/);
+  await store.autosave(loaded.session,'continued');
+  const entries=(await store.list()).slots[0].snapshots;
+  for(const id of [first,manual,last])assert.ok(entries.some(s=>s.id===id));
+  assert.equal((await store.openSnapshot(slot,manual)).data,'manual');
 });
