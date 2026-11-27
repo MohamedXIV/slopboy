@@ -491,7 +491,30 @@ async function main(){
     const restored=await readManual();
     if(restored.length!==3||restored[2].kind!=='manual'||restored[2].data!=='2')
       throw Error('Manual save did not restore after reload: '+JSON.stringify(restored));
-    console.log('Canonical routes, offline guest continuity, HeroUI and live manual save capture/restore smoke passed');
+    await pressA(); // live state 3
+    await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=open-manual-saves]')",'Manual tab missing before overwrite');
+    await evalJs("document.querySelector('[data-testid=open-manual-saves]').click();true");
+    await waitSave("document.querySelectorAll('[data-testid=save-snapshot][data-kind=manual]').length===3",'Manual saves missing before overwrite');
+    await evalJs("document.querySelector('[data-testid=save-snapshot][data-kind=manual] [data-testid=save-options]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=replace-save]')",'Overwrite action missing');
+    await evalJs("document.querySelector('[data-testid=replace-save]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=confirm-save-change]')",'Overwrite confirmation missing');
+    await evalJs("document.querySelector('[data-testid=cancel-save-change]').click();true");
+    if(JSON.stringify(await readManual())!==JSON.stringify(restored))throw Error('Cancelled overwrite changed saved data');
+    await evalJs("document.querySelector('[data-testid=replace-save]').click();true");
+    await evalJs("document.querySelector('[data-testid=confirm-save-change]').click();true");
+    await waitSave("document.querySelector('[data-testid=player-save-manager] [role=status]')?.textContent==='Save overwritten.'",'Overwrite not acknowledged');
+    const overwritten=await readManual();
+    if(overwritten.length!==3||overwritten[2].data!=='3')throw Error('Overwrite must store fresh live state: '+JSON.stringify(overwritten));
+    await evalJs("document.querySelector('[data-testid=save-snapshot][data-kind=manual][data-active=false] [data-testid=save-options]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=delete-save]:not(:disabled)')",'Delete action missing');
+    await evalJs("document.querySelector('[data-testid=delete-save]').click();true");
+    await evalJs("document.querySelector('[data-testid=confirm-save-change]').click();true");
+    await waitSave("document.querySelectorAll('[data-testid=save-snapshot][data-kind=manual]').length===2",'Delete did not remove exactly one local save');
+    const deleted=await readManual();
+    if(deleted.length!==2||deleted[1].data!=='3')throw Error('Delete affected current state: '+JSON.stringify(deleted));
+    console.log('Canonical routes, offline guest continuity, HeroUI and live manual save capture/restore/management smoke passed');
   }finally{
     browser?.close();
     await server.stop();
