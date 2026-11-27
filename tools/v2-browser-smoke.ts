@@ -314,6 +314,9 @@ async function main(){
     await waitSave("!document.querySelector('[data-testid=player-save-manager]')&&!!document.querySelector('.v2-led.on')&&document.querySelector('.v2-save-current')?.textContent.includes('New playthrough')",'Named playthrough did not boot');
     await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
     await waitSave("!!document.querySelector('[data-testid=playthrough][data-active=true] [data-testid=save-snapshot]')",'Named autosave not acknowledged');
+    if(await evalJs("Array.from(document.querySelectorAll('[data-testid=save-versions]')).some(el=>!el.hidden)||!!document.querySelector('[data-testid=save-technical-details]')")===true)throw Error('Save history and technical data must be collapsed by default');
+    await evalJs("document.querySelector('[data-testid=playthrough][data-active=true] [data-testid=toggle-save-versions]').click();true");
+    await waitSave("!document.querySelector('[data-testid=playthrough][data-active=true] [data-testid=save-versions]').hidden",'Save options did not expand');
     // Disabled real API must not block local play or falsely acknowledge a cloud write.
     await evalJs("document.querySelector('[data-testid=open-cloud-saves]').click();true");
     await waitSave("!!document.querySelector('[data-testid=refresh-cloud-saves]')",'Cloud tab not available');
@@ -338,14 +341,15 @@ async function main(){
       return respond({snapshots:f?[f.row]:[],usedBytes:f?.row.bytes??0});
     };return true;})()`);
     await evalJs("document.querySelector('[data-testid=refresh-cloud-saves]').click();true");
-    await waitSave("!!document.querySelector('[data-testid=upload-local-snapshot]')",'Cloud local snapshot picker missing');
-    await evalJs("document.querySelector('[data-testid=upload-local-snapshot]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=upload-current-save]')",'Direct current-save backup missing');
+    if(await evalJs("!!document.querySelector('[data-testid=cloud-technical-details]')||!!document.querySelector('[data-testid=upload-local-snapshot]')")===true)throw Error('Cloud details must be collapsed by default');
+    await evalJs("document.querySelector('[data-testid=upload-current-save]').click();true");
     await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent==='Cloud backup saved.'",'Cloud upload acknowledgement missing');
     await evalJs("document.querySelector('[data-testid=select-cloud-restore]').click();true");
     await waitSave("!!document.querySelector('[data-testid=keep-both-cloud]')",'Explicit restore confirmation missing');
     await evalJs("document.querySelector('[data-testid=keep-both-cloud]').click();true");
     await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent.includes('active save is unchanged')===true",'Cloud copy not confirmed');
-    await evalJs("window.fetch=window.__originalCloudFetch;Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Local saves').click();true");
+    await evalJs("window.fetch=window.__originalCloudFetch;Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='On this device').click();true");
     await waitSave("Array.from(document.querySelectorAll('[data-testid=playthrough]')).some(x=>x.textContent.includes('cloud copy'))&&document.querySelector('[data-testid=active-save-name]')?.textContent==='New playthrough'",'Keep both changed active save or failed to persist copy');
     await evalJs("Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Resume').click();true");
     // Routing cutover: canonical app must not load the legacy layout.

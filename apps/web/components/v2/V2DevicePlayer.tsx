@@ -471,7 +471,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
       }
       setSaveListing(await slotStore.list());
-      setSaveNotice(action.kind==='manual'?'Manual save saved on this device.':'Save action completed on this device.');return true;
+      setSaveNotice(action.kind==='manual'?'Game saved.':action.kind==='backup'?'Checkpoint saved.':action.kind==='rename-slot'||action.kind==='rename-snapshot'?'Name updated.':'');return true;
     }catch{setSaveNotice('Save action could not complete. Existing saves were retained.');return false;}
     finally{saveActionBusy.current=false;setSaveBusy(false);}
   };
@@ -986,7 +986,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
                   setSaveListing(await slotStore.list());
                   if(activate){signal.throwIfAborted();const opened=await slotStore.open(target);
                     restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
-                    setSaveNotice('Cloud save restored as a separate playthrough.');}
+                    setSaveNotice('Cloud backup restored.');}
                 },
               }:undefined}/>}
             {status !== 'running' && (
