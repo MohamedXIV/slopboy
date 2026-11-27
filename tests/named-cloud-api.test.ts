@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {GAMES} from '../packages/catalog/src/index.ts';
 import {encodeCloudSnapshot,cloudSnapshotDigest,CLOUD_SNAPSHOT_FORMAT} from '../packages/runtime/src/cloud-snapshot.ts';
-import {handleNamedCloud,namedCloudEnabled,managedCloudEnabled,type NamedCloudDependencies} from '../apps/web/server/named-cloud-api.ts';
+import {handleNamedCloud,namedCloudEnabled,managedCloudEnabled,type NamedCloudDependencies,type AtomicManagedDependencies} from '../apps/web/server/named-cloud-api.ts';
 
 const game=GAMES[2],a='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',b='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -111,4 +111,16 @@ test('managed autosave requests bind the active authenticated account before res
   assert.deepEqual(await (await run(get(id))).json(),{snapshot:raw});
   h.deps.reserve=async()=>({outcome:'retired'});
   assert.deepEqual(await (await run(post(raw))).json(),{error:'AUTOSAVE_RETIRED'});
+});
+
+test('transactional managed route stores only reviewed autosaves and verifies atomic readback',async()=>{
+  const h=harness(),raw=await encodeCloudSnapshot(await envelope()),scope={expectedAccount:a,deviceId:id};
+  let stored='',calls=0;
+  const deps:AtomicManagedDependencies={...h.deps,store:async(account,_game,value)=>{assert.equal(account,a);stored=value;calls++;return {outcome:'stored',snapshots:[{id}],usedBytes:Buffer.byteLength(value)};},read:async()=>({id,bytes:Buffer.byteLength(stored),digest:hash(new TextEncoder().encode(stored)),snapshot:stored})};
+  const run=(req:Request)=>handleNamedCloud(req,game.gameId,deps,scope);
+  h.setActor(b);assert.equal((await run(post(raw))).status,403);assert.equal(calls,0);h.setActor(a);
+  assert.equal((await run(post(raw))).status,201);assert.equal(stored,raw);assert.equal(h.counts().uploads,0);
+  assert.deepEqual(await (await run(get(id))).json(),{snapshot:raw});
+  deps.read=async()=>({id,bytes:Buffer.byteLength(stored),digest:'a'.repeat(64),snapshot:stored});
+  assert.equal((await run(get(id))).status,503);
 });

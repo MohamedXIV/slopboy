@@ -49,8 +49,8 @@ function runProc(cmd: string, args: string[]): Promise<void> {
 
 test('migration files load cleanly with matching checksums', async () => {
   const { up, down } = await loadMigrationFiles(migrationsDir);
-  assert.equal(up.length, 13);
-  assert.equal(down.length, 13);
+  assert.equal(up.length, 14);
+  assert.equal(down.length, 14);
 
   assert.equal(up[0].version, 1);
   assert.equal(up[0].name, 'initial_schema');
@@ -62,7 +62,7 @@ test('migration files load cleanly with matching checksums', async () => {
 
   assert.equal(up[3].version, 4);
   assert.equal(up[3].name, 'source_drafts');
-  assert.deepEqual(down.map(file => file.version), [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+  assert.deepEqual(down.map(file => file.version), [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
 });
 
 test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', async (t) => {
@@ -109,8 +109,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 3. Test fresh migration UP
     const upResult = await migrateUp(config, migrationsDir);
-    assert.equal(upResult.applied, 13);
-    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    assert.equal(upResult.applied, 14);
+    assert.deepEqual(upResult.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 
     // 4. Verify migration idempotency (re-running applies 0)
     const secondUp = await migrateUp(config, migrationsDir);
@@ -428,8 +428,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8a. Roll back additive migration 3 first (fixtures only).
     const rollback3 = await migrateDown(config, migrationsDir, 2);
-    assert.equal(rollback3.rolledBack, 11);
-    assert.deepEqual(rollback3.versions, [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3]);
+    assert.equal(rollback3.rolledBack, 12);
+    assert.deepEqual(rollback3.versions, [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3]);
     const noInstallTable=await executePsql(config,{sql:"SELECT to_regclass('user_installations');"});
     assert.equal(noInstallTable.stdout.trim(),'');
     const noVersionColumn=await executePsql(config,{sql:`
@@ -461,8 +461,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // 8d. Re-run migrations UP on clean database to confirm clean repeatability
     const reMigrate = await migrateUp(config, migrationsDir);
-    assert.equal(reMigrate.applied, 13);
-    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    assert.equal(reMigrate.applied, 14);
+    assert.deepEqual(reMigrate.versions, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
 
 
     // 8e. Issue #27 Phase 2C: prove the guarded import against the ACTUAL
@@ -743,8 +743,8 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     // Upgrade 003 -> 004 preserves imported games and revisions.
     const downgrade4=await migrateDown(config,migrationsDir,3);
-    assert.deepEqual(downgrade4.versions,[13,12,11,10,9,8,7,6,5,4]);
-    assert.equal((await migrateUp(config,migrationsDir)).applied,10);
+    assert.deepEqual(downgrade4.versions,[14,13,12,11,10,9,8,7,6,5,4]);
+    assert.equal((await migrateUp(config,migrationsDir)).applied,11);
     assert.equal((await executePsql(config,{sql:`SELECT count(*) FROM games WHERE id='${GAMES[0].gameId}';`})).stdout.trim(),'1');
     const sourceId='55555555-5555-4555-8555-555555555555';
     const writeSource=(actor:string,game:string)=>`PREPARE source_write(uuid,uuid,uuid,uuid,text,text) AS ${CREATE_SOURCE_DRAFT_SQL};`+
@@ -992,7 +992,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     await executePsql(config,{sql:`SET ROLE slopboy_test_web;SELECT public.release_cloud_save_backup('${alice}','${reviewed.gameId}','${first.backupId}');`});
     assert.equal((await list(alice)).usedBytes,15);
     await assert.rejects(()=>migrateDown(config,migrationsDir,10),/Pending legacy cloud reservations retained/);
-    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[12,13]);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[12,13,14]);
     const legacyRetries=await Promise.all([reserve(alice,"'puzzle position'"),reserve(alice,"'puzzle position'"),reserve(alice,"'puzzle position'")]);
     assert.equal(legacyRetries.filter(x=>x.outcome==='reserved').length,1);
     assert.equal(legacyRetries.filter(x=>x.outcome==='in_progress').length,2);
@@ -1147,6 +1147,37 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.equal((await namedList(admin)).snapshots.length,1);
     assert.equal((await namedList(admin)).usedBytes,4000);
     assert.equal((await list(admin)).usedBytes,4000);
+    const atomicDevice=randomUUID(),atomicOther=randomUUID();
+    const makeRaw=(n:number)=>{
+      const data='state '+n;
+      return JSON.stringify({format:'slopboy-cloud-snapshot-v1',gameId:reviewed.gameId,hardwareId:'slopboy-1000',hardwareVersion:'0.1.0',slotId:randomUUID(),slotName:'Run',
+        snapshot:{id:randomUUID(),name:'Autosave',kind:'auto',revisionId:reviewed.revisionId,releaseVersion:null,schemaVersion:1,createdAt:1234+n,data,bytes:Buffer.byteLength(data),digest:createHash('sha256').update(data).digest('hex')}});
+    };
+    const atomicStore=(raw:string,dev=atomicDevice,actor=admin)=>managed(`SELECT public.store_atomic_managed_autosave('${actor}','${reviewed.gameId}','${dev}',$fixture${raw}$fixture$)`);
+    const atomicRead=(id:string,dev=atomicDevice,actor=admin)=>managed(`SELECT coalesce(public.read_atomic_managed_autosave('${actor}','${reviewed.gameId}','${dev}','${id}'),'null'::jsonb)`);
+    const raws=Array.from({length:7},(_,i)=>makeRaw(i));
+    assert.equal((await atomicStore(raws[0],device)).outcome,'in_progress');
+    assert.equal((await atomicStore(raws[0],atomicDevice,alice)).outcome,'not_found');
+    assert.equal((await atomicStore(raws[0].replace('state 0','broken!'))).outcome,'invalid');
+    const firstAtomic=await atomicStore(raws[0]);
+    assert.equal(firstAtomic.outcome,'stored');
+    const firstId=firstAtomic.snapshots[0].id;
+    assert.equal((await atomicStore(raws[0])).outcome,'replayed');
+    for(const raw of raws.slice(1))assert.equal((await atomicStore(raw)).outcome,'stored');
+    const ring=await managedList(atomicDevice);
+    assert.equal(ring.snapshots.length,5);
+    assert.equal(ring.usedBytes,4000+raws.slice(-5).reduce((n,raw)=>n+Buffer.byteLength(raw),0));
+    assert.equal(await atomicRead(firstId),null);
+    const current=ring.snapshots.find((row:{digest:string})=>row.digest===createHash('sha256').update(raws[6]).digest('hex'));
+    assert.equal((await atomicRead(current.id)).snapshot,raws[6]);
+    assert.equal(await atomicRead(current.id,atomicOther),null);
+    assert.equal(await atomicRead(current.id,atomicDevice,alice),null);
+    assert.equal((await atomicStore(raws[0],atomicOther)).outcome,'stored');
+    assert.equal((await managedList(atomicDevice)).snapshots.length,5);
+    await assert.rejects(()=>executePsql(config,{sql:`SET ROLE slopboy_test_web;SELECT public.read_atomic_managed_autosave('${admin}','${reviewed.gameId}','${atomicDevice}','${current.id}')`}));
+    await assert.rejects(()=>migrateDown(config,migrationsDir,13),/Transactional managed autosaves retained/);
+    // Only the disposable test database: clear transactional fixtures before testing old rollback.
+    await executePsql(config,{sql:'DELETE FROM public.managed_auto_snapshots WHERE storage_key IS NULL'});
     await assert.rejects(()=>migrateDown(config,migrationsDir,11),/Managed autosaves retained/);
     // Disposable PostgreSQL test fixture only; never a hosted cleanup path.
     await executePsql(config,{sql:'DELETE FROM public.managed_auto_snapshots'});
@@ -1160,7 +1191,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
 
     assert.deepEqual((await migrateDown(config,migrationsDir,4)).versions,[9,8,7,6,5]);
     assert.match((await executePsql(config,{sql:`SELECT source_text FROM game_source_drafts WHERE id='${revisionUuid}'`})).stdout,/export default/);
-    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9,10,11,12,13]);
+    assert.deepEqual((await migrateUp(config,migrationsDir)).versions,[5,6,7,8,9,10,11,12,13,14]);
 
   } finally {
     // Stop server and clean up temporary cluster
