@@ -9,6 +9,8 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const PART=/^[a-zA-Z0-9._-]{1,80}$/;
 const SHA=/^[a-f0-9]{64}$/;
 export const SYNC_RETRY_MS=60_000;
+/** At most two requests per cycle, below the existing daily request cap for ordinary sessions. */
+export const SYNC_CYCLE_MS=120_000;
 const MAX_RECORD_BYTES=2*CLOUD_SNAPSHOT_MAX_BYTES+4096;
 const bytes=(value:string)=>new TextEncoder().encode(value).byteLength;
 const object=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -18,7 +20,7 @@ export interface PendingSync {
   raw:string;digest:string;bytes:number;slotId:string;snapshotId:string;lastAttemptAt:number|null;
 }
 interface Intent {
-  format:typeof FORMAT;scope:SyncScope;generation:string|null;pending:PendingSync|null;
+  format:typeof FORMAT;scope:SyncScope;generation:string|null;pending:PendingSync|null;lastCycleAt?:number;
 }
 export interface SyncAcknowledgment {
   digest:string;bytes:number;slotId:string;snapshotId:string;
@@ -37,6 +39,7 @@ function decode(raw:unknown,scope:SyncScope):Intent{
     Object.keys(scope).some(k=>v.scope===null||!object(v.scope)||v.scope[k]!==scope[k as keyof SyncScope])||
     !(v.generation===null||typeof v.generation==='string'&&UUID.test(v.generation)))
     throw Error('INVALID_SYNC_INTENT');
+  if(v.lastCycleAt!==undefined&&!timestamp(v.lastCycleAt))throw Error('INVALID_SYNC_INTENT');
   const p=v.pending;
   if(p!==null&&(!object(p)||typeof p.raw!=='string'||p.bytes!==bytes(p.raw)||Number(p.bytes)>CLOUD_SNAPSHOT_MAX_BYTES||
     typeof p.digest!=='string'||!SHA.test(p.digest)||typeof p.slotId!=='string'||!UUID.test(p.slotId)||
@@ -79,6 +82,15 @@ export function createCloudSyncIntent(driver:AtomicSaveDriver,identity:SyncScope
         if(enabled&&!state.generation)state.generation=crypto.randomUUID();
         if(!enabled)state.generation=null;
         return state.generation;
+      });
+    },
+    /** Durable throttle, shared across tabs and retained across disable/re-enable. */
+    async claimCycle(generation:string):Promise<boolean>{
+      return change(state=>{
+        requireGeneration(state,generation);
+        const now=clock();if(!timestamp(now))throw Error('INVALID_SYNC_CLOCK');
+        if(state.lastCycleAt!==undefined&&now-state.lastCycleAt<SYNC_CYCLE_MS)return false;
+        state.lastCycleAt=now;return true;
       });
     },
     async stage(generation:string,raw:string):Promise<SyncAcknowledgment>{

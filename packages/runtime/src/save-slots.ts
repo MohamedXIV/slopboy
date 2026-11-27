@@ -319,6 +319,19 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
     },
     /** Explicit immutable snapshot export. The current autosave may advance
      * concurrently, but an export of the chosen ID never substitutes its head. */
+    /** Newest committed autosave by atomic insertion order, not client clock.
+     * Old v1 records remain explicit-backup-only until a new autosave upgrades them. */
+    async latestAutosaveExport():Promise<string|null>{
+      enabled();
+      const r=decode(await driver.get(key),game),latest=r.autoOrder?.at(-1);
+      if(!latest)return null;
+      const slot=r.slots.find(s=>s.snapshots.some(x=>x.id===latest&&x.kind==='auto'));
+      if(!slot)throw Error('INVALID_SAVE_RECORD');
+      const snapshot=findSnapshot(slot,latest);
+      assertCompatible(snapshot,game);
+      return encodeCloudSnapshot({format:CLOUD_SNAPSHOT_FORMAT,gameId:game.gameId,hardwareId:game.hardwareId,
+        hardwareVersion:game.hardwareVersion,slotId:slot.id,slotName:slot.name,snapshot},game);
+    },
     async exportCloudSnapshot(slotId:string,snapshotId:string):Promise<string>{
       enabled();
       const slot=findSlot(decode(await driver.get(key),game),slotId);
