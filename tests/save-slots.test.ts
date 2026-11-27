@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createSlotSaveStore,type SlotGame} from '../packages/runtime/src/save-slots.ts';
+import {createSlotSaveStore,LOCAL_SLOT_POLICY,type SlotGame} from '../packages/runtime/src/save-slots.ts';
 import {createGameSaveService,gameSlotKey,type AtomicSaveDriver} from '../packages/runtime/src/save-store.ts';
 import {SLOPBOY_1000} from '../packages/hardware/src/index.ts';
 import {decodeCloudSnapshot,encodeCloudSnapshot,compareCloudSnapshot,CLOUD_SNAPSHOT_MAX_BYTES} from '../packages/runtime/src/cloud-snapshot.ts';
@@ -56,7 +56,7 @@ test('manual captures and backups remain immutable when autosave advances; fork 
   assert.equal((await store.open(fork)).data,'old');
   assert.equal((await store.open(slot)).data,'new');
   const snapshots=(await store.list()).slots[0].snapshots;
-  assert.equal(snapshots.filter(s=>s.kind==='auto').length,1);
+  assert.equal(snapshots.filter(s=>s.kind==='auto').length,2);
   assert.ok(snapshots.some(s=>s.id===manual&&s.kind==='manual'));
   assert.ok(snapshots.some(s=>s.id===backup&&s.kind==='backup'));
 });
@@ -140,4 +140,96 @@ test('cloud envelope has a bounded canonical encoding and cannot contain extra s
   await assert.rejects(encodeCloudSnapshot({...JSON.parse(raw),sessionToken:session.token}),/INVALID_CLOUD_SNAPSHOT/);
   await assert.rejects(decodeCloudSnapshot(raw.replace('"format":','"format":"ignored","format":')),/NONCANONICAL/);
   assert.equal((await a.list()).slots[0].snapshots.length,2);
+});
+
+test('five autosaves rotate in transaction order across the game, never evict manual or backed-up progress',async()=>{
+  const {d}=driver(),store=createSlotSaveStore(d,game);
+  const one=await store.create('First'),two=await store.create('Second');
+  const a=(await store.open(one)).session;
+  const first=await store.autosave(a,'one');
+  const kept=await store.backupSnapshot(one,first,'Keep first');
+  const manual=await store.manualSave(a,'Manual','manual');
+  const second=await store.autosave(a,'two');
+  const b=(await store.open(two)).session;
+  const later:string[]=[];
+  for(let i=3;i<=7;i++)later.push(await store.autosave(b,String(i)));
+  const reopened=createSlotSaveStore(d,game),listing=await reopened.list();
+  const all=listing.slots.flatMap(s=>s.snapshots);
+  assert.deepEqual(all.filter(s=>s.kind==='auto').map(s=>s.id),later);
+  assert.equal(all.filter(s=>s.kind==='auto').length,LOCAL_SLOT_POLICY.maxAutosaves);
+  assert.ok(all.some(s=>s.id===kept&&s.kind==='backup'));
+  assert.ok(all.some(s=>s.id===manual&&s.kind==='manual'));
+  assert.equal(all.some(s=>s.id===second),false);
+  assert.equal(listing.slots[0].headId,manual);
+  assert.equal((await reopened.open(two)).data,'7');
+  assert.equal((await reopened.open(one)).data,'manual');
+  assert.equal((await decodeCloudSnapshot(await reopened.exportCloudSnapshot(one,kept))).snapshot.data,'one');
+  await assert.rejects(reopened.backupSnapshot(one,first,'Already rotated'),/SAVE_SNAPSHOT_NOT_FOUND/);
+  await assert.rejects(reopened.backupSnapshot(one,manual,'Not auto'),/NOT_AUTOSAVE/);
+});
+test('historical autosave backup preserves source time, digest and head without activation',async()=>{
+  const {d}=driver(),store=createSlotSaveStore(d,game),slot=await store.create('Run');
+  const {session}=await store.open(slot),old=await store.autosave(session,'old');
+  const latest=await store.autosave(session,'latest');
+  const before=(await store.list()).slots[0].snapshots.find(s=>s.id===old)!;
+  const copy=await store.backupSnapshot(slot,old,'Keep it');
+  const after=(await store.list()).slots[0];
+  const saved=after.snapshots.find(s=>s.id===copy)!;
+  assert.equal(after.headId,latest);
+  assert.equal(saved.createdAt,before.createdAt);
+  assert.equal(saved.digest,before.digest);
+  assert.equal(saved.kind,'backup');
+  assert.equal((await store.list()).selectedSlotId,slot);
+});
+test('legacy per-slot records upgrade on first autosave without discarding existing payloads beyond five',async()=>{
+  const {d,records}=driver(),store=createSlotSaveStore(d,game);
+  // Assemble authentic old-format per-slot snapshots from independent stores.
+  await store.create('Placeholder');
+  const key=[...records.keys()][0],old=JSON.parse(records.get(key)!);
+  old.slots=[];old.active=null;old.format='slopboy-save-slots-v1';delete old.autoOrder;
+  for(let i=0;i<6;i++){
+    const isolated=driver(),oldStore=createSlotSaveStore(isolated.d,game);
+    const oldSlot=await oldStore.create('Old '+i),opened=await oldStore.open(oldSlot);
+    await oldStore.autosave(opened.session,'old '+i);
+    const raw=JSON.parse([...isolated.records.values()][0]);
+    old.slots.push(raw.slots[0]);
+  }
+  records.set(key,JSON.stringify(old));
+  assert.equal((await store.list()).slots.flatMap(s=>s.snapshots).filter(s=>s.kind==='auto').length,6);
+  const slot=await store.create('New'),{session}=await store.open(slot);
+  await store.autosave(session,'new');
+  const after=(await store.list()).slots.flatMap(s=>s.snapshots);
+  assert.equal(after.filter(s=>s.kind==='auto').length,5);
+  assert.equal(after.filter(s=>s.name==='Recovered autosave').length,2);
+  assert.equal(after.filter(s=>s.kind==='backup').length,2);
+  assert.equal(after.length,7);
+  const migrated=JSON.parse(records.get(key)!);
+  assert.equal(migrated.format,'slopboy-save-slots-v2');
+  assert.equal(migrated.autoOrder.length,5);
+});
+test('invalid persisted auto order fails closed',async()=>{
+  const {d,records}=driver(),store=createSlotSaveStore(d,game),slot=await store.create('Run');
+  const {session}=await store.open(slot);await store.autosave(session,'good');
+  const key=[...records.keys()][0],raw=JSON.parse(records.get(key)!);
+  raw.autoOrder=[crypto.randomUUID()];const corrupted=JSON.stringify(raw);records.set(key,corrupted);
+  await assert.rejects(store.list(),/INVALID_SAVE_RECORD/);
+  await assert.rejects(store.autosave(session,'new'),/INVALID_SAVE_RECORD/);
+  assert.equal(records.get(key),corrupted);
+});
+
+test('load chosen save directly, fence old session, and keep both manual and autosave data',async()=>{
+  const {d}=driver(),store=createSlotSaveStore(d,game),slot=await store.create('Run');
+  const {session}=await store.open(slot);
+  const first=await store.autosave(session,'first');
+  const manual=await store.manualSave(session,'Keep','manual');
+  const last=await store.autosave(session,'last');
+  const loaded=await store.openSnapshot(slot,first);
+  assert.equal(loaded.data,'first');
+  assert.equal((await store.list()).slots[0].headId,first);
+  assert.equal((await store.list()).slots.length,1);
+  await assert.rejects(store.autosave(session,'stale'),/STALE_SAVE_SESSION/);
+  await store.autosave(loaded.session,'continued');
+  const entries=(await store.list()).slots[0].snapshots;
+  for(const id of [first,manual,last])assert.ok(entries.some(s=>s.id===id));
+  assert.equal((await store.openSnapshot(slot,manual)).data,'manual');
 });
