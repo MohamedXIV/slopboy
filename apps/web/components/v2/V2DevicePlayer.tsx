@@ -458,6 +458,12 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
           const value=await captureLiveSave();
           await slotStore.manualSave(saved.session,action.name,value);break;
         }
+        case 'replace-manual':{
+          if(!saved?.session||!manualSupported)throw Error('Manual save unsupported');
+          const value=await captureLiveSave();
+          await slotStore.replaceManualSave(saved.session,action.target,value);break;
+        }
+        case 'delete-permanent':await slotStore.deletePermanentSave(action.target);break;
         case 'backup-snapshot':await slotStore.backupSnapshot(action.slotId,action.snapshotId,action.name);break;
         case 'legacy':{
           const value=await createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game)).read();
@@ -471,8 +477,11 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
       }
       setSaveListing(await slotStore.list());
-      setSaveNotice(action.kind==='manual'?'Game saved.':action.kind==='backup-snapshot'?'Backup saved.':action.kind==='rename-slot'||action.kind==='rename-snapshot'?'Name updated.':'');return true;
-    }catch{setSaveNotice('Save action could not complete. Existing saves were retained.');return false;}
+      setSaveNotice(action.kind==='manual'?'Game saved.':action.kind==='replace-manual'?'Save overwritten.':action.kind==='delete-permanent'?'Save deleted from this device.':action.kind==='backup-snapshot'?'Backup saved.':action.kind==='rename-slot'||action.kind==='rename-snapshot'?'Name updated.':'');return true;
+    }catch(error){
+      const code=error instanceof Error?error.message:'';
+      setSaveNotice(code==='ACTIVE_SAVE_PROTECTED'?'Load another save before deleting this one.':code==='SAVE_SNAPSHOT_CHANGED'||code==='SAVE_SNAPSHOT_NOT_FOUND'?'This save changed. Reopen Saves and try again.':'Save action could not complete. Existing saves were retained.');return false;
+    }
     finally{saveActionBusy.current=false;setSaveBusy(false);}
   };
   const withCloudLock=async(work:()=>Promise<void>)=>{

@@ -233,3 +233,57 @@ test('load chosen save directly, fence old session, and keep both manual and aut
   for(const id of [first,manual,last])assert.ok(entries.some(s=>s.id===id));
   assert.equal((await store.openSnapshot(slot,manual)).data,'manual');
 });
+
+function confirmed(list:Awaited<ReturnType<ReturnType<typeof createSlotSaveStore>['list']>>,slotId:string,snapshotId:string){
+  const slot=list.slots.find(s=>s.id===slotId)!,snapshot=slot.snapshots.find(s=>s.id===snapshotId)!;
+  return {slotId,snapshotId,digest:snapshot.digest,snapshotName:snapshot.name,slotName:slot.name};
+}
+test('replace a chosen permanent save with live data, fresh identity, and atomic session head',async()=>{
+  const {d}=driver(),store=createSlotSaveStore(d,game);
+  const old=await store.create('Old'),oldSession=(await store.open(old)).session;
+  const previous=await store.manualSave(oldSession,'Before boss','old');
+  const auto=await store.autosave(oldSession,'old auto');
+  const slot=await store.create('Current'),session=(await store.open(slot)).session;
+  const other=await store.manualSave(session,'Another','other');
+  const target=confirmed(await store.list(),old,previous);
+  const next=await store.replaceManualSave(session,target,'live');
+  assert.notEqual(next,previous);
+  const result=await store.list();
+  assert.equal(result.selectedSlotId,slot);
+  assert.equal(result.slots[0].headId,auto);
+  assert.equal(result.slots[1].headId,next);
+  assert.ok(result.slots[1].snapshots.some(s=>s.id===other));
+  assert.equal(result.slots[1].snapshots.find(s=>s.id===next)?.name,'Before boss');
+  assert.equal((await decodeCloudSnapshot(await store.exportCloudSnapshot(slot,next))).snapshot.data,'live');
+  assert.equal((await store.open(slot)).data,'live');
+  await assert.rejects(store.exportCloudSnapshot(old,previous),/SAVE_SNAPSHOT_NOT_FOUND/);
+  await assert.rejects(store.deletePermanentSave(target),/SAVE_SNAPSHOT_NOT_FOUND/);
+});
+test('local deletion and replacement guard active head, autosaves, legacy, stale confirmation and stale sessions',async()=>{
+  const {d,records}=driver(),store=createSlotSaveStore(d,game),slot=await store.create('Run');
+  const {session}=await store.open(slot);
+  const auto=await store.autosave(session,'auto');
+  const older=await store.manualSave(session,'Older','older');
+  const active=await store.manualSave(session,'Current','current');
+  const list=await store.list();
+  const target=confirmed(list,slot,older),protectedTarget=confirmed(list,slot,auto);
+  const activeTarget=confirmed(list,slot,active);
+  await assert.rejects(store.deletePermanentSave(activeTarget),/ACTIVE_SAVE_PROTECTED/);
+  await assert.rejects(store.deletePermanentSave(protectedTarget),/SAVE_PROTECTED/);
+  await assert.rejects(store.replaceManualSave(session,protectedTarget,'new'),/SAVE_PROTECTED/);
+  await store.renameSnapshot(slot,older,'Renamed');
+  const before=[...records.values()][0];
+  await assert.rejects(store.deletePermanentSave(target),/SAVE_SNAPSHOT_CHANGED/);
+  await assert.rejects(store.replaceManualSave(session,target,'new'),/SAVE_SNAPSHOT_CHANGED/);
+  assert.equal([...records.values()][0],before);
+  const current=(await store.open(slot)).session;
+  const fresh=confirmed(await store.list(),slot,older);
+  await assert.rejects(store.replaceManualSave(session,fresh,'stale'),/STALE_SAVE_SESSION/);
+  const updated=await store.replaceManualSave(current,activeTarget,'new current');
+  await store.deletePermanentSave(fresh);
+  const remaining=(await store.list()).slots[0];
+  assert.equal(remaining.headId,updated);
+  assert.deepEqual(remaining.snapshots.map(s=>s.id),[auto,updated]);
+  const autoOnly=createSlotSaveStore(d,{...game,capabilities:{mode:'auto',schemaVersion:1}});
+  await assert.rejects(autoOnly.replaceManualSave(current,confirmed(await store.list(),slot,updated),'fake'),/MANUAL_SAVE_UNSUPPORTED/);
+});

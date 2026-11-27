@@ -1,7 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {Button,Input,Label,TextField} from '@heroui/react';
-import type {SlotListing} from '@slopboy/runtime/save-slots';
+import type {SlotListing,ConfirmedSaveTarget} from '@slopboy/runtime/save-slots';
 import PlayerCloudSaves,{type PlayerCloudActions} from './PlayerCloudSaves';
 import {saveEntries,saveDate,nextSaveSort,SAVE_SORT_LABELS,type SaveSort,type SaveLane} from './player-save-list';
 
@@ -12,20 +12,24 @@ export type SaveManagerAction=
   | {kind:'rename-slot';slotId:string;name:string}
   | {kind:'rename-snapshot';slotId:string;snapshotId:string;name:string}
   | {kind:'backup-snapshot';slotId:string;snapshotId:string;name:string}
-  | {kind:'manual';name:string};
-type NamedAction=Exclude<SaveManagerAction,{kind:'load-snapshot'}|{kind:'legacy'}|{kind:'create'}>;
+  | {kind:'manual';name:string}
+  | {kind:'replace-manual';target:ConfirmedSaveTarget}
+  | {kind:'delete-permanent';target:ConfirmedSaveTarget};
+type DestructiveAction=Extract<SaveManagerAction,{kind:'replace-manual'}|{kind:'delete-permanent'}>;
+type NamedAction=Exclude<SaveManagerAction,{kind:'load-snapshot'}|{kind:'legacy'}|{kind:'create'}|DestructiveAction>;
 export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud}:{
   listing:SlotListing|null;currentSlotId:string|null;legacyAvailable:boolean;schema:number;
   busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;
 }){
   const [editor,setEditor]=useState<NamedAction|null>(null);
   const [newGame,setNewGame]=useState(false);
+  const [confirmation,setConfirmation]=useState<{action:DestructiveAction;name:string;date:string}|null>(null);
   const [tab,setTab]=useState<SaveLane|'cloud'>(autoSupported?'auto':'manual');
   const [query,setQuery]=useState('');
   const [sort,setSort]=useState<SaveSort>('newest');
   const [details,setDetails]=useState<string|null>(null);
   const rows=tab==='cloud'?[]:saveEntries(listing,currentSlotId,tab,query,sort);
-  const changeTab=(next:SaveLane|'cloud')=>{setTab(next);setEditor(null);setNewGame(false);setQuery('');setDetails(null);};
+  const changeTab=(next:SaveLane|'cloud')=>{setTab(next);setEditor(null);setNewGame(false);setConfirmation(null);setQuery('');setDetails(null);};
   const autos=saveEntries(listing,currentSlotId,'auto','','newest').length;
   const manuals=saveEntries(listing,currentSlotId,'manual','','newest').length;
   return <section className="v2-save-manager sb-heroui-live" aria-label="Game saves" data-testid="player-save-manager">
@@ -39,8 +43,8 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
     </div>
     {tab==='cloud'&&cloud?<PlayerCloudSaves cloud={cloud} local={listing} schema={schema} busy={busy}/>:!listing?<p>Loading saves…</p>:<>
       <div className="v2-save-manager-actions">
-        {tab==='manual'&&manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>{setNewGame(false);setEditor({kind:'manual',name:'Manual save'});}}>New save</Button>}
-        <Button size="sm" variant="secondary" isDisabled={busy} data-testid="new-playthrough" onPress={()=>{setEditor(null);setNewGame(true);}}>New game</Button>
+        {tab==='manual'&&manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>{setConfirmation(null);setNewGame(false);setEditor({kind:'manual',name:'Manual save'});}}>New save</Button>}
+        <Button size="sm" variant="secondary" isDisabled={busy} data-testid="new-playthrough" onPress={()=>{setConfirmation(null);setEditor(null);setNewGame(true);}}>New game</Button>
         {legacyAvailable&&currentSlotId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>void onAction({kind:'legacy'})}>Load original save</Button>}
       </div>
       {newGame&&<div className="v2-save-manager-slot">
@@ -65,6 +69,10 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
       {!rows.length&&<p>{query.trim()?'No matching saves.':tab==='auto'?'No autosaves yet.':'No manual saves or backups yet.'}</p>}
       {rows.map(({slotId,snapshot:s,name,active})=>{
         const compatible=s.schemaVersion===schema&&s.revisionId!==null;
+        const slot=listing.slots.find(item=>item.id===slotId)!;
+        const target:ConfirmedSaveTarget={slotId,snapshotId:s.id,digest:s.digest,snapshotName:s.name,slotName:slot.name};
+        const manageable=s.kind!=='auto'&&s.kind!=='legacy';
+        const confirm=(kind:DestructiveAction['kind'])=>{setEditor(null);setNewGame(false);setConfirmation({action:{kind,target},name,date:saveDate(s.createdAt)});};
         return <article key={s.id} className="v2-save-manager-slot" data-testid="save-snapshot" data-kind={s.kind} data-active={active?'true':'false'}>
           <div className="v2-save-manager-head">
             <div><strong>{name}</strong>{active&&<span> · Current</span>}
@@ -73,12 +81,27 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
             </div>
             <div className="v2-save-manager-actions">
               <Button size="sm" variant="primary" isDisabled={busy||!compatible} data-testid="load-save" onPress={()=>void onAction({kind:'load-snapshot',slotId,snapshotId:s.id})}>Load</Button>
-              {s.kind==='auto'?<Button size="sm" variant="secondary" isDisabled={busy} data-testid="backup-autosave" onPress={()=>{setNewGame(false);setEditor({kind:'backup-snapshot',slotId,snapshotId:s.id,name:'Backup '+saveDate(s.createdAt)});}}>Backup</Button>:
-              <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>{setNewGame(false);setEditor(s.kind==='fork'?{kind:'rename-slot',slotId,name}:{kind:'rename-snapshot',slotId,snapshotId:s.id,name});}}>Rename</Button>}
-              <Button size="sm" variant="secondary" aria-expanded={details===s.id} onPress={()=>setDetails(details===s.id?null:s.id)}>Details</Button>
+              {s.kind==='auto'?<Button size="sm" variant="secondary" isDisabled={busy} data-testid="backup-autosave" onPress={()=>{setConfirmation(null);setNewGame(false);setEditor({kind:'backup-snapshot',slotId,snapshotId:s.id,name:'Backup '+saveDate(s.createdAt)});}}>Backup</Button>:
+              <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>{setConfirmation(null);setNewGame(false);setEditor(s.kind==='fork'?{kind:'rename-slot',slotId,name}:{kind:'rename-snapshot',slotId,snapshotId:s.id,name});}}>Rename</Button>}
+              <Button size="sm" variant="secondary" aria-expanded={details===s.id} isDisabled={busy} data-testid="save-options" onPress={()=>{setConfirmation(null);setDetails(details===s.id?null:s.id);}}>{manageable?'Options':'Details'}</Button>
             </div>
           </div>
-          {details===s.id&&<small data-testid="save-technical-details">{s.releaseVersion?'Game '+s.releaseVersion+' · ':''}Schema {s.schemaVersion} · {s.revisionId?'Revision '+s.revisionId.slice(0,8):'Unknown revision'} · {s.bytes} bytes</small>}
+          {details===s.id&&<div>
+            {manageable&&<div className="v2-save-manager-actions">
+              {manualSupported&&<Button size="sm" variant="secondary" isDisabled={busy||!manualReady} data-testid="replace-save" onPress={()=>confirm('replace-manual')}>Overwrite with current progress</Button>}
+              <Button size="sm" variant="danger" isDisabled={busy||active} data-testid="delete-save" onPress={()=>confirm('delete-permanent')}>Delete</Button>
+              {active&&<small>Load another save before deleting this one.</small>}
+            </div>}
+            <small data-testid="save-technical-details">{s.releaseVersion?'Game '+s.releaseVersion+' · ':''}Schema {s.schemaVersion} · {s.revisionId?'Revision '+s.revisionId.slice(0,8):'Unknown revision'} · {s.bytes} bytes</small>
+          </div>}
+          {confirmation?.action.target.snapshotId===s.id&&<div className="v2-save-manager-slot" role="group" aria-label="Confirm save change">
+            <strong>{confirmation.action.kind==='replace-manual'?'Overwrite':'Delete'} {confirmation.name}?</strong>
+            <p>{confirmation.date}. {confirmation.action.kind==='replace-manual'?'This replaces the selected local save with your current game progress.':'This removes the selected save from this device.'} Other saves and cloud backups are kept.</p>
+            <div className="v2-save-manager-actions">
+              <Button size="sm" variant="danger" isDisabled={busy} data-testid="confirm-save-change" onPress={async()=>{if(await onAction(confirmation.action)){setConfirmation(null);setDetails(null);}}}>{confirmation.action.kind==='replace-manual'?'Overwrite save':'Delete save'}</Button>
+              <Button size="sm" variant="secondary" isDisabled={busy} data-testid="cancel-save-change" onPress={()=>setConfirmation(null)}>Cancel</Button>
+            </div>
+          </div>}
         </article>;
       })}
     </>}

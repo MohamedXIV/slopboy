@@ -37,6 +37,11 @@ export interface SlotSnapshot {
 export interface SaveSlot {
   id:string;name:string;createdAt:number;headId:string|null;snapshots:SlotSnapshot[];
 }
+/** Exact identity observed by the player before destructive local confirmation. */
+export interface ConfirmedSaveTarget {
+  readonly slotId:string;readonly snapshotId:string;readonly digest:string;
+  readonly snapshotName:string;readonly slotName:string;
+}
 export interface SaveSession {
   readonly slotId:string;readonly token:string;readonly revisionId:string;readonly schemaVersion:number;
 }
@@ -110,6 +115,17 @@ function findSlot(r:SlotRecord,slotId:string):SaveSlot{
 }
 function findSnapshot(slot:SaveSlot,snapshotId:string):SlotSnapshot{
   const s=slot.snapshots.find(s=>s.id===snapshotId);if(!s)throw Error('SAVE_SNAPSHOT_NOT_FOUND');return s;
+}
+function confirmedPermanent(r:SlotRecord,target:ConfirmedSaveTarget){
+  const slot=findSlot(r,target.slotId),snapshot=findSnapshot(slot,target.snapshotId);
+  if(snapshot.kind==='auto'||snapshot.kind==='legacy')throw Error('SAVE_PROTECTED');
+  if(snapshot.digest!==target.digest||snapshot.name!==target.snapshotName||slot.name!==target.slotName)
+    throw Error('SAVE_SNAPSHOT_CHANGED');
+  return {slot,snapshot};
+}
+function removePermanent(slot:SaveSlot,snapshot:SlotSnapshot){
+  slot.snapshots=slot.snapshots.filter(s=>s.id!==snapshot.id);
+  if(slot.headId===snapshot.id)slot.headId=slot.snapshots.at(-1)?.id??null;
 }
 /** Upgrade old per-slot autosaves without losing any historical payload.
  * Old timestamps order the initial ring only; new writes use commit order. */
@@ -240,6 +256,32 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
       const next=await prepare(data,'manual',name);
       return mutate(r=>{const slot=assertSession(r,session,game);
         slot.snapshots.push(next);slot.headId=next.id;return next.id;});
+    },
+    /** Replace only the explicitly confirmed permanent save with fresh live
+     * data. Issue a new immutable snapshot identity for cloud comparisons.
+     * The replacement belongs to the current session; other saved states
+     * and the autosave ring are unchanged. All changes commit atomically. */
+    async replaceManualSave(session:SaveSession,target:ConfirmedSaveTarget,data:string):Promise<string>{
+      if(!supportsManualSave(game.capabilities))throw Error('MANUAL_SAVE_UNSUPPORTED');
+      const name=label(target.snapshotName);
+      const next=await prepare(data,'manual',name);
+      return mutate(r=>{
+        const current=assertSession(r,session,game),{slot,snapshot}=confirmedPermanent(r,target);
+        if(snapshot.kind==='fork')next.name=slot.name;
+        removePermanent(slot,snapshot);
+        current.snapshots.push(next);current.headId=next.id;
+        return next.id;
+      });
+    },
+    /** Deletion affects this device only; do not delete the selected head,
+     * autosave ring or legacy recovery data. */
+    async deletePermanentSave(target:ConfirmedSaveTarget):Promise<void>{
+      enabled();
+      await mutate(r=>{
+        const {slot,snapshot}=confirmedPermanent(r,target);
+        if(r.active?.slotId===slot.id&&slot.headId===snapshot.id)throw Error('ACTIVE_SAVE_PROTECTED');
+        removePermanent(slot,snapshot);
+      });
     },
     /** Copy an existing head without pretending this is a live manual save. */
     async backupHead(session:SaveSession,name:string):Promise<string>{
