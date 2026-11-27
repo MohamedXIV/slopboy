@@ -34,6 +34,14 @@ export function cloudCompatibility(row:CloudRow,identity:CloudSnapshotIdentity,s
   if(row.hardwareId!==identity.hardwareId+'@'+identity.hardwareVersion||row.schemaVersion!==schema)return 'Incompatible';
   return row.revisionId?'Compatible':'Unknown compatibility';
 }
+export function exactLocalCloudMatch(row:CloudRow,local:SlotListing|null,identity:CloudSnapshotIdentity):boolean{
+  if(row.hardwareId!==identity.hardwareId+'@'+identity.hardwareVersion)return false;
+  const slot=local?.slots.find(s=>s.id===row.slotId);
+  const s=slot?.snapshots.find(s=>s.id===row.snapshotId);
+  return Boolean(slot&&s&&slot.name===row.slotName&&s.name===row.snapshotName&&s.kind===row.kind&&
+    s.digest===row.payloadDigest&&s.bytes===row.payloadBytes&&s.schemaVersion===row.schemaVersion&&
+    s.revisionId===row.revisionId&&s.releaseVersion===row.releaseVersion&&s.createdAt===row.snapshotCreatedAt);
+}
 export function localComparison(row:CloudRow,local:SlotListing|null){
   const slot=local?.slots.find(s=>s.id===row.slotId);
   if(!slot)return {status:'different-slot' as const,slot:null,head:null};

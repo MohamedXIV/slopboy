@@ -323,8 +323,7 @@ async function main(){
     await evalJs("document.querySelector('[data-testid=sort-saves]').click();true");
     await waitSave("document.querySelector('[data-testid=sort-saves]')?.textContent==='Oldest first'",'Sort order did not change');
     // Disabled real API must not block local play or falsely acknowledge a cloud write.
-    await evalJs("document.querySelector('[data-testid=open-cloud-saves]').click();true");
-    await waitSave("!!document.querySelector('[data-testid=refresh-cloud-saves]')",'Cloud tab not available');
+    await waitSave("!!document.querySelector('[data-testid=refresh-cloud-saves]')",'Integrated cloud controls unavailable');
     await evalJs("document.querySelector('[data-testid=refresh-cloud-saves]').click();true");
     await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent.includes('unavailable')===true",'Disabled cloud API did not fail closed');
     // Mock only the HTTP boundary; export/import and IndexedDB remain real.
@@ -346,9 +345,16 @@ async function main(){
       return respond({snapshots:f?[f.row]:[],usedBytes:f?.row.bytes??0});
     };return true;})()`);
     await evalJs("document.querySelector('[data-testid=refresh-cloud-saves]').click();true");
-    await waitSave("!!document.querySelector('[data-testid=upload-local-snapshot]')",'Cloud local snapshot picker missing');
-    await evalJs("document.querySelector('[data-testid=upload-local-snapshot]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=save-snapshot][data-kind=backup] [data-testid=upload-local-snapshot]')",'Inline cloud backup missing');
+    await evalJs("document.querySelector('[data-testid=save-snapshot][data-kind=backup] [data-testid=upload-local-snapshot]').click();true");
     await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent==='Cloud backup saved.'",'Cloud upload acknowledgement missing');
+    await waitSave("document.querySelector('[data-testid=save-snapshot][data-kind=backup] [data-testid=save-location]')?.textContent==='On this device + cloud'",'Exact cloud match not shown');
+    if(await evalJs("!!document.querySelector('[data-testid=cloud-snapshot]')")===true)throw Error('Matched cloud save duplicated');
+    await evalJs("document.querySelector('[data-testid=save-snapshot][data-kind=backup] [data-testid=save-options]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=delete-save]:not(:disabled)')",'Local backup deletion unavailable');
+    await evalJs("document.querySelector('[data-testid=delete-save]').click();true");
+    await evalJs("document.querySelector('[data-testid=confirm-save-change]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=cloud-snapshot]')&&!document.querySelector('[data-testid=save-snapshot][data-kind=backup]')",'Remote copy missing after local deletion');
     await evalJs("document.querySelector('[data-testid=select-cloud-restore]').click();true");
     await waitSave("!!document.querySelector('[data-testid=keep-both-cloud]')",'Explicit restore confirmation missing');
     await evalJs("document.querySelector('[data-testid=keep-both-cloud]').click();true");
