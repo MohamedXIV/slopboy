@@ -1,5 +1,5 @@
 'use client';
-import {useState} from 'react';
+import {useState,type ReactNode} from 'react';
 import {Button,Input,Label,TextField} from '@heroui/react';
 import type {SlotListing,ConfirmedSaveTarget} from '@slopboy/runtime/save-slots';
 import {usePlayerCloudSaves,CloudSaveControls,CloudRestoreConfirmation,type PlayerCloudActions} from './PlayerCloudSaves';
@@ -19,9 +19,9 @@ export type SaveManagerAction=
   | {kind:'delete-permanent';target:ConfirmedSaveTarget};
 type DestructiveAction=Extract<SaveManagerAction,{kind:'replace-manual'}|{kind:'delete-permanent'}>;
 type NamedAction=Exclude<SaveManagerAction,{kind:'load-snapshot'}|{kind:'legacy'}|{kind:'create'}|DestructiveAction>;
-export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud}:{
+export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud,syncControls}:{
   listing:SlotListing|null;currentSlotId:string|null;legacyAvailable:boolean;schema:number;
-  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;
+  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;syncControls?:ReactNode;
 }){
   const [editor,setEditor]=useState<NamedAction|null>(null);
   const [newGame,setNewGame]=useState(false);
@@ -44,6 +44,7 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
       <Button size="sm" variant={tab==='manual'?'primary':'secondary'} aria-pressed={tab==='manual'} isDisabled={busy} data-testid="open-manual-saves" onPress={()=>changeTab('manual')}>Manual saves ({manuals})</Button>
     </div>
     {cloud&&<CloudSaveControls state={cloudState} busy={busy}/>}
+    {syncControls}
     {!listing?<p>Loading saves…</p>:<>
       <div className="v2-save-manager-actions">
         {tab==='manual'&&manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>{setConfirmation(null);setNewGame(false);setEditor({kind:'manual',name:'Manual save'});}}>New save</Button>}

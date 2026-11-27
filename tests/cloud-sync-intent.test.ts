@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCloudSyncIntent,SYNC_RETRY_MS,type SyncScope} from '../packages/runtime/src/cloud-sync-intent.ts';
+import {createCloudSyncIntent,getCloudSyncDeviceId,SYNC_RETRY_MS,SYNC_CYCLE_MS,type SyncScope} from '../packages/runtime/src/cloud-sync-intent.ts';
 import {encodeCloudSnapshot,CLOUD_SNAPSHOT_FORMAT,cloudSnapshotDigest} from '../packages/runtime/src/cloud-snapshot.ts';
+import {runManagedSyncCycle} from '../apps/web/components/v2/managed-sync-worker.ts';
+import {decodeCloudSnapshot} from '../packages/runtime/src/cloud-snapshot.ts';
 import type {AtomicSaveDriver} from '../packages/runtime/src/save-store.ts';
 
 function driver(){
@@ -65,4 +67,56 @@ test('corruption cannot silently replace a durable intent or claim tampered payl
   records.set(key,'invalid');
   await assert.rejects(a.setEnabled(false),/INVALID_SYNC_INTENT/);
   assert.equal(records.get(key),'invalid');
+});
+
+test('managed cycle checks opt-in, online state, exact ack and account/device headers; retains lost upload bytes',async()=>{
+  const {d}=driver();let now=1000,online=false,active=true,fail=false,requests=0;
+  const intent=createCloudSyncIntent(d,scope,()=>now),first=await payload('first'),second=await payload('second');
+  let latest=first,rows:unknown[]=[],sent:string[]=[];
+  const deps={scope,intent,signal:new AbortController().signal,isActive:()=>active,online:()=>online,
+    latestAutosave:async()=>latest,request:async(url:string,init:RequestInit)=>{
+      requests++;
+      assert.ok(url.endsWith('/cloud-autosaves'));
+      const headers=new Headers(init.headers);
+      assert.equal(headers.get('x-slopboy-sync-account'),scope.accountId);
+      assert.equal(headers.get('x-slopboy-sync-device'),scope.deviceId);
+      if(init.method==='POST'){
+        const raw=String(init.body);sent.push(raw);
+        const v=await decodeCloudSnapshot(raw,scope),s=v.snapshot;
+        rows=[{id:crypto.randomUUID(),slotId:v.slotId,slotName:v.slotName,snapshotId:s.id,snapshotName:s.name,
+          kind:s.kind,revisionId:s.revisionId,releaseVersion:s.releaseVersion,schemaVersion:s.schemaVersion,
+          hardwareId:v.hardwareId+'@'+v.hardwareVersion,snapshotCreatedAt:s.createdAt,payloadBytes:s.bytes,payloadDigest:s.digest,
+          bytes:new TextEncoder().encode(raw).byteLength,digest:await cloudSnapshotDigest(raw),storedAt:new Date().toISOString()}];
+        if(fail)throw Error('lost response');
+      }
+      return Response.json({snapshots:rows,usedBytes:1000});
+    }};
+  const run=()=>runManagedSyncCycle(deps);
+  assert.equal(await run(),'offline');online=true;
+  assert.equal(await run(),'disabled');assert.equal(requests,0);
+  await intent.setEnabled(true);fail=true;
+  assert.equal(await run(),'unavailable');assert.equal((await intent.status()).pending,true);
+  latest=second;fail=false;now+=SYNC_CYCLE_MS-1;
+  assert.equal(await run(),'throttled');
+  now++;assert.equal(await run(),'synced');assert.deepEqual(sent,[first,first]);
+  now+=SYNC_CYCLE_MS;assert.equal(await run(),'synced');assert.deepEqual(sent,[first,first,second]);
+  now+=SYNC_CYCLE_MS;assert.equal(await run(),'idle');assert.equal(sent.length,3);
+  active=false;assert.equal(await run(),'cancelled');
+});
+test('managed cycle rejects wrong acknowledgment and fences opt-out during request',async()=>{
+  const {d}=driver();let now=1000;const intent=createCloudSyncIntent(d,scope,()=>now),raw=await payload('private');
+  await intent.setEnabled(true);
+  const deps={scope,intent,signal:new AbortController().signal,isActive:()=>true,online:()=>true,latestAutosave:async()=>raw,
+    request:async()=>Response.json({snapshots:[],usedBytes:0})};
+  assert.equal(await runManagedSyncCycle(deps),'unavailable');
+  assert.equal((await intent.status()).pending,true);
+  now+=SYNC_CYCLE_MS;
+  assert.equal(await runManagedSyncCycle({...deps,request:async()=>{await intent.setEnabled(false);return Response.json({snapshots:[],usedBytes:0});}}),'cancelled');
+  assert.equal((await intent.status()).pending,true);
+});
+
+test('browser installation identity is atomic, stable across tabs and refuses corruption',async()=>{
+  const {d,records}=driver();const ids=await Promise.all([getCloudSyncDeviceId(d),getCloudSyncDeviceId(d),getCloudSyncDeviceId(d)]);
+  assert.equal(new Set(ids).size,1);assert.equal(await getCloudSyncDeviceId(d),ids[0]);
+  records.set([...records.keys()][0],'bad-device');await assert.rejects(getCloudSyncDeviceId(d),/INVALID_SYNC_DEVICE/);
 });
