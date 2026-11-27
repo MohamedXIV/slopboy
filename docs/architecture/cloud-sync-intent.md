@@ -1,0 +1,9 @@
+# Automatic cloud sync: durable client intent (#36)
+
+This slice is host-only and not connected to the player or network. Existing explicit backups and the local save store are unchanged. The default is off. A later trusted host supplies the verified active account UUID, browser installation UUID and game/hardware identity; the local namespace is not an authorization boundary against a user with browser storage access.
+
+Store at most one exact canonical pending envelope per scope, bounded by the existing transport limit. Do not replace an unresolved digest as autosaves rotate: keep its exact bytes for idempotent retry and derive newer candidates from the current local save list after acknowledgment. No unbounded per-autosave queue. No background upload, cron or paid service. The 60-second local atomic retry lease prevents ordinary duplicate work across tabs; server reservation fencing remains independently required.
+
+Disabling clears the consent generation but retains unresolved bytes; re-enabling creates a new generation, not an automatic upload. Account/device/game changes use separate keys. The eventual network worker must abort stale work and use authenticated account binding on every request, check current consent and online state, and refuse to resume another account's intent. Do not expose this module to game code. Only acknowledge an exact object after authenticated server confirmation and verified storage readback. A local lease is not proof of network completion.
+
+Remaining gates: managed server lane distinct from pinned explicit backups, quota accounting for pending/ready/retired bytes, safe writer fencing and retirement, account-bound API, candidate selection from latest local saves, user consent UI, online/reconnect worker, hosted multi-account/offline acceptance. No auto-sync or provider deletion is enabled by this slice.
