@@ -13,7 +13,10 @@ interface CycleDependencies {
   latestAutosave:()=>Promise<string|null>;
   request:(url:string,init:RequestInit)=>Promise<Response>;
 }
-class SyncResponseError extends Error{constructor(readonly status:number,readonly code:unknown){super('SYNC_RESPONSE');}}
+class SyncResponseError extends Error{
+  readonly status:number;readonly code:unknown;
+  constructor(status:number,code:unknown){super('SYNC_RESPONSE');this.status=status;this.code=code;}
+}
 function exactAck(list:CloudListing,ack:SyncAcknowledgment){
   return list.snapshots.some(row=>row.kind==='auto'&&row.slotId===ack.slotId&&row.snapshotId===ack.snapshotId&&row.digest===ack.digest&&row.bytes===ack.bytes);
 }
