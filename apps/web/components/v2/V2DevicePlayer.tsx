@@ -23,6 +23,7 @@ import OfflineInstallControl from './OfflineInstallControl';
 import {reviewedPixelSaveCapabilities,supportsAutosave,supportsManualSave,supportsProgressSave} from '@slopboy/runtime/save-capabilities';
 import {createSlotSaveStore,type SaveSession,type SlotListing} from '@slopboy/runtime/save-slots';
 import PlayerSaveManager,{type SaveManagerAction} from './PlayerSaveManager';
+import {useManagedSync,ManagedSyncControls} from './ManagedSyncControls';
 import './v2-player.css';
 
 const DEVICE=SLOPBOY_1000; // Explicit v1 compatibility adapter; not a new KAPLAY sandbox.
@@ -64,7 +65,7 @@ const CYCLE_BUTTONS:ReadonlyArray<{name:InputName;label:string;className:string}
 
 const PRESET_ORDER=['clean','lcd','phosphor'] as const;
 
-export default function V2DevicePlayer({game}:{game:PlayableGame}){
+export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:PlayableGame;managedSyncAvailable?:boolean}){
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [saved,setSaved]=useState<{epoch:number;value:string|null;session?:SaveSession}|null>(null);
   const reviewedCapability=useMemo(()=>reviewedPixelSaveCapabilities(game.gameId,game.revisionId),[game.gameId,game.revisionId]);
@@ -78,6 +79,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
     gameId:game.gameId,revisionId:game.revisionId,releaseVersion:null,hardwareId:DEVICE.id,
     hardwareVersion:DEVICE.version,capabilities:capability
   }):null,[game.gameId,game.revisionId,capability]);
+  const sync=useManagedSync(managedSyncAvailable&&game.status==='published'&&supportsAutosave(reviewedCapability),game.gameId,DEVICE.id,DEVICE.version,slotStore);
   const [saveManagerOpen,setSaveManagerOpen]=useState(false);
   const [saveListing,setSaveListing]=useState<SlotListing|null>(null);
   const [legacyAvailable,setLegacyAvailable]=useState(false);
@@ -985,7 +987,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             {saveManagerOpen&&slotStore&&<PlayerSaveManager key={game.gameId+':'+game.revisionId} listing={saveListing} currentSlotId={saved?.session?.slotId??null}
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
               autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
-              onAction={saveAction} onClose={closeSaveManager}
+              onAction={saveAction} onClose={closeSaveManager} syncControls={sync?<ManagedSyncControls state={sync}/>:undefined}
               cloud={game.status==='published'&&supportsProgressSave(reviewedCapability)?{
                 identity:{gameId:game.gameId,hardwareId:DEVICE.id,hardwareVersion:DEVICE.version},withLock:withCloudLock,
                 exportSnapshot:async(slotId,snapshotId)=>{await flushSaves();return slotStore.exportCloudSnapshot(slotId,snapshotId);},

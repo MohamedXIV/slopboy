@@ -5,6 +5,7 @@ import type {AtomicSaveDriver} from './save-store.ts';
 import {cloudSnapshotDigest,decodeCloudSnapshot,CLOUD_SNAPSHOT_MAX_BYTES,type CloudSnapshotIdentity} from './cloud-snapshot.ts';
 
 const FORMAT='slopboy-cloud-sync-intent-v1';
+const DEVICE_KEY='slopboy-cloud-sync-device-v1';
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const PART=/^[a-zA-Z0-9._-]{1,80}$/;
 const SHA=/^[a-f0-9]{64}$/;
@@ -15,6 +16,13 @@ const MAX_RECORD_BYTES=2*CLOUD_SNAPSHOT_MAX_BYTES+4096;
 const bytes=(value:string)=>new TextEncoder().encode(value).byteLength;
 const object=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 const timestamp=(v:unknown):v is number=>typeof v==='number'&&Number.isSafeInteger(v)&&v>=0;
+/** Atomic browser installation identity; never an account credential. */
+export async function getCloudSyncDeviceId(driver:AtomicSaveDriver):Promise<string>{
+  return driver.update(DEVICE_KEY,raw=>{
+    if(raw!==undefined&&(typeof raw!=='string'||!UUID.test(raw)))throw Error('INVALID_SYNC_DEVICE');
+    const value=typeof raw==='string'?raw:crypto.randomUUID();return {value,result:value};
+  });
+}
 export interface SyncScope extends CloudSnapshotIdentity {accountId:string;deviceId:string}
 export interface PendingSync {
   raw:string;digest:string;bytes:number;slotId:string;snapshotId:string;lastAttemptAt:number|null;

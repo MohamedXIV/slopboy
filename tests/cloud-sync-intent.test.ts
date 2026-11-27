@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createCloudSyncIntent,SYNC_RETRY_MS,SYNC_CYCLE_MS,type SyncScope} from '../packages/runtime/src/cloud-sync-intent.ts';
+import {createCloudSyncIntent,getCloudSyncDeviceId,SYNC_RETRY_MS,SYNC_CYCLE_MS,type SyncScope} from '../packages/runtime/src/cloud-sync-intent.ts';
 import {encodeCloudSnapshot,CLOUD_SNAPSHOT_FORMAT,cloudSnapshotDigest} from '../packages/runtime/src/cloud-snapshot.ts';
 import {runManagedSyncCycle} from '../apps/web/components/v2/managed-sync-worker.ts';
 import {decodeCloudSnapshot} from '../packages/runtime/src/cloud-snapshot.ts';
@@ -113,4 +113,10 @@ test('managed cycle rejects wrong acknowledgment and fences opt-out during reque
   now+=SYNC_CYCLE_MS;
   assert.equal(await runManagedSyncCycle({...deps,request:async()=>{await intent.setEnabled(false);return Response.json({snapshots:[],usedBytes:0});}}),'cancelled');
   assert.equal((await intent.status()).pending,true);
+});
+
+test('browser installation identity is atomic, stable across tabs and refuses corruption',async()=>{
+  const {d,records}=driver();const ids=await Promise.all([getCloudSyncDeviceId(d),getCloudSyncDeviceId(d),getCloudSyncDeviceId(d)]);
+  assert.equal(new Set(ids).size,1);assert.equal(await getCloudSyncDeviceId(d),ids[0]);
+  records.set([...records.keys()][0],'bad-device');await assert.rejects(getCloudSyncDeviceId(d),/INVALID_SYNC_DEVICE/);
 });
