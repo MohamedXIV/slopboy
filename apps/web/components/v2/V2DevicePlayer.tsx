@@ -447,8 +447,10 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
       let target:string|undefined;
       switch(action.kind){
         case 'create':target=await slotStore.create(action.name);break;
-        case 'load':target=action.slotId;break;
-        case 'fork':target=await slotStore.fork(action.slotId,action.snapshotId,action.name);break;
+        case 'load-snapshot':{
+          const opened=await slotStore.openSnapshot(action.slotId,action.snapshotId);
+          restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);break;
+        }
         case 'rename-slot':await slotStore.renameSlot(action.slotId,action.name);break;
         case 'rename-snapshot':await slotStore.renameSnapshot(action.slotId,action.snapshotId,action.name);break;
         case 'manual':{
@@ -456,9 +458,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
           const value=await captureLiveSave();
           await slotStore.manualSave(saved.session,action.name,value);break;
         }
-        case 'backup':
-          if(!saved?.session)throw Error('Select a named save first');
-          await slotStore.backupHead(saved.session,action.name);break;
+        case 'backup-snapshot':await slotStore.backupSnapshot(action.slotId,action.snapshotId,action.name);break;
         case 'legacy':{
           const value=await createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game)).read();
           if(value===null)throw Error('Legacy save unavailable');
@@ -471,7 +471,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
         restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
       }
       setSaveListing(await slotStore.list());
-      setSaveNotice(action.kind==='manual'?'Manual save saved on this device.':'Save action completed on this device.');return true;
+      setSaveNotice(action.kind==='manual'?'Game saved.':action.kind==='backup-snapshot'?'Backup saved.':action.kind==='rename-slot'||action.kind==='rename-snapshot'?'Name updated.':'');return true;
     }catch{setSaveNotice('Save action could not complete. Existing saves were retained.');return false;}
     finally{saveActionBusy.current=false;setSaveBusy(false);}
   };
@@ -986,7 +986,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
                   setSaveListing(await slotStore.list());
                   if(activate){signal.throwIfAborted();const opened=await slotStore.open(target);
                     restartWith({value:opened.data,session:opened.session});savePaused.current=false;setSaveManagerOpen(false);
-                    setSaveNotice('Cloud save restored as a separate playthrough.');}
+                    setSaveNotice('Cloud backup restored.');}
                 },
               }:undefined}/>}
             {status !== 'running' && (
@@ -1002,7 +1002,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
           </div>
 
           {slotStore&&<div className="v2-save-current" role="status">
-            Current save: <strong>{saved?.session?saveListing?.slots.find(s=>s.id===saved.session?.slotId)?.name??'Named playthrough':legacyAvailable?'Legacy autosave':'Preparing save…'}</strong>
+            <strong>{saved?.session?autoSupported?'Autosave enabled':'Manual saves':legacyAvailable?'Original save':'Preparing save…'}</strong>
             {saveNotice&&<span> · {saveNotice}</span>}
           </div>}
           <div className="v2-controlbar">
