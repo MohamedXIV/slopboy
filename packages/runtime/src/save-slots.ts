@@ -8,7 +8,7 @@ const FORMAT='slopboy-save-slots-v1';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY_PART=/^[a-zA-Z0-9._-]{1,80}$/;
 // Host storage policies, not imaginary device limits. Reject, never evict named saves.
-export const LOCAL_SLOT_POLICY=Object.freeze({maxPayloadBytes:256*1024,maxRecordBytes:10*1024*1024,maxLabelLength:80});
+export const LOCAL_SLOT_POLICY=Object.freeze({maxPayloadBytes:256*1024,maxRecordBytes:10*1024*1024,maxLabelLength:80,maxAutosaves:5});
 const encoder=new TextEncoder();
 const bytes=(s:string)=>encoder.encode(s).byteLength;
 const id=()=>crypto.randomUUID();
@@ -42,6 +42,8 @@ export interface SaveSession {
 interface SlotRecord {
   format:typeof FORMAT;gameId:string;hardwareId:string;hardwareVersion:string;
   slots:SaveSlot[];active:SaveSession|null;legacyImported:boolean;
+  /** Old records omit this; once written, IDs are in atomic insertion order. */
+  autoOrder?:string[];
 }
 type SnapshotInfo=Omit<SlotSnapshot,'data'>;
 export interface SlotListing {
@@ -56,7 +58,7 @@ function slotRecordKey(game:SlotGame):string{
 }
 function empty(game:SlotGame):SlotRecord{
   return {format:FORMAT,gameId:game.gameId,hardwareId:game.hardwareId,hardwareVersion:game.hardwareVersion,
-    slots:[],active:null,legacyImported:false};
+    slots:[],active:null,legacyImported:false,autoOrder:[]};
 }
 function decode(raw:unknown,game:SlotGame):SlotRecord{
   if(raw===undefined)return empty(game);
@@ -67,7 +69,7 @@ function decode(raw:unknown,game:SlotGame):SlotRecord{
   if(!record(value)||value.format!==FORMAT||value.gameId!==game.gameId||value.hardwareId!==game.hardwareId||
     value.hardwareVersion!==game.hardwareVersion||!Array.isArray(value.slots)||typeof value.legacyImported!=='boolean')
     throw Error('INVALID_SAVE_RECORD');
-  const slots=new Set<string>(),snapshots=new Set<string>();
+  const slots=new Set<string>(),snapshots=new Set<string>(),autos=new Set<string>();
   for(const slot of value.slots){
     if(!record(slot)||!validId(slot.id)||slots.has(slot.id)||!validLabel(slot.name)||!positiveTime(slot.createdAt)||
       !Array.isArray(slot.snapshots))throw Error('INVALID_SAVE_RECORD');
@@ -81,10 +83,18 @@ function decode(raw:unknown,game:SlotGame):SlotRecord{
         !validSchema(s.schemaVersion)||!(s.createdAt===null||positiveTime(s.createdAt))||
         !payload(s.data)||s.bytes!==bytes(s.data)||typeof s.digest!=='string'||!/^[a-f0-9]{64}$/.test(s.digest))
         throw Error('INVALID_SAVE_RECORD');
-      if(s.kind==='auto'&&++autoCount>1)throw Error('INVALID_SAVE_RECORD');
+      if(s.kind==='auto'){
+        if(!Object.hasOwn(value,'autoOrder')&&++autoCount>1)throw Error('INVALID_SAVE_RECORD');
+        autos.add(s.id);
+      }
       snapshots.add(s.id);
     }
     if(slot.headId!==null&&(!validId(slot.headId)||!slot.snapshots.some(s=>s.id===slot.headId)))throw Error('INVALID_SAVE_RECORD');
+  }
+  if(Object.hasOwn(value,'autoOrder')){
+    if(!Array.isArray(value.autoOrder)||value.autoOrder.length>LOCAL_SLOT_POLICY.maxAutosaves||
+      value.autoOrder.length!==autos.size||new Set(value.autoOrder).size!==autos.size||
+      !value.autoOrder.every(entry=>typeof entry==='string'&&autos.has(entry)))throw Error('INVALID_SAVE_RECORD');
   }
   if(value.active!==null){
     const a=value.active;
@@ -98,6 +108,28 @@ function findSlot(r:SlotRecord,slotId:string):SaveSlot{
 }
 function findSnapshot(slot:SaveSlot,snapshotId:string):SlotSnapshot{
   const s=slot.snapshots.find(s=>s.id===snapshotId);if(!s)throw Error('SAVE_SNAPSHOT_NOT_FOUND');return s;
+}
+/** Upgrade old per-slot autosaves without losing any historical payload.
+ * Old timestamps order the initial ring only; new writes use commit order. */
+function ensureAutoOrder(r:SlotRecord):string[]{
+  if(r.autoOrder)return r.autoOrder;
+  const previous=r.slots.flatMap(slot=>slot.snapshots.filter(s=>s.kind==='auto').map(snapshot=>({slot,snapshot})))
+    .sort((a,b)=>(a.snapshot.createdAt??0)-(b.snapshot.createdAt??0));
+  while(previous.length>=LOCAL_SLOT_POLICY.maxAutosaves){
+    const {slot,snapshot}=previous.shift()!;
+    const preserved:SlotSnapshot={...snapshot,id:id(),kind:'backup',name:'Recovered autosave'};
+    slot.snapshots=slot.snapshots.map(s=>s.id===snapshot.id?preserved:s);
+    if(slot.headId===snapshot.id)slot.headId=preserved.id;
+  }
+  return r.autoOrder=previous.map(x=>x.snapshot.id);
+}
+function evictOldestAuto(r:SlotRecord,order:string[]):void{
+  const oldest=order.shift();
+  if(!oldest)throw Error('INVALID_SAVE_RECORD');
+  const slot=r.slots.find(s=>s.snapshots.some(x=>x.id===oldest&&x.kind==='auto'));
+  if(!slot)throw Error('INVALID_SAVE_RECORD');
+  slot.snapshots=slot.snapshots.filter(s=>s.id!==oldest);
+  if(slot.headId===oldest)slot.headId=slot.snapshots.at(-1)?.id??null;
 }
 function assertSession(r:SlotRecord,session:SaveSession,game:SlotGame):SaveSlot{
   const a=r.active;
@@ -178,8 +210,11 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
       const next=await prepare(data,'auto','Autosave');
       return mutate(r=>{
         const slot=assertSession(r,session,game);
-        slot.snapshots=slot.snapshots.filter(s=>s.kind!=='auto');
-        slot.snapshots.push(next);slot.headId=next.id;return next.id;
+        const order=ensureAutoOrder(r);
+        // Retain five writes per game/device, not five per hidden playthrough.
+        // Transaction commit order is stable even when timestamps tie or clocks move.
+        if(order.length===LOCAL_SLOT_POLICY.maxAutosaves)evictOldestAuto(r,order);
+        slot.snapshots.push(next);order.push(next.id);slot.headId=next.id;return next.id;
       });
     },
     /** Input must be freshly captured by the trusted adapter, not the old auto head. */
@@ -196,6 +231,20 @@ export function createSlotSaveStore(driver:AtomicSaveDriver,identity:SlotGame){
         const slot=assertSession(r,session,game);
         if(!slot.headId)throw Error('NO_SAVE_DATA');
         const source=findSnapshot(slot,slot.headId);
+        const next:SlotSnapshot={...source,id:id(),name:nextName,kind:'backup'};
+        slot.snapshots.push(next);return next.id;
+      });
+    },
+    /** Keep a chosen autosave permanently, without activating it or changing its time. */
+    async backupSnapshot(slotId:string,snapshotId:string,name:string):Promise<string>{
+      enabled();const nextName=label(name);
+      const candidate=findSnapshot(findSlot(decode(await driver.get(key),game),slotId),snapshotId);
+      if(candidate.kind!=='auto')throw Error('NOT_AUTOSAVE');
+      await verifySnapshot(candidate);
+      return mutate(r=>{
+        const slot=findSlot(r,slotId),source=findSnapshot(slot,snapshotId);
+        if(source.kind!=='auto'||source.digest!==candidate.digest||source.data!==candidate.data)
+          throw Error('SAVE_SNAPSHOT_CHANGED');
         const next:SlotSnapshot={...source,id:id(),name:nextName,kind:'backup'};
         slot.snapshots.push(next);return next.id;
       });

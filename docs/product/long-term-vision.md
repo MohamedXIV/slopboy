@@ -5,6 +5,8 @@
 **Primary implementation roadmap:** [ROADMAP.md](../../ROADMAP.md). **Architectural core:** ADR-002 → ADR-003 → ADR-004 → ADR-005.  
 **GitHub tracking:** [Project #7](https://github.com/users/MohamedXIV/projects/7), deferred Epic issues [#50–#55](https://github.com/MohamedXIV/slopboy/issues/50), and their execution issues [#56–#67](https://github.com/MohamedXIV/slopboy/issues/56).
 
+**Current save UX direction (#36, owner approved):** conventional separate Autosaves (rolling latest five per game/device) and player-managed manual/permanent backups, with hidden internal session identities, search/sort, per-save cloud backup and optional automatic cloud sync. Local-first; cloud retention and quota-safe reconciliation precede automated sync. See [ADR-006](../architecture/adr-006-game-save-management.md).
+
 **Current (not deferred) AI onboarding UX:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) proposes an open `/ai` page that accepts the player's free-form game idea with **Genre optional** and shares versioned, accurate game authoring constraints with ChatGPT/Claude. This is not a new engine, authenticated connector, social/publishing feature or alternative to secure private-draft gates.
 
 ## Why this exists

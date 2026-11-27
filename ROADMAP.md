@@ -8,6 +8,8 @@
 
 **AI game-idea entry point:** [#102](https://github.com/MohamedXIV/slopboy/issues/102) adds a public `/ai` prompt/guide experience with versioned Markdown/JSON and **optional Genre**. This discoverability track complements #46/#49; it does not bypass OAuth, account-owned drafts, adapter approval, sandboxing or public-review gates. Merged in [PR #106](https://github.com/MohamedXIV/slopboy/pull/106).
 
+**Save UX refinement (#36):** owner-approved flat Autosaves / Manual saves; local rolling five and exact historical autosave backup first, then player UI/search/sort/manual management, then opt-in automatic cloud sync after bounded retention and reconciliation. Existing admin-only cloud QA remains in place. See [ADR-006](docs/architecture/adr-006-game-save-management.md).
+
 ## Locked product direction
 
 - **Framework-based AI games:** new cartridges contain game source written against an **approved, version-pinned engine template** (first KAPLAY candidate, Phaser 4 planned, PixiJS 8 later evaluation); not arbitrary self-contained HTML/CSS/JS websites. An engine-neutral host contract handles input, saves, lifecycle and display. Frameworks do not make uploaded JavaScript trusted. See [ADR-004](docs/architecture/adr-004-approved-game-frameworks.md) and [Epic #43](https://github.com/MohamedXIV/slopboy/issues/43).
