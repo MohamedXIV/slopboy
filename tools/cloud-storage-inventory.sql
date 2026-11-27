@@ -1,6 +1,10 @@
 -- Operator-only metadata export. Run on the reviewed matching DB target.
 -- No writes, payloads, access grants or automatic repair. One MVCC snapshot.
 BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;
+-- Refuse partial inventories after the managed lane exists.
+DO $ BEGIN IF to_regclass('public.managed_auto_snapshots') IS NOT NULL THEN
+ RAISE EXCEPTION 'Use cloud-storage-inventory-managed.sql for schema 012 or later';
+END IF; END $;
 WITH inventory AS (
  SELECT 'legacy' AS lane,id,account_id,game_id,storage_key,byte_size,digest,status,
         b.created_at,b.ready_at,to_jsonb(b)->>'last_attempt_at' AS last_attempt_at

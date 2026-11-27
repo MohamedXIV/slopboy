@@ -37,3 +37,23 @@ test('empty complete inventory is a valid observation, not a cleanup authorizati
   assert.deepEqual(report.counts,{});assert.equal(report.storageObjects,0);
   assert.equal(report.mode,'read-only-observations');
 });
+
+test('managed inventory distinguishes logical retirement from missing live objects and charges all bytes',()=>{
+  const live={...row(1),lane:'managed',retiredAt:null};
+  const retired={...row(2),lane:'managed',retiredAt:recent};
+  const missing={...row(3),lane:'managed',retiredAt:recent};
+  const mismatch={...row(4),lane:'managed',retiredAt:recent};
+  const pending={...row(5,'pending'),lane:'managed',retiredAt:null};
+  const m={...metadata([live,retired,missing,mismatch,pending]),managedIncluded:true};
+  const report=compareCloudInventory(m,storage([object(live.key),object(retired.key),object(mismatch.key,19)]),capture);
+  assert.deepEqual(report.counts,{'ready-size-match':1,'retired-present':1,'retired-missing':1,'retired-size-mismatch':1,'pending-stale-missing':1});
+  assert.equal(report.retiredReservedBytes,60);
+  assert.equal(report.reservedBytes,100);
+  assert.equal(report.integrityVerified,false);
+  assert.equal(report.managedIncluded,true);
+  assert.throws(()=>compareCloudInventory({...m,managedIncluded:false},storage([]),capture));
+  for(const invalid of [{...pending,retiredAt:recent},{...retired,retiredAt:'2026-11-26T10:00:00Z'},{...retired,lane:'named'}, {...live,retiredAt:undefined}]){
+    const fixture=JSON.parse(JSON.stringify({...m,rows:[invalid]}));
+    assert.throws(()=>compareCloudInventory(fixture,storage([]),capture));
+  }
+});
