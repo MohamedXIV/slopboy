@@ -982,7 +982,7 @@ export default function V2DevicePlayer({game}:{game:PlayableGame}){
             )}
 
             {fullscreen&&slotStore&&!saveManagerOpen&&<Button className="v2-fullscreen-saves" size="sm" variant="secondary" isDisabled={saveBusy||!saved} onPress={showSaveManager}>Saves</Button>}
-            {saveManagerOpen&&slotStore&&<PlayerSaveManager listing={saveListing} currentSlotId={saved?.session?.slotId??null}
+            {saveManagerOpen&&slotStore&&<PlayerSaveManager key={game.gameId+':'+game.revisionId} listing={saveListing} currentSlotId={saved?.session?.slotId??null}
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
               autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
               onAction={saveAction} onClose={closeSaveManager}

@@ -19,7 +19,6 @@ export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:bool
   const controller=useRef<AbortController|null>(null);
   useEffect(()=>()=>controller.current?.abort(),[]);
   const endpoint=cloud?'/api/account/games/'+encodeURIComponent(cloud.identity.gameId)+'/cloud-snapshots':null;
-  useEffect(()=>{setList(null);setChoice(null);setNotice('');return()=>controller.current?.abort();},[endpoint]);
   async function request(signal:AbortSignal,options:RequestInit={},id?:string){
     if(!endpoint)throw Error('CLOUD_UNAVAILABLE');
     const response=await fetch(endpoint+(id?'?backupId='+encodeURIComponent(id):''),{
@@ -46,7 +45,7 @@ export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:bool
     }finally{controller.current=null;}
   }
   const refresh=()=>void run(async signal=>{
-    const {value}=await request(signal);setList(parseCloudListing(value));setChoice(null);
+    const {value}=await request(signal);signal.throwIfAborted();setList(parseCloudListing(value));setChoice(null);
   });
   const upload=(slotId:string,snapshotId:string)=>void run(async signal=>{
     if(!cloud)return;
