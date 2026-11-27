@@ -1105,6 +1105,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     assert.equal(await consume(admin),false);
     await executePsql(config,{sql:'UPDATE public.named_cloud_global_budget SET day_window=-1 WHERE singleton'});
     assert.equal(await consume(admin),true);
+    {
     // Owner-only managed lane: no permissions granted to the application.
     const device=randomUUID(),otherDevice=randomUUID();
     const managed=async(query:string)=>JSON.parse((await executePsql(config,{sql:query})).stdout.trim().split('\n').at(-1)!);
@@ -1143,6 +1144,7 @@ test('ephemeral postgres: fresh migration, constraints, seeding, and rollback', 
     // Disposable PostgreSQL test fixture only; never a hosted cleanup path.
     await executePsql(config,{sql:'DELETE FROM public.managed_auto_snapshots'});
 
+    }
     // Each migration rolls back independently. 010 removes only budget/attempt metadata;
     // 009 must still refuse to drop a retained named snapshot.
     await assert.rejects(()=>migrateDown(config,migrationsDir,8),/Named cloud snapshots retained/);
