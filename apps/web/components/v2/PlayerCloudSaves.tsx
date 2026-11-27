@@ -69,18 +69,17 @@ export default function PlayerCloudSaves({cloud,local,schema,busy}:{cloud:Player
       <p data-testid="cloud-usage">{list.snapshots.length} / {CLOUD_GAME_LIMIT} cloud snapshots · {(list.usedBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB / {ACCOUNT_CLOUD_BYTES/1024/1024} MiB account storage</p>
       {!list.snapshots.length&&<p>No cloud saves yet.</p>}
       {list.snapshots.map(row=><article key={row.id} className="v2-save-manager-slot" data-testid="cloud-snapshot">
-        <strong>{row.slotName} · {row.snapshotName}</strong>
-        <p>{row.kind} · {row.releaseVersion?'Game '+row.releaseVersion:'Release version not assigned'} · Schema {row.schemaVersion}</p>
-        <small>{row.revisionId?'Revision '+row.revisionId.slice(0,8):'Unknown revision'} · {cloudCompatibility(row,cloud.identity,schema)}</small>
+        <strong>{row.snapshotName}</strong>
+        {cloudCompatibility(row,cloud.identity,schema)!=='Compatible'&&<small>Cannot load with this game version.</small>}
         <p>{row.snapshotCreatedAt?new Date(row.snapshotCreatedAt).toLocaleString():'Unknown save date'} · Stored {new Date(row.storedAt).toLocaleString()}</p>
-        <Button size="sm" variant="secondary" isDisabled={busy} data-testid="select-cloud-restore" onPress={()=>{setChoice(row);setName((row.slotName+' cloud copy').slice(0,80));setNotice('');}}>Restore</Button>
+        <Button size="sm" variant="secondary" isDisabled={busy} data-testid="select-cloud-restore" onPress={()=>{setChoice(row);setName((row.snapshotName+' cloud copy').slice(0,80));setNotice('');}}>Restore</Button>
       </article>)}
       {choice&&<article className="v2-save-manager-slot" aria-label="Restore cloud save" data-testid="cloud-restore-confirm">
         <h3>{comparison?.status==='conflict'?'Save conflict':'Restore cloud save'}</h3>
         {comparison?.slot&&<p>Local: {comparison.slot.name} · {comparison.head?.name??'No saved progress'} · {comparison.head?.createdAt?new Date(comparison.head.createdAt).toLocaleString():'Unknown date'}</p>}
         <p>Cloud: {choice.slotName} · {choice.snapshotName} · {cloudCompatibility(choice,cloud.identity,schema)}</p>
-        <p>Restoring creates a separate local playthrough; it never replaces the current one.</p>
-        <TextField name="cloudCopyName" isRequired isDisabled={busy}><Label>New playthrough name</Label>
+        <p>Restoring creates a new local save. Your current progress stays safe.</p>
+        <TextField name="cloudCopyName" isRequired isDisabled={busy}><Label>Name of restored save</Label>
           <Input maxLength={80} value={name} onChange={e=>setName(e.target.value)}/></TextField>
         <div className="v2-save-manager-actions">
           <Button size="sm" variant="primary" isDisabled={busy||!name.trim()} data-testid="keep-both-cloud" onPress={()=>restore(false)}>Keep both</Button>
@@ -91,7 +90,7 @@ export default function PlayerCloudSaves({cloud,local,schema,busy}:{cloud:Player
       </article>}
       <h3>Back up a local save</h3>
       {local?.slots.flatMap(slot=>slot.snapshots.map(snapshot=><div key={snapshot.id} className="v2-save-manager-snapshot">
-        <p>{slot.name} · {snapshot.name} · {snapshot.kind}</p>
+        <p>{snapshot.kind==='fork'?slot.name:snapshot.name} · {snapshot.createdAt?new Date(snapshot.createdAt).toLocaleString():'Unknown date'}</p>
         <Button size="sm" variant="secondary" isDisabled={busy} data-testid="upload-local-snapshot" onPress={()=>upload(slot.id,snapshot.id)}>Back up to cloud</Button>
       </div>))}
     </>}

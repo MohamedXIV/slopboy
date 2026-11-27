@@ -309,11 +309,19 @@ async function main(){
     await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
     await waitSave("!!document.querySelector('[data-testid=new-playthrough]')",'Save manager did not list local slots');
     await evalJs("document.querySelector('[data-testid=new-playthrough]').click();true");
-    await waitSave("!!document.querySelector('[data-testid=confirm-save-name]')",'New playthrough editor missing');
-    await evalJs("document.querySelector('[data-testid=confirm-save-name]').click();true");
-    await waitSave("!document.querySelector('[data-testid=player-save-manager]')&&!!document.querySelector('.v2-led.on')&&document.querySelector('.v2-save-current')?.textContent.includes('New playthrough')",'Named playthrough did not boot');
+    await waitSave("!!document.querySelector('[data-testid=confirm-new-game]')",'New game confirmation missing');
+    await evalJs("document.querySelector('[data-testid=confirm-new-game]').click();true");
+    await waitSave("!document.querySelector('[data-testid=player-save-manager]')&&!!document.querySelector('.v2-led.on')",'New game did not boot');
     await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
-    await waitSave("!!document.querySelector('[data-testid=playthrough][data-active=true] [data-testid=save-snapshot]')",'Named autosave not acknowledged');
+    await waitSave("!!document.querySelector('[data-testid=save-snapshot][data-kind=auto][data-active=true]')",'Autosave not acknowledged');
+    if(await evalJs("!!document.querySelector('[data-testid=playthrough]')||!!document.querySelector('[data-testid=save-technical-details]')")===true)throw Error('Internal save groups or technical metadata visible');
+    await evalJs("document.querySelector('[data-testid=save-snapshot][data-kind=auto][data-active=true] [data-testid=backup-autosave]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=confirm-save-name]')",'Autosave backup editor missing');
+    await evalJs("document.querySelector('[data-testid=confirm-save-name]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=save-snapshot][data-kind=backup]')",'Permanent backup missing from manual saves');
+    if(await evalJs("!!document.querySelector('[data-testid=save-snapshot][data-kind=auto]')")===true)throw Error('Autosave leaked into manual list');
+    await evalJs("document.querySelector('[data-testid=sort-saves]').click();true");
+    await waitSave("document.querySelector('[data-testid=sort-saves]')?.textContent==='Oldest first'",'Sort order did not change');
     // Disabled real API must not block local play or falsely acknowledge a cloud write.
     await evalJs("document.querySelector('[data-testid=open-cloud-saves]').click();true");
     await waitSave("!!document.querySelector('[data-testid=refresh-cloud-saves]')",'Cloud tab not available');
@@ -345,8 +353,10 @@ async function main(){
     await waitSave("!!document.querySelector('[data-testid=keep-both-cloud]')",'Explicit restore confirmation missing');
     await evalJs("document.querySelector('[data-testid=keep-both-cloud]').click();true");
     await waitSave("document.querySelector('[data-testid=cloud-save-notice]')?.textContent.includes('active save is unchanged')===true",'Cloud copy not confirmed');
-    await evalJs("window.fetch=window.__originalCloudFetch;Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Local saves').click();true");
-    await waitSave("Array.from(document.querySelectorAll('[data-testid=playthrough]')).some(x=>x.textContent.includes('cloud copy'))&&document.querySelector('[data-testid=active-save-name]')?.textContent==='New playthrough'",'Keep both changed active save or failed to persist copy');
+    await evalJs("window.fetch=window.__originalCloudFetch;document.querySelector('[data-testid=open-manual-saves]').click();true");
+    await waitSave("Array.from(document.querySelectorAll('[data-testid=save-snapshot][data-kind=fork]')).some(x=>x.textContent.includes('cloud copy')&&x.dataset.active==='false')",'Keep both changed active save or failed to persist copy');
+    await evalJs("document.querySelector('[data-testid=open-autosaves]').click();true");
+    await waitSave("!!document.querySelector('[data-testid=save-snapshot][data-kind=auto][data-active=true]')",'Active autosave was not retained');
     await evalJs("Array.from(document.querySelectorAll('[data-testid=player-save-manager] button')).find(b=>b.textContent==='Resume').click();true");
     // Routing cutover: canonical app must not load the legacy layout.
     const navigate=async(path:string,expected:string,expression:string)=>{
@@ -450,6 +460,8 @@ async function main(){
     };
     const capture=async(count:number)=>{
       await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
+      await waitSave("!!document.querySelector('[data-testid=open-manual-saves]')",'Manual saves tab unavailable');
+      await evalJs("document.querySelector('[data-testid=open-manual-saves]').click();true");
       await waitSave("!!document.querySelector('[data-testid=manual-save]')&&!document.querySelector('[data-testid=manual-save]').disabled",'Manual capture unavailable');
       await evalJs("document.querySelector('[data-testid=manual-save]').click();true");
       await waitSave("!!document.querySelector('[data-testid=confirm-save-name]')",'Manual name editor missing');

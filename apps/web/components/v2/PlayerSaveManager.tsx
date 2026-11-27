@@ -3,68 +3,84 @@ import {useState} from 'react';
 import {Button,Input,Label,TextField} from '@heroui/react';
 import type {SlotListing} from '@slopboy/runtime/save-slots';
 import PlayerCloudSaves,{type PlayerCloudActions} from './PlayerCloudSaves';
+import {saveEntries,saveDate,nextSaveSort,SAVE_SORT_LABELS,type SaveSort,type SaveLane} from './player-save-list';
 
 export type SaveManagerAction=
   | {kind:'create';name:string}
-  | {kind:'load';slotId:string}
+  | {kind:'load-snapshot';slotId:string;snapshotId:string}
   | {kind:'legacy'}
   | {kind:'rename-slot';slotId:string;name:string}
   | {kind:'rename-snapshot';slotId:string;snapshotId:string;name:string}
-  | {kind:'backup';name:string}
-  | {kind:'manual';name:string}
-  | {kind:'fork';slotId:string;snapshotId:string;name:string};
-type NamedAction=Exclude<SaveManagerAction,{kind:'load'}|{kind:'legacy'}>;
+  | {kind:'backup-snapshot';slotId:string;snapshotId:string;name:string}
+  | {kind:'manual';name:string};
+type NamedAction=Exclude<SaveManagerAction,{kind:'load-snapshot'}|{kind:'legacy'}|{kind:'create'}>;
 export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud}:{
   listing:SlotListing|null;currentSlotId:string|null;legacyAvailable:boolean;schema:number;
   busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;
 }){
   const [editor,setEditor]=useState<NamedAction|null>(null);
-  const [tab,setTab]=useState<'local'|'cloud'>('local');
-  const current=listing?.slots.find(slot=>slot.id===currentSlotId);
-  const compatible=(s:{revisionId:string|null;schemaVersion:number})=>s.schemaVersion===schema&&s.revisionId!==null;
+  const [newGame,setNewGame]=useState(false);
+  const [tab,setTab]=useState<SaveLane|'cloud'>(autoSupported?'auto':'manual');
+  const [query,setQuery]=useState('');
+  const [sort,setSort]=useState<SaveSort>('newest');
+  const [details,setDetails]=useState<string|null>(null);
+  const rows=tab==='cloud'?[]:saveEntries(listing,currentSlotId,tab,query,sort);
+  const changeTab=(next:SaveLane|'cloud')=>{setTab(next);setEditor(null);setNewGame(false);setQuery('');setDetails(null);};
+  const autos=saveEntries(listing,currentSlotId,'auto','','newest').length;
+  const manuals=saveEntries(listing,currentSlotId,'manual','','newest').length;
   return <section className="v2-save-manager sb-heroui-live" aria-label="Game saves" data-testid="player-save-manager">
-    <header className="v2-save-manager-head"><div><h2>Game saves</h2>
-      <p>Current save: <strong data-testid="active-save-name">{current?.name??(currentSlotId?'Loading…':'Legacy autosave')}</strong></p>
-      <small>{manualSupported&&autoSupported?'Manual + autosave':manualSupported?'Manual save':'Autosave supported'} · Local storage · Save schema {schema}</small></div>
+    <header className="v2-save-manager-head"><h2>Game saves</h2>
       <Button size="sm" variant="secondary" isDisabled={busy} onPress={onClose}>Resume</Button></header>
     {notice&&<p role="status">{notice}</p>}
-    {cloud&&<div className="v2-save-manager-actions" aria-label="Save locations">
-      <Button size="sm" variant={tab==='local'?'primary':'secondary'} aria-pressed={tab==='local'} isDisabled={busy} onPress={()=>setTab('local')}>Local saves</Button>
-      <Button size="sm" variant={tab==='cloud'?'primary':'secondary'} aria-pressed={tab==='cloud'} isDisabled={busy} data-testid="open-cloud-saves" onPress={()=>{setEditor(null);setTab('cloud');}}>Cloud saves</Button>
-    </div>}
-    {tab==='cloud'&&cloud?<PlayerCloudSaves cloud={cloud} local={listing} schema={schema} busy={busy}/>:!listing?<p>Reading local saves…</p>:<>
+    <div className="v2-save-manager-actions" aria-label="Save types">
+      {(autoSupported||autos>0)&&<Button size="sm" variant={tab==='auto'?'primary':'secondary'} aria-pressed={tab==='auto'} isDisabled={busy} data-testid="open-autosaves" onPress={()=>changeTab('auto')}>Autosaves ({autos})</Button>}
+      <Button size="sm" variant={tab==='manual'?'primary':'secondary'} aria-pressed={tab==='manual'} isDisabled={busy} data-testid="open-manual-saves" onPress={()=>changeTab('manual')}>Manual saves ({manuals})</Button>
+      {cloud&&<Button size="sm" variant={tab==='cloud'?'primary':'secondary'} aria-pressed={tab==='cloud'} isDisabled={busy} data-testid="open-cloud-saves" onPress={()=>changeTab('cloud')}>Cloud</Button>}
+    </div>
+    {tab==='cloud'&&cloud?<PlayerCloudSaves cloud={cloud} local={listing} schema={schema} busy={busy}/>:!listing?<p>Loading saves…</p>:<>
       <div className="v2-save-manager-actions">
-        <Button size="sm" variant="primary" isDisabled={busy} data-testid="new-playthrough" onPress={()=>setEditor({kind:'create',name:'New playthrough'})}>New playthrough</Button>
-        {manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>setEditor({kind:'manual',name:'Manual save'})}>Save game</Button>}
-        {autoSupported&&current?.headId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor({kind:'backup',name:'Autosave backup'})}>Back up autosave</Button>}
-        {legacyAvailable&&currentSlotId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>void onAction({kind:'legacy'})}>Load legacy autosave</Button>}
+        {tab==='manual'&&manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>{setNewGame(false);setEditor({kind:'manual',name:'Manual save'});}}>New save</Button>}
+        <Button size="sm" variant="secondary" isDisabled={busy} data-testid="new-playthrough" onPress={()=>{setEditor(null);setNewGame(true);}}>New game</Button>
+        {legacyAvailable&&currentSlotId&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>void onAction({kind:'legacy'})}>Load original save</Button>}
       </div>
-      {editor&&<form onSubmit={async e=>{e.preventDefault();if(!busy&&editor.name.trim()&&await onAction(editor))setEditor(null);}}>
-        <TextField name="saveName" isRequired isDisabled={busy}><Label>Save name</Label>
+      {newGame&&<div className="v2-save-manager-slot">
+        <p>Start a new game? Existing saves are kept.</p>
+        <div className="v2-save-manager-actions"><Button size="sm" isDisabled={busy} data-testid="confirm-new-game" onPress={()=>void onAction({kind:'create',name:'New game'})}>Start new game</Button>
+        <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setNewGame(false)}>Cancel</Button></div>
+      </div>}
+      {editor&&<form onSubmit={async e=>{e.preventDefault();if(!busy&&editor.name.trim()&&await onAction(editor)){
+        if(editor.kind==='backup-snapshot'||editor.kind==='manual')changeTab('manual');else setEditor(null);
+      }}}>
+        <TextField name="saveName" isRequired isDisabled={busy}><Label>{editor.kind==='backup-snapshot'?'Backup name':'Save name'}</Label>
           <Input maxLength={80} value={editor.name} onChange={e=>setEditor({...editor,name:e.target.value})}/></TextField>
-        <div className="v2-save-manager-actions"><Button type="submit" size="sm" isDisabled={busy||!editor.name.trim()} data-testid="confirm-save-name">Confirm</Button>
+        <div className="v2-save-manager-actions"><Button type="submit" size="sm" isDisabled={busy||!editor.name.trim()} data-testid="confirm-save-name">{editor.kind==='rename-slot'||editor.kind==='rename-snapshot'?'Rename':'Save'}</Button>
           <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor(null)}>Cancel</Button></div>
       </form>}
-      {!currentSlotId&&legacyAvailable&&<p>The original autosave remains available. A new playthrough starts separately without replacing it.</p>}
-      {listing.slots.map(slot=>{
-        const head=slot.snapshots.find(s=>s.id===slot.headId);
-        return <article key={slot.id} className="v2-save-manager-slot" data-testid="playthrough" data-active={slot.id===currentSlotId?'true':'false'}>
-          <div className="v2-save-manager-head"><div><strong>{slot.name}</strong>{slot.id===currentSlotId&&<span> · Active save</span>}
-            <p>{head?'Saved progress':'New game'}</p></div>
+      {tab==='auto'&&<small>Only the latest five autosaves are kept. Back up any save to keep it.</small>}
+      {tab==='manual'&&!manualSupported&&<small>Backups from Autosaves appear here. This game saves automatically.</small>}
+      <div className="v2-save-manager-actions">
+        <TextField name="searchSaves"><Label>Search saves</Label><Input data-testid="search-saves" placeholder="Name or date" value={query} onChange={e=>setQuery(e.target.value)}/></TextField>
+        <Button size="sm" variant="secondary" data-testid="sort-saves" aria-label={'Sort: '+SAVE_SORT_LABELS[sort]+'. Change order'} onPress={()=>setSort(nextSaveSort(sort))}>{SAVE_SORT_LABELS[sort]}</Button>
+      </div>
+      {!rows.length&&<p>{query.trim()?'No matching saves.':tab==='auto'?'No autosaves yet.':'No manual saves or backups yet.'}</p>}
+      {rows.map(({slotId,snapshot:s,name,active})=>{
+        const compatible=s.schemaVersion===schema&&s.revisionId!==null;
+        return <article key={s.id} className="v2-save-manager-slot" data-testid="save-snapshot" data-kind={s.kind} data-active={active?'true':'false'}>
+          <div className="v2-save-manager-head">
+            <div><strong>{name}</strong>{active&&<span> · Current</span>}
+              <p data-testid="save-date">{saveDate(s.createdAt)}{s.kind==='backup'?' · Backup':s.kind==='legacy'?' · Original save':s.kind==='fork'?' · Restored copy':''}</p>
+              {!compatible&&<small>Cannot load with this game version.</small>}
+            </div>
             <div className="v2-save-manager-actions">
-              <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor({kind:'rename-slot',slotId:slot.id,name:slot.name})}>Rename</Button>
-              {slot.id!==currentSlotId&&<Button size="sm" variant="secondary" isDisabled={busy||Boolean(head&&!compatible(head))} onPress={()=>void onAction({kind:'load',slotId:slot.id})}>Load</Button>}
-            </div></div>
-          {slot.snapshots.map(s=><div key={s.id} className="v2-save-manager-snapshot" data-testid="save-snapshot" data-kind={s.kind}>
-            <div><strong>{s.name}</strong> · {s.kind}<p>{s.releaseVersion?'Game '+s.releaseVersion:'Release version not assigned'} · Schema {s.schemaVersion}</p>
-              <small>{s.revisionId?'Revision '+s.revisionId.slice(0,8):'Unknown revision'} · {s.schemaVersion!==schema?'Incompatible':s.revisionId?'Compatible':'Unknown compatibility'}</small>
-              <p>{s.createdAt?new Date(s.createdAt).toLocaleString():'Unknown date'} · {s.bytes} bytes</p></div>
-            <div className="v2-save-manager-actions">{s.kind!=='auto'&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>setEditor({kind:'rename-snapshot',slotId:slot.id,snapshotId:s.id,name:s.name})}>Rename</Button>}
-              <Button size="sm" variant="secondary" isDisabled={busy||!compatible(s)} onPress={()=>setEditor({kind:'fork',slotId:slot.id,snapshotId:s.id,name:slot.name+' copy'})}>Load as new playthrough</Button></div>
-          </div>)}
+              <Button size="sm" variant="primary" isDisabled={busy||!compatible} data-testid="load-save" onPress={()=>void onAction({kind:'load-snapshot',slotId,snapshotId:s.id})}>Load</Button>
+              {s.kind==='auto'?<Button size="sm" variant="secondary" isDisabled={busy} data-testid="backup-autosave" onPress={()=>{setNewGame(false);setEditor({kind:'backup-snapshot',slotId,snapshotId:s.id,name:'Backup '+saveDate(s.createdAt)});}}>Backup</Button>:
+              <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>{setNewGame(false);setEditor(s.kind==='fork'?{kind:'rename-slot',slotId,name}:{kind:'rename-snapshot',slotId,snapshotId:s.id,name});}}>Rename</Button>}
+              <Button size="sm" variant="secondary" aria-expanded={details===s.id} onPress={()=>setDetails(details===s.id?null:s.id)}>Details</Button>
+            </div>
+          </div>
+          {details===s.id&&<small data-testid="save-technical-details">{s.releaseVersion?'Game '+s.releaseVersion+' · ':''}Schema {s.schemaVersion} · {s.revisionId?'Revision '+s.revisionId.slice(0,8):'Unknown revision'} · {s.bytes} bytes</small>}
         </article>;
       })}
     </>}
-    <small>{manualSupported?'Manual saves capture the current game state.':'This game does not support live manual capture.'} {autoSupported?'Backups copy the last autosave. ':''}{cloud?'Cloud backups are optional.':'Cloud backups are not available for this revision.'}</small>
   </section>;
 }
