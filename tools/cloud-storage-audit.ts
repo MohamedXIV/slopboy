@@ -19,10 +19,10 @@ const timestamp=(v:unknown):number=>{
   if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(v))throw Error('INVALID_TIMESTAMP');
   const t=Date.parse(v);if(!Number.isFinite(t))throw Error('INVALID_TIMESTAMP');return t;
 };
-type Lane='legacy'|'named';
-type Row={key:string;lane:Lane;status:'ready'|'pending';bytes:number;activity:number};
+type Lane='legacy'|'named'|'managed';
+type Row={key:string;lane:Lane;status:'ready'|'pending';bytes:number;activity:number;retired:boolean};
 type Stored={key:string;bytes:number;modified:number};
-type Category='ready-size-match'|'ready-missing'|'ready-size-mismatch'|'pending-recent'|'pending-stale-present'|'pending-stale-missing'|'pending-stale-size-mismatch'|'orphan-recent'|'orphan-stale'|'unexpected-key';
+type Category='ready-size-match'|'ready-missing'|'ready-size-mismatch'|'pending-recent'|'pending-stale-present'|'pending-stale-missing'|'pending-stale-size-mismatch'|'orphan-recent'|'orphan-stale'|'unexpected-key'|'retired-present'|'retired-missing'|'retired-size-mismatch';
 type Entry={keyRef:string;category:Category;lane:Lane|null;reservedBytes:number;objectBytes:number};
 const keyRef=(key:string)=>createHash('sha256').update(key).digest('hex');
 function parseMetadata(input:unknown){
@@ -34,18 +34,21 @@ function parseMetadata(input:unknown){
       typeof row.gameId!=='string'||!ID.test(row.gameId)||typeof row.id!=='string'||!ID.test(row.id)||
       typeof row.digest!=='string'||!DIGEST.test(row.digest)||
       row.key!=='backups/'+row.accountId+'/'+row.gameId+'/'+row.id+'/'+row.digest+'.json'||
-      (row.lane!=='legacy'&&row.lane!=='named')||(row.status!=='ready'&&row.status!=='pending')||
-      !size(row.bytes,256*1024)||(row.lane==='named'&&row.bytes===0)||rows.has(row.key))
+      (row.lane!=='legacy'&&row.lane!=='named'&&row.lane!=='managed')||(row.status!=='ready'&&row.status!=='pending')||
+      !size(row.bytes,256*1024)||(row.lane!=='legacy'&&row.bytes===0)||rows.has(row.key))
       throw Error('INVALID_OR_DUPLICATE_METADATA');
+    if(row.lane==='managed'&&(input.managedIncluded!==true||!Object.hasOwn(row,'retiredAt')))throw Error('INCOMPLETE_MANAGED_INVENTORY');
+    const retired=row.retiredAt==null?null:timestamp(row.retiredAt);
+    if(retired!==null&&(row.lane!=='managed'||row.status!=='ready'))throw Error('INVALID_RETIREMENT');
     const created=timestamp(row.createdAt);
     const attempted=row.lastAttemptAt==null?created:timestamp(row.lastAttemptAt);
     const ready=row.readyAt===null?null:timestamp(row.readyAt);
     if((row.status==='ready')!==(ready!==null)||attempted<created||
-      (ready!==null&&ready<created)||Math.max(created,attempted,ready??0)>captured)
+      (ready!==null&&ready<created)||(retired!==null&&(ready===null||retired<ready))||Math.max(created,attempted,ready??0,retired??0)>captured)
       throw Error('INVALID_METADATA_TIME');
-    rows.set(row.key,{key:row.key,lane:row.lane,status:row.status,bytes:row.bytes,activity:Math.max(created,attempted,ready??0)});
+    rows.set(row.key,{key:row.key,lane:row.lane,status:row.status,bytes:row.bytes,activity:Math.max(created,attempted,ready??0,retired??0),retired:retired!==null});
   }
-  return {captured,rows};
+  return {captured,rows,managedIncluded:input.managedIncluded===true};
 }
 function parseObjects(input:unknown,captured:number){
   if(!obj(input)||input.IsTruncated!==false||input.Prefix!=='backups/'||input.NextContinuationToken||
@@ -66,7 +69,7 @@ function parseObjects(input:unknown,captured:number){
   return objects;
 }
 export function compareCloudInventory(metadata:unknown,storage:unknown,storageCapturedAt:string){
-  const {captured,rows}=parseMetadata(metadata),storageCaptured=timestamp(storageCapturedAt);
+  const {captured,rows,managedIncluded}=parseMetadata(metadata),storageCaptured=timestamp(storageCapturedAt);
   if(Math.abs(captured-storageCaptured)>MAX_CAPTURE_SKEW_MS)throw Error('INVENTORY_CAPTURE_SKEW');
   const objects=parseObjects(storage,storageCaptured);
   const cutoff=Math.min(captured,storageCaptured)-STALE_AFTER_MS;
@@ -74,7 +77,8 @@ export function compareCloudInventory(metadata:unknown,storage:unknown,storageCa
   for(const [key,row] of rows){
     const stored=objects.get(key);
     let category:Category;
-    if(row.status==='ready')category=!stored?'ready-missing':stored.bytes!==row.bytes?'ready-size-mismatch':'ready-size-match';
+    if(row.retired)category=!stored?'retired-missing':stored.bytes!==row.bytes?'retired-size-mismatch':'retired-present';
+    else if(row.status==='ready')category=!stored?'ready-missing':stored.bytes!==row.bytes?'ready-size-mismatch':'ready-size-match';
     else if(Math.max(row.activity,stored?.modified??0)>cutoff)category='pending-recent';
     else category=!stored?'pending-stale-missing':stored.bytes!==row.bytes?'pending-stale-size-mismatch':'pending-stale-present';
     entries.push({keyRef:keyRef(key),category,lane:row.lane,reservedBytes:row.bytes,objectBytes:stored?.bytes??0});
@@ -89,7 +93,8 @@ export function compareCloudInventory(metadata:unknown,storage:unknown,storageCa
   for(const entry of entries)counts[entry.category]=(counts[entry.category]??0)+1;
   return {format:'slopboy-cloud-inventory-audit-v1',mode:'read-only-observations',integrityVerified:false,
     capturedAt:new Date(captured).toISOString(),storageCapturedAt:new Date(storageCaptured).toISOString(),
-    metadataRows:rows.size,storageObjects:objects.size,
+    metadataRows:rows.size,storageObjects:objects.size,managedIncluded,
+    retiredReservedBytes:[...rows.values()].filter(row=>row.retired).reduce((n,row)=>n+row.bytes,0),
     reservedBytes:entries.reduce((n,e)=>n+e.reservedBytes,0),
     observedObjectBytes:entries.reduce((n,e)=>n+e.objectBytes,0),
     counts,entries};
