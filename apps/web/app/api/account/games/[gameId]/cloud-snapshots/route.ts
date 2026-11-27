@@ -8,7 +8,7 @@ import {handleNamedCloud,namedCloudEnabled,type NamedCloudDependencies} from '@/
 export const dynamic='force-dynamic';
 export const runtime='nodejs';
 type Context={params:Promise<{gameId:string}>};
-function dependencies():NamedCloudDependencies{
+function dependencies(expectedAccount:string|null):NamedCloudDependencies{
   const sql=()=>{
     if(!process.env.DATABASE_URL)throw Error('DATABASE_UNAVAILABLE');
     return neon(process.env.DATABASE_URL);
@@ -17,7 +17,7 @@ function dependencies():NamedCloudDependencies{
   return {
     enabled:()=>namedCloudEnabled(process.env)&&cloudStorageReady(),
     subject:async()=>{verified=await currentSubject();return verified;},
-    role:async actor=>verified&&verified.id===actor.id?(await readProfile(verified))?.role:null,
+    role:async actor=>verified&&verified.id===actor.id&&(!expectedAccount||expectedAccount===actor.id.toLowerCase())?(await readProfile(verified))?.role:null,
     game:readPlayableGame,
     consumeRequest:async account=>{
       const [row]=await sql()`SELECT public.consume_named_cloud_request(${account}::uuid) AS allowed`;
@@ -43,7 +43,7 @@ function dependencies():NamedCloudDependencies{
   };
 }
 async function snapshots(request:Request,{params}:Context){
-  return handleNamedCloud(request,(await params).gameId,dependencies());
+  return handleNamedCloud(request,(await params).gameId,dependencies(request.headers.get('x-slopboy-sync-account')));
 }
 export const GET=snapshots;
 export const POST=snapshots;

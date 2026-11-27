@@ -8,6 +8,7 @@ import {ACCOUNT_CLOUD_BYTES,CLOUD_GAME_LIMIT,parseCloudListing,localComparison,c
 
 export interface PlayerCloudActions {
   identity:CloudSnapshotIdentity;
+  expectedAccount?:string;
   withLock:(work:()=>Promise<void>)=>Promise<void>;
   exportSnapshot:(slotId:string,snapshotId:string)=>Promise<string>;
   importSnapshot:(raw:string,name:string,activate:boolean,signal:AbortSignal)=>Promise<void>;
@@ -21,8 +22,10 @@ export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:bool
   const endpoint=cloud?'/api/account/games/'+encodeURIComponent(cloud.identity.gameId)+'/cloud-snapshots':null;
   async function request(signal:AbortSignal,options:RequestInit={},id?:string){
     if(!endpoint)throw Error('CLOUD_UNAVAILABLE');
+    const headers=new Headers(options.headers);
+    if(cloud?.expectedAccount)headers.set('x-slopboy-sync-account',cloud.expectedAccount);
     const response=await fetch(endpoint+(id?'?backupId='+encodeURIComponent(id):''),{
-      ...options,signal,cache:'no-store',credentials:'same-origin',
+      ...options,headers,signal,cache:'no-store',credentials:'same-origin',
     });
     const value:unknown=await response.json().catch(()=>null);
     if(!response.ok){
