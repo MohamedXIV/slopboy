@@ -18,14 +18,20 @@ export function saveEntries(list:SlotListing|null,activeSlotId:string|null,lane:
     slotId:slot.id,snapshot,name:snapshot.kind==='fork'?slot.name:snapshot.name,
     active:slot.id===activeSlotId&&slot.headId===snapshot.id,
   })))??[];
+  return filterAndSortSaves(rows,query,sort,row=>row.snapshot.createdAt);
+}
+/** Shared search/order across both local and remote-only entries. */
+export function filterAndSortSaves<T extends {name:string}>(rows:T[],query:string,sort:SaveSort,date:(row:T)=>number|null):T[]{
   const q=query.trim().toLocaleLowerCase();
-  return rows.filter(row=>!q||[row.name,saveDate(row.snapshot.createdAt),knownDate(row.snapshot.createdAt)?new Date(row.snapshot.createdAt).toISOString():''].some(v=>v.toLocaleLowerCase().includes(q)))
-    .sort((a,b)=>{
-      const at=knownDate(a.snapshot.createdAt)?a.snapshot.createdAt:null,bt=knownDate(b.snapshot.createdAt)?b.snapshot.createdAt:null;
-      if(sort==='name'){const diff=a.name.localeCompare(b.name);if(diff)return diff;}
-      if(at===null||bt===null)return at===bt?0:at===null?1:-1;
-      return sort==='oldest'?at-bt:bt-at;
-    });
+  return rows.filter(row=>{
+    const at=date(row);
+    return !q||[row.name,saveDate(at),knownDate(at)?new Date(at).toISOString():''].some(v=>v.toLocaleLowerCase().includes(q));
+  }).sort((a,b)=>{
+    const ad=date(a),bd=date(b),at=knownDate(ad)?ad:null,bt=knownDate(bd)?bd:null;
+    if(sort==='name'){const diff=a.name.localeCompare(b.name);if(diff)return diff;}
+    if(at===null||bt===null)return at===bt?0:at===null?1:-1;
+    return sort==='oldest'?at-bt:bt-at;
+  });
 }
 export const SAVE_SORT_LABELS:Record<SaveSort,string>={newest:'Newest first',oldest:'Oldest first',name:'Name A–Z'};
 export function nextSaveSort(sort:SaveSort):SaveSort{
