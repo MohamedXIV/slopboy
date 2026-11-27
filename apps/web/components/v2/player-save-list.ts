@@ -5,8 +5,11 @@ type Slot=SlotListing['slots'][number];
 export interface SaveListEntry {
   slotId:string; snapshot:Slot['snapshots'][number]; name:string; active:boolean;
 }
+function knownDate(timestamp:number|null):timestamp is number{
+  return timestamp!==null&&Number.isFinite(new Date(timestamp).getTime());
+}
 export function saveDate(timestamp:number|null):string{
-  return timestamp===null?'Unknown date':new Date(timestamp).toLocaleString(undefined,{
+  return !knownDate(timestamp)?'Unknown date':new Date(timestamp).toLocaleString(undefined,{
     year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',
   });
 }
@@ -16,9 +19,9 @@ export function saveEntries(list:SlotListing|null,activeSlotId:string|null,lane:
     active:slot.id===activeSlotId&&slot.headId===snapshot.id,
   })))??[];
   const q=query.trim().toLocaleLowerCase();
-  return rows.filter(row=>!q||[row.name,saveDate(row.snapshot.createdAt),row.snapshot.createdAt===null?'':new Date(row.snapshot.createdAt).toISOString()].some(v=>v.toLocaleLowerCase().includes(q)))
+  return rows.filter(row=>!q||[row.name,saveDate(row.snapshot.createdAt),knownDate(row.snapshot.createdAt)?new Date(row.snapshot.createdAt).toISOString():''].some(v=>v.toLocaleLowerCase().includes(q)))
     .sort((a,b)=>{
-      const at=a.snapshot.createdAt,bt=b.snapshot.createdAt;
+      const at=knownDate(a.snapshot.createdAt)?a.snapshot.createdAt:null,bt=knownDate(b.snapshot.createdAt)?b.snapshot.createdAt:null;
       if(sort==='name'){const diff=a.name.localeCompare(b.name);if(diff)return diff;}
       if(at===null||bt===null)return at===bt?0:at===null?1:-1;
       return sort==='oldest'?at-bt:bt-at;

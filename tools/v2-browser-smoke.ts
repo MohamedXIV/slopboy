@@ -460,6 +460,8 @@ async function main(){
     };
     const capture=async(count:number)=>{
       await evalJs("document.querySelector('[data-testid=open-game-saves]').click();true");
+      await waitSave("!!document.querySelector('[data-testid=open-manual-saves]')",'Manual saves tab unavailable');
+      await evalJs("document.querySelector('[data-testid=open-manual-saves]').click();true");
       await waitSave("!!document.querySelector('[data-testid=manual-save]')&&!document.querySelector('[data-testid=manual-save]').disabled",'Manual capture unavailable');
       await evalJs("document.querySelector('[data-testid=manual-save]').click();true");
       await waitSave("!!document.querySelector('[data-testid=confirm-save-name]')",'Manual name editor missing');
