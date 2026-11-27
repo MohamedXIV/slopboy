@@ -65,7 +65,9 @@ export function eligibleSnapshot(value:CloudSnapshot,game:CloudGame):boolean {
   return supportsProgressSave(source)&&source?.schemaVersion===s.schemaVersion&&
     (s.kind!=='auto'||supportsAutosave(source))&&(s.kind!=='manual'||supportsManualSave(source));
 }
-export async function handleNamedCloud(request:Request,gameId:string,deps:NamedCloudDependencies):Promise<Response>{
+export type ManagedCloudScope={expectedAccount:string;deviceId:string};
+export function managedCloudEnabled(env:Readonly<Record<string,string|undefined>>):boolean{return env.CLOUD_MANAGED_AUTOSAVES_ENABLED==='1';}
+export async function handleNamedCloud(request:Request,gameId:string,deps:NamedCloudDependencies,managed?:ManagedCloudScope):Promise<Response>{
   try{
     if(!deps.enabled())return error('NOT_FOUND',404);
     const create=request.method==='POST';
@@ -79,6 +81,8 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
     if(!actor.emailVerified)return error('FORBIDDEN',403);
     if(!isGameUuid(gameId)||!isGameUuid(actor.id))return error('NOT_FOUND',404);
     const account=actor.id.toLowerCase(),gameKey=gameId.toLowerCase();
+    if(managed&&(!isGameUuid(managed.expectedAccount)||!isGameUuid(managed.deviceId)||managed.expectedAccount.toLowerCase()!==account))
+      return error('SYNC_SCOPE_MISMATCH',403);
     if(await deps.role(actor)!=='admin')return error('NOT_FOUND',404);
     if(!await deps.consumeRequest(account))return Response.json({error:'CLOUD_RATE_LIMIT'},{status:429,headers:{
       'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
@@ -116,7 +120,7 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
       bytes=await readBoundedBytes(request,CLOUD_SNAPSHOT_MAX_BYTES);
       const raw=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
       value=await decodeCloudSnapshot(raw,identity);
-      if(!eligibleSnapshot(value,game))throw Error('UNREVIEWED_SAVE');
+      if(!eligibleSnapshot(value,game)||(managed&&value.snapshot.kind!=='auto'))throw Error('UNREVIEWED_SAVE');
     }catch{return error('INVALID_SAVE',400);}
     const digest=hash(bytes);
     const reserved=await deps.reserve(account,gameKey,digest,bytes.byteLength,snapshotMetadata(value));
@@ -125,6 +129,7 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
     if(reserved.outcome==='invalid')return error('INVALID_SAVE',400);
     if(reserved.outcome==='quota')return error('BACKUP_QUOTA',409);
     if(reserved.outcome==='in_progress')return error('BACKUP_IN_PROGRESS',409);
+    if(managed&&reserved.outcome==='retired')return error('AUTOSAVE_RETIRED',409);
     if(reserved.outcome==='replayed')return listing(reserved);
     if(!['reserved','resumed'].includes(reserved.outcome)||!reserved.backupId||!reserved.storageKey)return error('UNAVAILABLE',503);
     const {storageKey,backupId}=reserved;

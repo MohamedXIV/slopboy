@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {GAMES} from '../packages/catalog/src/index.ts';
 import {encodeCloudSnapshot,cloudSnapshotDigest,CLOUD_SNAPSHOT_FORMAT} from '../packages/runtime/src/cloud-snapshot.ts';
-import {handleNamedCloud,namedCloudEnabled,type NamedCloudDependencies} from '../apps/web/server/named-cloud-api.ts';
+import {handleNamedCloud,namedCloudEnabled,managedCloudEnabled,type NamedCloudDependencies} from '../apps/web/server/named-cloud-api.ts';
 
 const game=GAMES[2],a='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',b='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -91,4 +91,24 @@ test('rate denial precedes game/storage access and fails closed',async()=>{
   h.deps.consumeRequest=async()=>{throw Error('database unavailable');};
   assert.equal((await handleNamedCloud(post(raw),game.gameId,h.deps)).status,503);
   assert.deepEqual(h.counts(),{uploads:0,reserves:0});
+});
+
+test('managed autosave requests bind the active authenticated account before reservation or listing',async()=>{
+  assert.equal(managedCloudEnabled({}),false);
+  assert.equal(managedCloudEnabled({CLOUD_MANAGED_AUTOSAVES_ENABLED:'1'}),true);
+  const h=harness(),raw=await encodeCloudSnapshot(await envelope()),scope={expectedAccount:a,deviceId:id};
+  const run=(request:Request)=>handleNamedCloud(request,game.gameId,h.deps,scope);
+  h.setActor(b);
+  assert.equal((await run(post(raw))).status,403);
+  assert.equal((await run(get())).status,403);
+  assert.deepEqual(h.counts(),{uploads:0,reserves:0});
+  h.setActor(a);
+  assert.equal((await handleNamedCloud(post(raw),game.gameId,h.deps,{...scope,deviceId:'invalid'})).status,403);
+  const backup=await envelope();backup.snapshot.kind='backup';
+  assert.equal((await run(post(await encodeCloudSnapshot(backup)))).status,400);
+  assert.equal((await run(post(raw))).status,201);
+  assert.equal((await run(post(raw))).status,200);
+  assert.deepEqual(await (await run(get(id))).json(),{snapshot:raw});
+  h.deps.reserve=async()=>({outcome:'retired'});
+  assert.deepEqual(await (await run(post(raw))).json(),{error:'AUTOSAVE_RETIRED'});
 });
