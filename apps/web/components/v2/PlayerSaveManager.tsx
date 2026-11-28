@@ -80,7 +80,6 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
           return <article key={'cloud:'+row.id} className="v2-save-manager-slot" data-testid="cloud-snapshot" data-kind={row.kind}>
             <div className="v2-save-manager-head"><div><strong>{entry.name}</strong>
               <p>{saveDate(row.snapshotCreatedAt)}</p>
-              {cloudState.list?.deletedSnapshotIds?.includes(s.id)&&<small>Cloud copy deleted · Create a new backup to upload again.</small>}
               <small data-testid="save-location">Cloud backup</small>
               {cloudCompatibility(row,cloud.identity,schema)!=='Compatible'&&<small> · Cannot load with this game version.</small>}</div>
               <Button size="sm" variant="primary" isDisabled={busy} data-testid="select-cloud-restore" onPress={()=>{setEditor(null);setNewGame(false);setConfirmation(null);cloudState.select(row);}}>Restore</Button>
@@ -98,6 +97,7 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
           <div className="v2-save-manager-head">
             <div><strong>{name}</strong>{active&&<span> · Current</span>}
               <p data-testid="save-date">{saveDate(s.createdAt)}{s.kind==='backup'?' · Backup':s.kind==='legacy'?' · Original save':s.kind==='fork'?' · Restored copy':''}</p>
+              {cloudState.list?.deletedSnapshotIds?.includes(s.id)&&<small>Cloud copy deleted · Create a new backup to upload again.</small>}
               <small data-testid="save-location">{entry.backedUp?'On this device + cloud':cloudState.list||!cloud?'On this device':'On this device · cloud not checked'}</small>
               {!compatible&&<small> · Cannot load with this game version.</small>}
             </div>
