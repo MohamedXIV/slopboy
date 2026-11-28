@@ -1,12 +1,14 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {Button} from '@heroui/react';
+import {Alert,Button,Chip} from '@heroui/react';
 import type {SlotListing} from '@slopboy/runtime/save-slots';
 import {CloudRestoreConfirmation,type PlayerCloudActions} from './PlayerCloudSaves';
 import {managedRestoreTransport} from './managed-restore-transport';
 import type {ManagedDevice} from './managed-device-contract';
 import {cloudCompatibility,exactLocalCloudMatch,type CloudRow,type CloudListing} from './player-cloud-contract';
 import {saveDate} from './player-save-list';
+import {ClockIcon,DeviceIcon,RefreshIcon} from './save-ui-icons';
+import {playSaveUiSound} from './save-ui-sfx';
 
 export default function ManagedRestoreControls({cloud,deviceId,local,schema,busy}:{cloud:PlayerCloudActions;deviceId:string;local:SlotListing|null;schema:number;busy:boolean}){
   const [devices,setDevices]=useState<ManagedDevice[]|null>(null),[source,setSource]=useState<string|null>(null);
@@ -45,25 +47,99 @@ export default function ManagedRestoreControls({cloud,deviceId,local,schema,busy
     await cloud.importSnapshot(raw,name.trim(),activate,signal);
     if(!activate&&!signal.aborted){setChoice(null);setNotice('Cloud autosave copied. Your active save is unchanged.');}
   });
-  return <section className="v2-save-manager-slot" aria-label="Synced autosaves" data-testid="managed-restore-controls">
-    <div className="v2-save-manager-actions"><strong>Synced autosaves</strong>
-      <Button size="sm" variant="secondary" isDisabled={locked} data-testid="discover-autosave-devices" onPress={refresh}>{devices?'Refresh devices':'Show cloud devices'}</Button>
-    </div>
-    {notice&&<p role="status">{notice}</p>}
-    {devices&&devices.length===0&&<p>No synced autosaves yet.</p>}
-    {devices?.map(device=><div key={device.deviceId} className="v2-save-manager-actions">
-      <Button size="sm" variant={source===device.deviceId?'primary':'secondary'} isDisabled={locked} aria-pressed={source===device.deviceId} onPress={()=>selectDevice(device.deviceId)}>
-        {device.deviceId===deviceId?'This browser':'Browser '+device.deviceId.slice(0,8)}
-      </Button><small>{device.count} saves · {saveDate(Date.parse(device.lastSavedAt))}</small>
-    </div>)}
-    {listing&&listing.snapshots.length===0&&<p>No autosaves on this browser.</p>}
-    {listing?.snapshots.map(row=><article key={row.id} className="v2-save-manager-slot" data-testid="managed-cloud-snapshot">
-      <div className="v2-save-manager-head"><div><strong>{row.snapshotName}</strong>
-        <p>{saveDate(row.snapshotCreatedAt)}</p>
-        <small>{exactLocalCloudMatch(row,local,cloud.identity)?'On this device + cloud':'Cloud autosave'}</small>
-        {cloudCompatibility(row,cloud.identity,schema)!=='Compatible'&&<small> · Cannot load with this game version.</small>}
-      </div><Button size="sm" variant="primary" isDisabled={locked} onPress={()=>{setChoice(row);setName((row.snapshotName+' cloud copy').slice(0,80));setNotice('');}}>Restore</Button></div>
-      {choice?.id===row.id&&<CloudRestoreConfirmation state={{choice,name,setName,restore,cancel,keepLocal:()=>{cancel();setNotice('Local progress kept.');}}} local={local} identity={cloud.identity} schema={schema} busy={locked}/>}
-    </article>)}
-  </section>;
+
+  return (
+    <section className="sb-cloud-strip" aria-label="Synced autosaves" data-testid="managed-restore-controls">
+      <div className="sb-cloud-strip-head">
+        <div className="sb-cloud-strip-left">
+          <DeviceIcon />
+          <strong>Synced devices</strong>
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          isDisabled={locked}
+          data-testid="discover-autosave-devices"
+          onPress={()=>{playSaveUiSound('tap');refresh();}}
+        >
+          <RefreshIcon />{devices?'Refresh devices':'Show cloud devices'}
+        </Button>
+      </div>
+
+      {notice&&(
+        <Alert status="default" className="sb-save-notice-alert">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description><span role="status">{notice}</span></Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+
+      {devices&&devices.length===0&&<small className="sb-sync-status">No synced autosaves yet.</small>}
+
+      {devices&&devices.length>0&&(
+        <div className="v2-save-manager-actions">
+          {devices.map(device=>(
+            <Button
+              key={device.deviceId}
+              size="sm"
+              variant={source===device.deviceId?'primary':'secondary'}
+              isDisabled={locked}
+              aria-pressed={source===device.deviceId}
+              onPress={()=>{playSaveUiSound('tap');selectDevice(device.deviceId);}}
+            >
+              {device.deviceId===deviceId?'This browser':'Browser '+device.deviceId.slice(0,8)} ({device.count})
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {listing&&listing.snapshots.length===0&&<small className="sb-sync-status">No autosaves on this browser.</small>}
+
+      {listing&&listing.snapshots.length>0&&(
+        <div className="sb-save-list">
+          {listing.snapshots.map(row=>{
+            const matched=exactLocalCloudMatch(row,local,cloud.identity);
+            const compat=cloudCompatibility(row,cloud.identity,schema)==='Compatible';
+            return (
+              <article key={row.id} className="sb-save-card" data-testid="managed-cloud-snapshot">
+                <div className="sb-save-card-top">
+                  <div className="sb-save-card-info">
+                    <div className="sb-save-card-title-row">
+                      <strong className="sb-save-card-name">{row.snapshotName}</strong>
+                      {matched&&<Chip color="success" variant="soft">On this device + cloud</Chip>}
+                      {!compat&&<Chip color="warning" variant="soft">Incompatible</Chip>}
+                    </div>
+                    <div className="sb-save-card-meta">
+                      <p className="sb-save-timestamp"><ClockIcon />{saveDate(row.snapshotCreatedAt)}</p>
+                      {!matched&&<span className="sb-save-location-pill">Cloud autosave</span>}
+                    </div>
+                  </div>
+                  <div className="sb-save-card-actions">
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      isDisabled={locked}
+                      onPress={()=>{playSaveUiSound('tap');setChoice(row);setName((row.snapshotName+' cloud copy').slice(0,80));setNotice('');}}
+                    >
+                      Restore
+                    </Button>
+                  </div>
+                </div>
+                {choice?.id===row.id&&(
+                  <CloudRestoreConfirmation
+                    state={{choice,name,setName,restore,cancel,keepLocal:()=>{cancel();setNotice('Local progress kept.');}}}
+                    local={local}
+                    identity={cloud.identity}
+                    schema={schema}
+                    busy={locked}
+                  />
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
 }

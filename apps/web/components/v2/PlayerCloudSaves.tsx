@@ -1,10 +1,12 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
-import {Button,Input,Label,TextField} from '@heroui/react';
+import {Alert,Button,Chip,Input,Label,TextField} from '@heroui/react';
 import type {SlotListing} from '@slopboy/runtime/save-slots';
 import {saveDate} from './player-save-list';
 import {cloudSnapshotDigest,CLOUD_SNAPSHOT_MAX_BYTES,type CloudSnapshotIdentity} from '@slopboy/runtime/cloud-snapshot';
 import {ACCOUNT_CLOUD_BYTES,CLOUD_GAME_LIMIT,parseCloudListing,localComparison,cloudCompatibility,verifyDownloadedSnapshot,cloudErrorMessage,type CloudListing,type CloudRow} from './player-cloud-contract';
+import {CloudIcon,RefreshIcon} from './save-ui-icons';
+import {playSaveUiSound} from './save-ui-sfx';
 
 export interface PlayerCloudActions {
   identity:CloudSnapshotIdentity;
@@ -97,43 +99,156 @@ export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:bool
   return {list,notice,choice,name,setName,refresh,upload,restore,select,cancel,keepLocal,manage,setManage,target,mutation,selectTarget,askDelete,askReplace,cancelManagement,confirmMutation};
 }
 export type PlayerCloudState=ReturnType<typeof usePlayerCloudSaves>;
+
 export function CloudSaveControls({state,busy}:{state:PlayerCloudState;busy:boolean}){
-  return <div className="v2-save-manager-slot">
-    <div className="v2-save-manager-actions"><Button size="sm" variant="secondary" isDisabled={busy} data-testid="refresh-cloud-saves" onPress={state.refresh}>{state.list?'Refresh cloud':'Show cloud saves'}</Button>
-    {state.list&&<small data-testid="cloud-usage">{state.list.snapshots.length} / {CLOUD_GAME_LIMIT} backups · {(state.list.usedBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB / {ACCOUNT_CLOUD_BYTES/1024/1024} MiB</small>}
-    {state.list?.deletedSnapshotIds!==undefined&&<Button size="sm" variant="secondary" isDisabled={busy} aria-expanded={state.manage} onPress={()=>{state.setManage(!state.manage);state.cancelManagement();}}>Manage cloud backups</Button>}</div>
-    {state.notice&&<p role="status" data-testid="cloud-save-notice">{state.notice}</p>}
-    {state.manage&&state.list?.deletedSnapshotIds!==undefined&&<section aria-label="Manage cloud backups">
-      <p>Cloud-only changes. Local saves are kept. Older object-backed copies cannot be deleted here.</p>
-      {state.list.snapshots.length===0&&<p>No cloud backups.</p>}
-      {state.list.snapshots.map(row=><div key={row.id} className="v2-save-manager-actions"><div><strong>{row.snapshotName}</strong><p>{saveDate(row.snapshotCreatedAt)}</p></div>
-        <Button size="sm" variant="secondary" isDisabled={busy} aria-pressed={state.target?.id===row.id} onPress={()=>state.selectTarget(row)}>Replace</Button>
-        <Button size="sm" variant="danger" isDisabled={busy} onPress={()=>state.askDelete(row)}>Delete</Button></div>)}
-      {state.target&&!state.mutation&&<p role="status">Replacing {state.target.snapshotName}. Select a local save below.</p>}
-      {state.mutation&&<div className="v2-save-manager-slot" role="group" aria-label="Confirm cloud change">
-        <strong>{state.mutation.kind==='delete'?'Delete':'Replace'} cloud backup {state.mutation.target.snapshotName}?</strong>
-        <p>{saveDate(state.mutation.target.snapshotCreatedAt)}. {state.mutation.kind==='replace'?'Replace with '+state.mutation.name+'. ':''}This removes the old cloud copy. Local saves remain unchanged.</p>
-        <div className="v2-save-manager-actions"><Button size="sm" variant="danger" isDisabled={busy} data-testid="confirm-cloud-change" onPress={state.confirmMutation}>{state.mutation.kind==='delete'?'Delete cloud copy':'Replace cloud copy'}</Button>
-        <Button size="sm" variant="secondary" isDisabled={busy} onPress={state.cancelManagement}>Cancel</Button></div>
-      </div>}
-    </section>}
-  </div>;
+  const quotaPct=state.list?Math.min(100,Math.round((state.list.usedBytes/ACCOUNT_CLOUD_BYTES)*100)):0;
+  return (
+    <div className="sb-cloud-strip">
+      <div className="sb-cloud-strip-head">
+        <div className="sb-cloud-strip-left">
+          <CloudIcon />
+          <strong>Cloud backups</strong>
+          {state.list&&(
+            <div className="sb-cloud-quota-wrap">
+              <div className="sb-cloud-quota-bar" aria-hidden="true">
+                <div className="sb-cloud-quota-fill" style={{width:quotaPct+'%'}} />
+              </div>
+              <small className="sb-cloud-usage-text" data-testid="cloud-usage">
+                {state.list.snapshots.length} / {CLOUD_GAME_LIMIT} backups · {(state.list.usedBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB / {ACCOUNT_CLOUD_BYTES/1024/1024} MiB
+              </small>
+            </div>
+          )}
+        </div>
+        <div className="v2-save-manager-actions">
+          <Button
+            size="sm"
+            variant="secondary"
+            isDisabled={busy}
+            data-testid="refresh-cloud-saves"
+            onPress={()=>{playSaveUiSound('tap');state.refresh();}}
+          >
+            <RefreshIcon />{state.list?'Refresh cloud':'Show cloud saves'}
+          </Button>
+          {state.list?.deletedSnapshotIds!==undefined&&(
+            <Button
+              size="sm"
+              variant="outline"
+              isDisabled={busy}
+              aria-expanded={state.manage}
+              onPress={()=>{playSaveUiSound('tap');state.setManage(!state.manage);state.cancelManagement();}}
+            >
+              {state.manage?'Done':'Manage'}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {state.notice&&(
+        <Alert status="default" className="sb-save-notice-alert">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>
+              <span role="status" data-testid="cloud-save-notice">{state.notice}</span>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      )}
+
+      {state.manage&&state.list?.deletedSnapshotIds!==undefined&&(
+        <section className="sb-cloud-manage-list" aria-label="Manage cloud backups">
+          <small className="sb-sync-status">Cloud-only changes — local saves are kept.</small>
+          {state.list.snapshots.length===0&&<small className="sb-sync-status">No cloud backups yet.</small>}
+          {state.list.snapshots.map(row=>(
+            <div key={row.id} className="sb-cloud-manage-row">
+              <div>
+                <strong>{row.snapshotName}</strong>
+                <p>{saveDate(row.snapshotCreatedAt)}</p>
+              </div>
+              <div className="v2-save-manager-actions">
+                <Button size="sm" variant="secondary" isDisabled={busy} aria-pressed={state.target?.id===row.id} onPress={()=>{playSaveUiSound('tap');state.selectTarget(row);}}>
+                  Replace
+                </Button>
+                <Button size="sm" variant="danger" isDisabled={busy} onPress={()=>{playSaveUiSound('warn');state.askDelete(row);}}>
+                  Delete
+                </Button>
+              </div>
+            </div>
+          ))}
+          {state.target&&!state.mutation&&(
+            <Chip color="accent" variant="soft">
+              <span role="status">Replacing {state.target.snapshotName} — choose a local save above.</span>
+            </Chip>
+          )}
+          {state.mutation&&(
+            <div className="sb-save-inline-panel is-danger" role="group" aria-label="Confirm cloud change">
+              <strong>{state.mutation.kind==='delete'?'Delete':'Replace'} cloud backup {state.mutation.target.snapshotName}?</strong>
+              <p>
+                {saveDate(state.mutation.target.snapshotCreatedAt)}. {state.mutation.kind==='replace'?'Replace with '+state.mutation.name+'. ':''}
+                Removes the old cloud copy. Local saves stay unchanged.
+              </p>
+              <div className="v2-save-manager-actions">
+                <Button
+                  size="sm"
+                  variant="danger"
+                  isDisabled={busy}
+                  data-testid="confirm-cloud-change"
+                  onPress={()=>{playSaveUiSound(state.mutation?.kind==='delete'?'delete':'save');state.confirmMutation();}}
+                >
+                  {state.mutation.kind==='delete'?'Delete cloud copy':'Replace cloud copy'}
+                </Button>
+                <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>{playSaveUiSound('tap');state.cancelManagement();}}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
 }
+
 export function CloudRestoreConfirmation({state,local,identity,schema,busy}:{state:Pick<PlayerCloudState,'choice'|'name'|'setName'|'restore'|'cancel'|'keepLocal'>;local:SlotListing|null;identity:CloudSnapshotIdentity;schema:number;busy:boolean}){
   const row=state.choice;if(!row)return null;
   const comparison=localComparison(row,local);
-  return <div className="v2-save-manager-slot" aria-label="Restore cloud save" data-testid="cloud-restore-confirm">
-    <h3>{comparison.status==='conflict'?'Local progress differs':'Restore cloud save?'}</h3>
-    {comparison.status==='conflict'&&<p>Local: {comparison.head?.name??'No saved progress'} · {saveDate(comparison.head?.createdAt??null)}</p>}
-    <p>Cloud: {row.snapshotName} · {saveDate(row.snapshotCreatedAt)}</p>
-    <p>Creates a new save on this device. Existing saves stay safe.</p>
-    <TextField name="cloudCopyName" isRequired isDisabled={busy}><Label>Name of restored save</Label>
-      <Input maxLength={80} value={state.name} onChange={e=>state.setName(e.target.value)}/></TextField>
-    <div className="v2-save-manager-actions">
-      <Button size="sm" variant="primary" isDisabled={busy||!state.name.trim()||cloudCompatibility(row,identity,schema)!=='Compatible'} data-testid="restore-cloud-play" onPress={()=>state.restore(true)}>Restore &amp; play</Button>
-      <Button size="sm" variant="secondary" isDisabled={busy||!state.name.trim()} data-testid="keep-both-cloud" onPress={()=>state.restore(false)}>Save a copy</Button>
-      {comparison.status==='conflict'&&<Button size="sm" variant="secondary" isDisabled={busy} onPress={state.keepLocal}>Keep local</Button>}
-      <Button size="sm" variant="secondary" isDisabled={busy} onPress={state.cancel}>Cancel</Button>
+  return (
+    <div className="sb-save-inline-panel" aria-label="Restore cloud save" data-testid="cloud-restore-confirm">
+      <strong>{comparison.status==='conflict'?'Local progress differs':'Restore cloud save?'}</strong>
+      {comparison.status==='conflict'&&<p>Local: {comparison.head?.name??'No saved progress'} · {saveDate(comparison.head?.createdAt??null)}</p>}
+      <p>Cloud: {row.snapshotName} · {saveDate(row.snapshotCreatedAt)}</p>
+      <p>Creates a new copy on this device — existing saves stay safe.</p>
+      <TextField name="cloudCopyName" isRequired isDisabled={busy}>
+        <Label>Name of restored save</Label>
+        <Input variant="secondary" maxLength={80} value={state.name} onChange={e=>state.setName(e.target.value)} />
+      </TextField>
+      <div className="v2-save-manager-actions">
+        <Button
+          size="sm"
+          variant="primary"
+          isDisabled={busy||!state.name.trim()||cloudCompatibility(row,identity,schema)!=='Compatible'}
+          data-testid="restore-cloud-play"
+          onPress={()=>{playSaveUiSound('load');state.restore(true);}}
+        >
+          Restore &amp; play
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          isDisabled={busy||!state.name.trim()}
+          data-testid="keep-both-cloud"
+          onPress={()=>{playSaveUiSound('save');state.restore(false);}}
+        >
+          Save a copy
+        </Button>
+        {comparison.status==='conflict'&&(
+          <Button size="sm" variant="outline" isDisabled={busy} onPress={()=>{playSaveUiSound('tap');state.keepLocal();}}>
+            Keep local
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" isDisabled={busy} onPress={()=>{playSaveUiSound('tap');state.cancel();}}>
+          Cancel
+        </Button>
+      </div>
     </div>
-  </div>;
+  );
 }
