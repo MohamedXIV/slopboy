@@ -68,7 +68,14 @@ export async function runManagedSyncCycle(deps:CycleDependencies):Promise<SyncCy
     if(!pending)return 'pending';
     const value=await decodeCloudSnapshot(pending.raw,scope);
     if(!allowed(value.snapshot.kind))throw Error('INVALID_SYNC_PAYLOAD');
-    const listing=await request(pending.raw);
+    let listing:CloudListing;
+    try{listing=await request(pending.raw);}
+    catch(error){
+      if(pinned&&error instanceof SyncResponseError&&error.status===409&&error.code==='BACKUP_DELETED'){
+        await check();return await intent.discardDeleted(generation,pending)?'idle':'pending';
+      }
+      throw error;
+    }
     if(!exactAck(listing,pending,allowed))throw Error('SYNC_ACK_MISMATCH');
     await check();
     return await intent.acknowledge(generation,pending)?'synced':'pending';

@@ -156,3 +156,12 @@ test('pinned sync has separate opt-in and pending bytes, never sends autosaves t
   now+=SYNC_CYCLE_MS;fail=false;assert.equal(await runManagedSyncCycle(deps),'synced');assert.deepEqual(sent,[backup,backup]);
   now+=SYNC_CYCLE_MS;assert.equal(await runManagedSyncCycle(deps),'idle');assert.equal(sent.length,2);
 });
+
+test('server-deleted protected pending snapshot is discarded, not acknowledged as upload',async()=>{
+ const {d}=driver(),intent=createCloudSyncIntent(d,scope,()=>1000,'pinned'),g=(await intent.setEnabled(true))!;
+ const v=await decodeCloudSnapshot(await payload('deleted'),scope);v.snapshot.kind='backup';const raw=await encodeCloudSnapshot(v);
+ await intent.stage(g,raw);
+ const result=await runManagedSyncCycle({scope,intent,signal:new AbortController().signal,isActive:()=>true,online:()=>true,nextPinnedSave:async()=>null,
+   request:async()=>Response.json({error:'BACKUP_DELETED'},{status:409})});
+ assert.equal(result,'idle');assert.equal((await intent.status()).pending,false);
+});

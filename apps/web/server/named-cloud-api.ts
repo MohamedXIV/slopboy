@@ -11,7 +11,7 @@ import {completeCloudBackup} from './cloud-backup-storage.ts';
 export interface CloudGame {
   gameId:string;revisionId:string;hardware:{id:string;version:string};
 }
-type Listing={snapshots:unknown[];usedBytes:number};
+type Listing={snapshots:unknown[];usedBytes:number;deletedSnapshotIds?:string[]};
 type Reservation=Partial<Listing>&{outcome:string;backupId?:string;storageKey?:string};
 type ReadyObject={id:string;storageKey:string;digest:string;bytes:number};
 export interface NamedCloudDependencies {
@@ -31,6 +31,11 @@ export type AtomicManagedDependencies=Pick<NamedCloudDependencies,'enabled'|'sub
   store(account:string,game:string,raw:string):Promise<Reservation|null>;
   read(account:string,game:string,id:string):Promise<{id:string;digest:string;bytes:number;snapshot:string}|null>;
 };
+export type CloudMutationTarget={id:string;digest:string};
+export type AtomicNamedDependencies=Omit<AtomicManagedDependencies,'store'>&Pick<NamedCloudDependencies,'lookup'|'download'>&{
+  store(account:string,game:string,raw:string,target?:CloudMutationTarget):Promise<Reservation|null>;
+  remove(account:string,game:string,target:CloudMutationTarget):Promise<Reservation|null>;
+};
 export function namedCloudEnabled(env:Readonly<Record<string,string|undefined>>):boolean {
   return env.CLOUD_NAMED_SNAPSHOTS_ENABLED==='1';
 }
@@ -49,7 +54,9 @@ function listing(value:Partial<Listing>|null,status=200){
       'schemaVersion','hardwareId','snapshotCreatedAt','payloadBytes','payloadDigest','bytes','digest','storedAt'];
     return Object.fromEntries(keys.map(key=>[key,s[key]]));
   });
-  return json({snapshots,usedBytes:value.usedBytes},status);
+  const deleted=value.deletedSnapshotIds;
+  if(deleted!==undefined&&(!Array.isArray(deleted)||deleted.length>1000||!deleted.every(id=>typeof id==='string'&&isGameUuid(id))||new Set(deleted).size!==deleted.length))return error('UNAVAILABLE',503);
+  return json({snapshots,usedBytes:value.usedBytes,...(deleted===undefined?{}:{deletedSnapshotIds:deleted})},status);
 }
 export function snapshotMetadata(value:CloudSnapshot){
   const s=value.snapshot;
@@ -71,15 +78,16 @@ export function eligibleSnapshot(value:CloudSnapshot,game:CloudGame):boolean {
 }
 export type ManagedCloudScope={expectedAccount:string;deviceId:string};
 export function managedCloudEnabled(env:Readonly<Record<string,string|undefined>>):boolean{return env.CLOUD_MANAGED_AUTOSAVES_ENABLED==='1';}
-export async function handleNamedCloud(request:Request,gameId:string,deps:NamedCloudDependencies|AtomicManagedDependencies,managed?:ManagedCloudScope):Promise<Response>{
+export async function handleNamedCloud(request:Request,gameId:string,deps:NamedCloudDependencies|AtomicManagedDependencies|AtomicNamedDependencies,managed?:ManagedCloudScope):Promise<Response>{
   try{
-    if('store' in deps&&!managed)return error('NOT_FOUND',404);
+    const namedAtomic='remove' in deps;
+    if(('store' in deps&&!managed&&!namedAtomic)||(namedAtomic&&managed))return error('NOT_FOUND',404);
     if(!deps.enabled())return error('NOT_FOUND',404);
-    const create=request.method==='POST';
-    if(!create&&request.method!=='GET')return error('METHOD_NOT_ALLOWED',405);
-    if(create&&!sameOriginMutation(request.headers.get('origin'),request.url,
+    const create=request.method==='POST',remove=request.method==='DELETE';
+    if(!create&&request.method!=='GET'&&!(remove&&namedAtomic))return error('METHOD_NOT_ALLOWED',405);
+    if((create||remove)&&!sameOriginMutation(request.headers.get('origin'),request.url,
       request.headers.get('sec-fetch-site'),request.headers.get('host')))return error('INVALID_ORIGIN',403);
-    if(!create&&['cross-site','same-site'].includes(request.headers.get('sec-fetch-site')??''))
+    if(!create&&!remove&&['cross-site','same-site'].includes(request.headers.get('sec-fetch-site')??''))
       return error('INVALID_ORIGIN',403);
     const actor=await deps.subject();
     if(!actor)return error('UNAUTHENTICATED',401);
@@ -88,6 +96,7 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
     const account=actor.id.toLowerCase(),gameKey=gameId.toLowerCase();
     if(managed&&(!isGameUuid(managed.expectedAccount)||!isGameUuid(managed.deviceId)||managed.expectedAccount.toLowerCase()!==account))
       return error('SYNC_SCOPE_MISMATCH',403);
+    if(namedAtomic&&request.headers.get('x-slopboy-sync-account')!==account)return error('SYNC_SCOPE_MISMATCH',403);
     if(await deps.role(actor)!=='admin')return error('NOT_FOUND',404);
     if(!await deps.consumeRequest(account))return Response.json({error:'CLOUD_RATE_LIMIT'},{status:429,headers:{
       'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
@@ -97,9 +106,21 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
       return error('NOT_FOUND',404);
     const identity={gameId:gameKey,hardwareId:game.hardware.id,hardwareVersion:game.hardware.version};
     const query=new URL(request.url).searchParams;
-    const ids=query.getAll('backupId');
-    if([...query.keys()].some(key=>key!=='backupId')||ids.length>1||(create&&ids.length))
+    const ids=query.getAll('backupId'),digests=query.getAll('digest');
+    const mutationTarget=namedAtomic&&(create||remove)&&ids.length===1&&digests.length===1&&isGameUuid(ids[0])&&/^[a-f0-9]{64}$/.test(digests[0])
+      ?{id:ids[0].toLowerCase(),digest:digests[0]}:undefined;
+    if([...query.keys()].some(key=>key!=='backupId'&&key!=='digest')||ids.length>1||digests.length>1||
+      ((create||remove)&&(ids.length||digests.length)&&!mutationTarget)||(!create&&!remove&&digests.length)||(remove&&!mutationTarget))
       return error('INVALID_QUERY',400);
+    if(remove&&'remove' in deps&&mutationTarget){
+      const result=await deps.remove(account,gameKey,mutationTarget);
+      if(!result)return error('UNAVAILABLE',503);
+      if(result.outcome==='not_found')return error('NOT_FOUND',404);
+      if(result.outcome==='changed')return error('BACKUP_CHANGED',409);
+      if(result.outcome==='quota')return error('BACKUP_QUOTA',409);
+      if(!['deleted','replayed'].includes(result.outcome))return error('UNAVAILABLE',503);
+      return listing(result);
+    }
     if(!create){
       if(!ids.length){
         const result=await deps.list(account,gameKey);
@@ -109,17 +130,20 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
       if(!isGameUuid(id))return error('NOT_FOUND',404);
       if('read' in deps){
         const row=await deps.read(account,gameKey,id);
-        if(!row)return error('NOT_FOUND',404);
+        if(!row&&!('lookup' in deps))return error('NOT_FOUND',404);
+        if(row){
         if(row.id!==id||typeof row.snapshot!=='string'||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>CLOUD_SNAPSHOT_MAX_BYTES||
           !/^[a-f0-9]{64}$/.test(row.digest))return error('UNAVAILABLE',503);
         const bytes=new TextEncoder().encode(row.snapshot);
         if(bytes.byteLength!==row.bytes||hash(bytes)!==row.digest)return error('UNAVAILABLE',503);
         const value=await decodeCloudSnapshot(row.snapshot,identity);
-        if(value.snapshot.kind!=='auto')return error('UNAVAILABLE',503);
+        if(managed&&value.snapshot.kind!=='auto')return error('UNAVAILABLE',503);
         return json({snapshot:row.snapshot});
+        }
       }
+      if(!('lookup' in deps))return error('NOT_FOUND',404);
       const row=await deps.lookup(account,gameKey,id);
-      if(!row)return error('NOT_FOUND',404);
+      if(!row||typeof row.storageKey!=='string')return error('NOT_FOUND',404);
       if(row.id!==id||row.bytes<1||row.bytes>CLOUD_SNAPSHOT_MAX_BYTES||!Number.isSafeInteger(row.bytes)||
         !/^[a-f0-9]{64}$/.test(row.digest))return error('UNAVAILABLE',503);
       const bytes=await deps.download(row.storageKey,account,gameKey,id,row.digest,row.bytes);
@@ -139,12 +163,15 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
       if(!eligibleSnapshot(value,game)||(managed&&value.snapshot.kind!=='auto'))throw Error('UNREVIEWED_SAVE');
     }catch{return error('INVALID_SAVE',400);}
     if('store' in deps){
-      const stored=await deps.store(account,gameKey,new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes));
+      const raw=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);
+      const stored='remove' in deps?await deps.store(account,gameKey,raw,mutationTarget):await deps.store(account,gameKey,raw);
       if(!stored)return error('UNAVAILABLE',503);
       if(stored.outcome==='not_found')return error('NOT_FOUND',404);
       if(stored.outcome==='invalid')return error('INVALID_SAVE',400);
       if(stored.outcome==='quota')return error('BACKUP_QUOTA',409);
       if(stored.outcome==='in_progress')return error('BACKUP_IN_PROGRESS',409);
+      if(namedAtomic&&stored.outcome==='deleted')return error('BACKUP_DELETED',409);
+      if(namedAtomic&&stored.outcome==='changed')return error('BACKUP_CHANGED',409);
       if(!['stored','replayed'].includes(stored.outcome))return error('UNAVAILABLE',503);
       return listing(stored,stored.outcome==='stored'?201:200);
     }
