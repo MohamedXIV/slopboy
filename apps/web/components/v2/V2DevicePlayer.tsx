@@ -81,6 +81,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false,saveAcco
     hardwareVersion:DEVICE.version,capabilities:capability
   }):null,[game.gameId,game.revisionId,capability,saveDriver]);
   const sync=useManagedSync(managedSyncAvailable&&game.status==='published'&&supportsAutosave(reviewedCapability),game.gameId,DEVICE.id,DEVICE.version,slotStore,saveAccountId);
+  const pinnedSync=useManagedSync(managedSyncAvailable&&game.status==='published'&&supportsProgressSave(reviewedCapability),game.gameId,DEVICE.id,DEVICE.version,slotStore,saveAccountId,'pinned');
   const [saveManagerOpen,setSaveManagerOpen]=useState(false);
   const [saveListing,setSaveListing]=useState<SlotListing|null>(null);
   const [legacyAvailable,setLegacyAvailable]=useState(false);
@@ -988,7 +989,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false,saveAcco
             {saveManagerOpen&&slotStore&&<PlayerSaveManager key={game.gameId+':'+game.revisionId} listing={saveListing} currentSlotId={saved?.session?.slotId??null}
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
               autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
-              onAction={saveAction} onClose={closeSaveManager} managedDeviceId={sync?.deviceId} syncControls={sync?<ManagedSyncControls state={sync}/>:undefined}
+              onAction={saveAction} onClose={closeSaveManager} managedDeviceId={sync?.deviceId} syncControls={<>{sync&&<ManagedSyncControls state={sync}/>}{pinnedSync&&<ManagedSyncControls state={pinnedSync}/>}</>}
               cloud={game.status==='published'&&supportsProgressSave(reviewedCapability)&&(!managedSyncAvailable||saveAccountId)?{
                 identity:{gameId:game.gameId,hardwareId:DEVICE.id,hardwareVersion:DEVICE.version},expectedAccount:saveAccountId??undefined,withLock:withCloudLock,
                 exportSnapshot:async(slotId,snapshotId)=>{await flushSaves();return slotStore.exportCloudSnapshot(slotId,snapshotId);},

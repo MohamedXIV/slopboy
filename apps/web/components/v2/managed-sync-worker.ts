@@ -3,25 +3,27 @@
  * No timers, account discovery, UI or automatic activation here. */
 import {cloudSnapshotDigest,decodeCloudSnapshot} from '../../../../packages/runtime/src/cloud-snapshot.ts';
 import {type createCloudSyncIntent,type SyncScope,type SyncAcknowledgment} from '../../../../packages/runtime/src/cloud-sync-intent.ts';
-import {parseCloudListing,type CloudListing} from './player-cloud-contract.ts';
+import {CLOUD_GAME_LIMIT,parseCloudListing,type CloudListing} from './player-cloud-contract.ts';
 
 type Intent=ReturnType<typeof createCloudSyncIntent>;
-type Result='disabled'|'offline'|'throttled'|'idle'|'synced'|'pending'|'quota'|'rate-limited'|'unavailable'|'retired'|'cancelled';
-interface CycleDependencies {
+export type SyncCycleResult='disabled'|'offline'|'throttled'|'idle'|'synced'|'pending'|'quota'|'rate-limited'|'unavailable'|'retired'|'cancelled';
+interface BaseCycleDependencies {
   scope:SyncScope;intent:Intent;signal:AbortSignal;
   isActive:()=>boolean;online:()=>boolean;
-  latestAutosave:()=>Promise<string|null>;
   request:(url:string,init:RequestInit)=>Promise<Response>;
 }
+type CycleDependencies=BaseCycleDependencies&({latestAutosave:()=>Promise<string|null>;nextPinnedSave?:never}|{nextPinnedSave:(listing:CloudListing)=>Promise<string|null>;latestAutosave?:never});
 class SyncResponseError extends Error{
   readonly status:number;readonly code:unknown;
   constructor(status:number,code:unknown){super('SYNC_RESPONSE');this.status=status;this.code=code;}
 }
-function exactAck(list:CloudListing,ack:SyncAcknowledgment){
-  return list.snapshots.some(row=>row.kind==='auto'&&row.slotId===ack.slotId&&row.snapshotId===ack.snapshotId&&row.digest===ack.digest&&row.bytes===ack.bytes);
+function exactAck(list:CloudListing,ack:SyncAcknowledgment,allowed:(kind:string)=>boolean){
+  return list.snapshots.some(row=>allowed(row.kind)&&row.slotId===ack.slotId&&row.snapshotId===ack.snapshotId&&row.digest===ack.digest&&row.bytes===ack.bytes);
 }
-export async function runManagedSyncCycle(deps:CycleDependencies):Promise<Result>{
+export async function runManagedSyncCycle(deps:CycleDependencies):Promise<SyncCycleResult>{
   const {intent,scope,signal}=deps;
+  const pinned=Boolean(deps.nextPinnedSave);
+  const allowed=(kind:string)=>pinned?kind==='manual'||kind==='backup':kind==='auto';
   const active=()=>!signal.aborted&&deps.isActive();
   if(!active())return 'cancelled';
   if(!deps.online())return 'offline';
@@ -35,10 +37,11 @@ export async function runManagedSyncCycle(deps:CycleDependencies):Promise<Result
       if(!deps.isActive()||!deps.online())throw Error('SYNC_CANCELLED');
     };
     if(!await intent.claimCycle(generation))return 'throttled';
-    const endpoint='/api/account/games/'+encodeURIComponent(scope.gameId)+'/cloud-autosaves';
+    const endpoint='/api/account/games/'+encodeURIComponent(scope.gameId)+(pinned?'/cloud-snapshots':'/cloud-autosaves');
     const request=async(raw?:string)=>{
       await check();
-      const headers:Record<string,string>={'x-slopboy-sync-account':scope.accountId,'x-slopboy-sync-device':scope.deviceId};
+      const headers:Record<string,string>={'x-slopboy-sync-account':scope.accountId};
+      if(!pinned)headers['x-slopboy-sync-device']=scope.deviceId;
       if(raw!==undefined)headers['Content-Type']='application/json';
       const response=await deps.request(endpoint,{method:raw===undefined?'GET':'POST',headers,body:raw,
         credentials:'same-origin',cache:'no-store',redirect:'error',signal});
@@ -48,23 +51,25 @@ export async function runManagedSyncCycle(deps:CycleDependencies):Promise<Result
       return parseCloudListing(value);
     };
     if(!status.pending){
-      const raw=await deps.latestAutosave();
+      const existing=deps.nextPinnedSave?await request():null;
+      const raw=deps.nextPinnedSave?await deps.nextPinnedSave(existing!):await deps.latestAutosave();
       if(raw===null)return 'idle';
       const value=await decodeCloudSnapshot(raw,scope);
-      if(value.snapshot.kind!=='auto'||!value.snapshot.revisionId)throw Error('INVALID_SYNC_PAYLOAD');
+      if(!allowed(value.snapshot.kind)||!value.snapshot.revisionId)throw Error('INVALID_SYNC_PAYLOAD');
       const ack={digest:await cloudSnapshotDigest(raw),bytes:new TextEncoder().encode(raw).byteLength,slotId:value.slotId,snapshotId:value.snapshot.id};
       // Avoid staging on a disabled backend, and avoid repeatedly uploading the newest acknowledged autosave.
-      const listing=await request();
-      if(exactAck(listing,ack))return 'idle';
+      const listing=existing??await request();
+      if(exactAck(listing,ack,allowed))return 'idle';
+      if(pinned&&listing.snapshots.length>=CLOUD_GAME_LIMIT)return 'quota';
       await check();
       await intent.stage(generation,raw);
     }
     const pending=await intent.claimAttempt(generation);
     if(!pending)return 'pending';
     const value=await decodeCloudSnapshot(pending.raw,scope);
-    if(value.snapshot.kind!=='auto')throw Error('INVALID_SYNC_PAYLOAD');
+    if(!allowed(value.snapshot.kind))throw Error('INVALID_SYNC_PAYLOAD');
     const listing=await request(pending.raw);
-    if(!exactAck(listing,pending))throw Error('SYNC_ACK_MISMATCH');
+    if(!exactAck(listing,pending,allowed))throw Error('SYNC_ACK_MISMATCH');
     await check();
     return await intent.acknowledge(generation,pending)?'synced':'pending';
   }catch(error){
