@@ -80,6 +80,7 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
           return <article key={'cloud:'+row.id} className="v2-save-manager-slot" data-testid="cloud-snapshot" data-kind={row.kind}>
             <div className="v2-save-manager-head"><div><strong>{entry.name}</strong>
               <p>{saveDate(row.snapshotCreatedAt)}</p>
+              {cloudState.list?.deletedSnapshotIds?.includes(s.id)&&<small>Cloud copy deleted · Create a new backup to upload again.</small>}
               <small data-testid="save-location">Cloud backup</small>
               {cloudCompatibility(row,cloud.identity,schema)!=='Compatible'&&<small> · Cannot load with this game version.</small>}</div>
               <Button size="sm" variant="primary" isDisabled={busy} data-testid="select-cloud-restore" onPress={()=>{setEditor(null);setNewGame(false);setConfirmation(null);cloudState.select(row);}}>Restore</Button>
@@ -104,7 +105,8 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
               <Button size="sm" variant="primary" isDisabled={busy||!compatible} data-testid="load-save" onPress={()=>void onAction({kind:'load-snapshot',slotId,snapshotId:s.id})}>Load</Button>
               {s.kind==='auto'?<Button size="sm" variant="secondary" isDisabled={busy} data-testid="backup-autosave" onPress={()=>{setConfirmation(null);setNewGame(false);setEditor({kind:'backup-snapshot',slotId,snapshotId:s.id,name:'Backup '+saveDate(s.createdAt)});}}>Backup</Button>:
               <Button size="sm" variant="secondary" isDisabled={busy} onPress={()=>{setConfirmation(null);setNewGame(false);setEditor(s.kind==='fork'?{kind:'rename-slot',slotId,name}:{kind:'rename-snapshot',slotId,snapshotId:s.id,name});}}>Rename</Button>}
-              {cloud&&!entry.backedUp&&<Button size="sm" variant="secondary" isDisabled={busy} data-testid="upload-local-snapshot" onPress={()=>cloudState.upload(slotId,s.id)}>Back up to cloud</Button>}
+              {cloud&&cloudState.target&&!cloudState.mutation&&!entry.backedUp&&!cloudState.list?.deletedSnapshotIds?.includes(s.id)&&<Button size="sm" variant="secondary" isDisabled={busy} data-testid="replace-cloud-with-local" onPress={()=>cloudState.askReplace(slotId,s.id,name)}>Use for cloud replacement</Button>}
+              {cloud&&!entry.backedUp&&!cloudState.list?.deletedSnapshotIds?.includes(s.id)&&<Button size="sm" variant="secondary" isDisabled={busy} data-testid="upload-local-snapshot" onPress={()=>cloudState.upload(slotId,s.id)}>Back up to cloud</Button>}
               <Button size="sm" variant="secondary" aria-expanded={details===s.id} isDisabled={busy} data-testid="save-options" onPress={()=>{setConfirmation(null);setDetails(details===s.id?null:s.id);}}>{manageable?'Options':'Details'}</Button>
             </div>
           </div>

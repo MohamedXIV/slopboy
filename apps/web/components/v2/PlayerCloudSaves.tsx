@@ -17,15 +17,17 @@ class CloudRequestError extends Error{}
 export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:boolean){
   const [list,setList]=useState<CloudListing|null>(null),[notice,setNotice]=useState('');
   const [choice,setChoice]=useState<CloudRow|null>(null),[name,setName]=useState('');
+  const [manage,setManage]=useState(false),[target,setTarget]=useState<CloudRow|null>(null);
+  const [mutation,setMutation]=useState<{kind:'delete';target:CloudRow}|{kind:'replace';target:CloudRow;slotId:string;snapshotId:string;name:string}|null>(null);
   const controller=useRef<AbortController|null>(null);
   useEffect(()=>()=>controller.current?.abort(),[]);
   const endpoint=cloud?'/api/account/games/'+encodeURIComponent(cloud.identity.gameId)+'/cloud-snapshots':null;
-  async function request(signal:AbortSignal,options:RequestInit={},id?:string){
+  async function request(signal:AbortSignal,options:RequestInit={},id?:string,digest?:string){
     if(!endpoint)throw Error('CLOUD_UNAVAILABLE');
     const headers=new Headers(options.headers);
     if(cloud?.expectedAccount)headers.set('x-slopboy-sync-account',cloud.expectedAccount);
-    const response=await fetch(endpoint+(id?'?backupId='+encodeURIComponent(id):''),{
-      ...options,headers,signal,cache:'no-store',credentials:'same-origin',
+    const response=await fetch(endpoint+(id?'?backupId='+encodeURIComponent(id)+(digest?'&digest='+encodeURIComponent(digest):''):''),{
+      ...options,headers,signal,cache:'no-store',credentials:'same-origin',redirect:'error',
     });
     const value:unknown=await response.json().catch(()=>null);
     if(!response.ok){
@@ -43,12 +45,12 @@ export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:bool
         setNotice(error instanceof CloudRequestError?error.message:
           error instanceof Error&&error.message==='CLOUD_CHANGED'?'Cloud save changed. Refresh the list and try again.':
           'Action could not complete. Existing local saves were retained.');
-        setList(null);setChoice(null);
+        setList(null);setChoice(null);setTarget(null);setMutation(null);
       }
     }finally{controller.current=null;}
   }
   const refresh=()=>void run(async signal=>{
-    const {value}=await request(signal);signal.throwIfAborted();setList(parseCloudListing(value));setChoice(null);
+    const {value}=await request(signal);signal.throwIfAborted();setList(parseCloudListing(value));setChoice(null);setTarget(null);setMutation(null);
   });
   const upload=(slotId:string,snapshotId:string)=>void run(async signal=>{
     if(!cloud)return;
@@ -70,17 +72,51 @@ export function usePlayerCloudSaves(cloud:PlayerCloudActions|undefined,busy:bool
     await cloud.importSnapshot(raw,name.trim(),activate,signal);
     if(!activate){setChoice(null);setNotice('Cloud save copied to this device. Your active save is unchanged.');}
   });
-  const select=(row:CloudRow)=>{setChoice(row);setName(((row.kind==='fork'?row.slotName:row.snapshotName)+' cloud copy').slice(0,80));setNotice('');};
+  const selectTarget=(row:CloudRow)=>{setChoice(null);setMutation(null);setTarget(row);};
+  const askDelete=(row:CloudRow)=>{setChoice(null);setTarget(null);setMutation({kind:'delete',target:row});};
+  const askReplace=(slotId:string,snapshotId:string,name:string)=>{if(target){setChoice(null);setMutation({kind:'replace',target,slotId,snapshotId,name});}};
+  const cancelManagement=()=>{setMutation(null);setTarget(null);};
+  const confirmMutation=()=>void run(async signal=>{
+    if(!cloud||!mutation||list?.deletedSnapshotIds===undefined)return;
+    const selected=mutation.target;
+    let raw:string|undefined,digest:string|undefined;
+    if(mutation.kind==='replace'){
+      raw=await cloud.exportSnapshot(mutation.slotId,mutation.snapshotId);signal.throwIfAborted();
+      digest=await cloudSnapshotDigest(raw);
+    }
+    const {value}=await request(signal,mutation.kind==='delete'?{method:'DELETE'}:{method:'POST',headers:{'Content-Type':'application/json'},body:raw},selected.id,selected.digest);
+    const next=parseCloudListing(value);
+    if(next.deletedSnapshotIds===undefined||!next.deletedSnapshotIds.includes(selected.snapshotId)||next.snapshots.some(row=>row.id===selected.id))throw Error('CLOUD_CHANGED');
+    if(mutation.kind==='replace'&&!next.snapshots.some(row=>row.slotId===mutation.slotId&&row.snapshotId===mutation.snapshotId&&row.digest===digest))throw Error('CLOUD_CHANGED');
+    signal.throwIfAborted();setList(next);setTarget(null);setMutation(null);setChoice(null);
+    setNotice(mutation.kind==='delete'?'Cloud backup deleted. Local saves are unchanged.':'Cloud backup replaced. Local saves are unchanged.');
+  });
+  const select=(row:CloudRow)=>{cancelManagement();setChoice(row);setName(((row.kind==='fork'?row.slotName:row.snapshotName)+' cloud copy').slice(0,80));setNotice('');};
   const cancel=()=>setChoice(null);
   const keepLocal=()=>{cancel();setNotice('Local progress kept.');};
-  return {list,notice,choice,name,setName,refresh,upload,restore,select,cancel,keepLocal};
+  return {list,notice,choice,name,setName,refresh,upload,restore,select,cancel,keepLocal,manage,setManage,target,mutation,selectTarget,askDelete,askReplace,cancelManagement,confirmMutation};
 }
 export type PlayerCloudState=ReturnType<typeof usePlayerCloudSaves>;
 export function CloudSaveControls({state,busy}:{state:PlayerCloudState;busy:boolean}){
-  return <div className="v2-save-manager-actions">
-    <Button size="sm" variant="secondary" isDisabled={busy} data-testid="refresh-cloud-saves" onPress={state.refresh}>{state.list?'Refresh cloud':'Show cloud saves'}</Button>
+  return <div className="v2-save-manager-slot">
+    <div className="v2-save-manager-actions"><Button size="sm" variant="secondary" isDisabled={busy} data-testid="refresh-cloud-saves" onPress={state.refresh}>{state.list?'Refresh cloud':'Show cloud saves'}</Button>
     {state.list&&<small data-testid="cloud-usage">{state.list.snapshots.length} / {CLOUD_GAME_LIMIT} backups · {(state.list.usedBytes/1024).toLocaleString(undefined,{maximumFractionDigits:1})} KiB / {ACCOUNT_CLOUD_BYTES/1024/1024} MiB</small>}
+    {state.list?.deletedSnapshotIds!==undefined&&<Button size="sm" variant="secondary" isDisabled={busy} aria-expanded={state.manage} onPress={()=>{state.setManage(!state.manage);state.cancelManagement();}}>Manage cloud backups</Button>}</div>
     {state.notice&&<p role="status" data-testid="cloud-save-notice">{state.notice}</p>}
+    {state.manage&&state.list?.deletedSnapshotIds!==undefined&&<section aria-label="Manage cloud backups">
+      <p>Cloud-only changes. Local saves are kept. Older object-backed copies cannot be deleted here.</p>
+      {state.list.snapshots.length===0&&<p>No cloud backups.</p>}
+      {state.list.snapshots.map(row=><div key={row.id} className="v2-save-manager-actions"><div><strong>{row.snapshotName}</strong><p>{saveDate(row.snapshotCreatedAt)}</p></div>
+        <Button size="sm" variant="secondary" isDisabled={busy} aria-pressed={state.target?.id===row.id} onPress={()=>state.selectTarget(row)}>Replace</Button>
+        <Button size="sm" variant="danger" isDisabled={busy} onPress={()=>state.askDelete(row)}>Delete</Button></div>)}
+      {state.target&&!state.mutation&&<p role="status">Replacing {state.target.snapshotName}. Select a local save below.</p>}
+      {state.mutation&&<div className="v2-save-manager-slot" role="group" aria-label="Confirm cloud change">
+        <strong>{state.mutation.kind==='delete'?'Delete':'Replace'} cloud backup {state.mutation.target.snapshotName}?</strong>
+        <p>{saveDate(state.mutation.target.snapshotCreatedAt)}. {state.mutation.kind==='replace'?'Replace with '+state.mutation.name+'. ':''}This removes the old cloud copy. Local saves remain unchanged.</p>
+        <div className="v2-save-manager-actions"><Button size="sm" variant="danger" isDisabled={busy} data-testid="confirm-cloud-change" onPress={state.confirmMutation}>{state.mutation.kind==='delete'?'Delete cloud copy':'Replace cloud copy'}</Button>
+        <Button size="sm" variant="secondary" isDisabled={busy} onPress={state.cancelManagement}>Cancel</Button></div>
+      </div>}
+    </section>}
   </div>;
 }
 export function CloudRestoreConfirmation({state,local,identity,schema,busy}:{state:Pick<PlayerCloudState,'choice'|'name'|'setName'|'restore'|'cancel'|'keepLocal'>;local:SlotListing|null;identity:CloudSnapshotIdentity;schema:number;busy:boolean}){

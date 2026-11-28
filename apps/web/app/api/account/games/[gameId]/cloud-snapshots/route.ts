@@ -42,7 +42,7 @@ function dependencies(expectedAccount:string|null):NamedCloudDependencies|Atomic
     upload:uploadCloudSave,download:downloadCloudSave,
   };
   if(!managedCloudEnabled(process.env))return base;
-  const decorate=async(account:string,game:string,result:any)=>{
+  const decorate=async<T extends {snapshots?:unknown[]}>(account:string,game:string,result:T|null):Promise<T|null>=>{
     if(!result||!Array.isArray(result.snapshots))return result;
     const [row]=await sql()`SELECT public.list_deleted_named_snapshot_ids(${account}::uuid,${game}::uuid) AS ids`;
     if(!Array.isArray(row?.ids))throw Error('INVALID_DELETION_LIST');
