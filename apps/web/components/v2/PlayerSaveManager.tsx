@@ -3,6 +3,7 @@ import {useState,type ReactNode} from 'react';
 import {Button,Input,Label,TextField} from '@heroui/react';
 import type {SlotListing,ConfirmedSaveTarget} from '@slopboy/runtime/save-slots';
 import {usePlayerCloudSaves,CloudSaveControls,CloudRestoreConfirmation,type PlayerCloudActions} from './PlayerCloudSaves';
+import ManagedRestoreControls from './ManagedRestoreControls';
 import {integratedSaves} from './integrated-save-list';
 import {cloudCompatibility} from './player-cloud-contract';
 import {saveEntries,saveDate,nextSaveSort,SAVE_SORT_LABELS,type SaveSort,type SaveLane} from './player-save-list';
@@ -19,9 +20,9 @@ export type SaveManagerAction=
   | {kind:'delete-permanent';target:ConfirmedSaveTarget};
 type DestructiveAction=Extract<SaveManagerAction,{kind:'replace-manual'}|{kind:'delete-permanent'}>;
 type NamedAction=Exclude<SaveManagerAction,{kind:'load-snapshot'}|{kind:'legacy'}|{kind:'create'}|DestructiveAction>;
-export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud,syncControls}:{
+export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable,schema,busy,notice,autoSupported,manualSupported,manualReady,onAction,onClose,cloud,syncControls,managedDeviceId}:{
   listing:SlotListing|null;currentSlotId:string|null;legacyAvailable:boolean;schema:number;
-  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;syncControls?:ReactNode;
+  busy:boolean;notice:string;autoSupported:boolean;manualSupported:boolean;manualReady:boolean;onAction:(action:SaveManagerAction)=>Promise<boolean>;onClose:()=>void;cloud?:PlayerCloudActions;syncControls?:ReactNode;managedDeviceId?:string;
 }){
   const [editor,setEditor]=useState<NamedAction|null>(null);
   const [newGame,setNewGame]=useState(false);
@@ -45,6 +46,7 @@ export default function PlayerSaveManager({listing,currentSlotId,legacyAvailable
     </div>
     {cloud&&<CloudSaveControls state={cloudState} busy={busy}/>}
     {syncControls}
+    {tab==='auto'&&cloud?.expectedAccount&&managedDeviceId&&<ManagedRestoreControls cloud={cloud} deviceId={managedDeviceId} local={listing} schema={schema} busy={busy}/>}
     {!listing?<p>Loading saves…</p>:<>
       <div className="v2-save-manager-actions">
         {tab==='manual'&&manualSupported&&<Button size="sm" variant="primary" isDisabled={busy||!manualReady} data-testid="manual-save" onPress={()=>{setConfirmation(null);setNewGame(false);setEditor({kind:'manual',name:'Manual save'});}}>New save</Button>}

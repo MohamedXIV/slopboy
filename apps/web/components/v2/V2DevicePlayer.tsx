@@ -988,7 +988,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false,saveAcco
             {saveManagerOpen&&slotStore&&<PlayerSaveManager key={game.gameId+':'+game.revisionId} listing={saveListing} currentSlotId={saved?.session?.slotId??null}
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
               autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
-              onAction={saveAction} onClose={closeSaveManager} syncControls={sync?<ManagedSyncControls state={sync}/>:undefined}
+              onAction={saveAction} onClose={closeSaveManager} managedDeviceId={sync?.deviceId} syncControls={sync?<ManagedSyncControls state={sync}/>:undefined}
               cloud={game.status==='published'&&supportsProgressSave(reviewedCapability)&&(!managedSyncAvailable||saveAccountId)?{
                 identity:{gameId:game.gameId,hardwareId:DEVICE.id,hardwareVersion:DEVICE.version},expectedAccount:saveAccountId??undefined,withLock:withCloudLock,
                 exportSnapshot:async(slotId,snapshotId)=>{await flushSaves();return slotStore.exportCloudSnapshot(slotId,snapshotId);},
