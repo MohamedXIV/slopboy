@@ -135,6 +135,15 @@ export function createCloudSyncIntent(driver:AtomicSaveDriver,identity:SyncScope
         return {...current.pending};
       });
     },
+    /** Clear only exact pinned pending bytes after authenticated server rejection as deleted. */
+    async discardDeleted(generation:string,ack:SyncAcknowledgment):Promise<boolean>{
+      if(lane!=='pinned')return false;
+      return change(state=>{
+        requireGeneration(state,generation);
+        if(!state.pending||state.pending.lastAttemptAt===null||!matches(state.pending,ack))return false;
+        state.pending=null;return true;
+      });
+    },
     /** Only invoke after authenticated server acknowledgment of this exact
      * immutable object and verified readback, not an optimistic HTTP success. */
     async acknowledge(generation:string,ack:SyncAcknowledgment):Promise<boolean>{

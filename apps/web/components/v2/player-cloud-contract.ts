@@ -4,7 +4,7 @@ import type {SlotListing} from '../../../../packages/runtime/src/save-slots.ts';
 export type CloudRow={id:string;slotId:string;slotName:string;snapshotId:string;snapshotName:string;kind:string;
   revisionId:string|null;releaseVersion:string|null;schemaVersion:number;hardwareId:string;snapshotCreatedAt:number|null;
   payloadBytes:number;payloadDigest:string;bytes:number;digest:string;storedAt:string};
-export type CloudListing={snapshots:CloudRow[];usedBytes:number};
+export type CloudListing={snapshots:CloudRow[];usedBytes:number;deletedSnapshotIds?:string[]};
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const sha=/^[a-f0-9]{64}$/;
 const obj=(v:unknown):v is Record<string,unknown>=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -28,7 +28,9 @@ export function parseCloudListing(v:unknown):CloudListing{
   if(!obj(v)||!Array.isArray(v.snapshots)||v.snapshots.length>CLOUD_GAME_LIMIT||
     !v.snapshots.every(isRow)||!int(v.usedBytes,0,ACCOUNT_CLOUD_BYTES)||
     new Set(v.snapshots.map(row=>row.id)).size!==v.snapshots.length)throw Error('INVALID_CLOUD_RESPONSE');
-  return {snapshots:v.snapshots,usedBytes:v.usedBytes};
+  const deleted=v.deletedSnapshotIds;
+  if(deleted!==undefined&&(!Array.isArray(deleted)||deleted.length>1000||!deleted.every(id=>typeof id==='string'&&uuid.test(id))||new Set(deleted).size!==deleted.length))throw Error('INVALID_CLOUD_RESPONSE');
+  return {snapshots:v.snapshots,usedBytes:v.usedBytes,...(deleted===undefined?{}:{deletedSnapshotIds:deleted as string[]})};
 }
 export function cloudCompatibility(row:CloudRow,identity:CloudSnapshotIdentity,schema:number):'Compatible'|'Incompatible'|'Unknown compatibility'{
   if(row.hardwareId!==identity.hardwareId+'@'+identity.hardwareVersion||row.schemaVersion!==schema)return 'Incompatible';
@@ -68,6 +70,8 @@ export function cloudErrorMessage(status:number,code?:string):string{
   if(status===403)return 'Cloud saves are not available to this account.';
   if(status===404)return 'Cloud saves are unavailable or this save is no longer accessible.';
   if(code==='BACKUP_IN_PROGRESS')return 'A cloud upload is pending confirmation. Retry the same unchanged snapshot after a minute. Your local save is safe.';
+  if(code==='BACKUP_DELETED')return 'This cloud copy was deleted. Create a new local backup to upload it again.';
+  if(code==='BACKUP_CHANGED')return 'Cloud backup changed or cannot be managed. Refresh the list and try again.';
   if(code==='BACKUP_QUOTA')return 'Cloud storage limit reached. Your local save is safe.';
   if(code==='INVALID_SAVE')return 'This save cannot be uploaded in its current format.';
   return 'Cloud request failed. Your local saves remain on this device.';

@@ -9,6 +9,7 @@ import type {CloudListing} from './player-cloud-contract.ts';
 export function nextPinnedCandidate(local:SlotListing,cloud:CloudListing,identity:CloudSnapshotIdentity){
   return local.slots.flatMap(slot=>slot.snapshots.map(snapshot=>({slotId:slot.id,snapshot})))
     .filter(({slotId,snapshot:s})=>{
+      if(cloud.deletedSnapshotIds?.includes(s.id))return false;
       if((s.kind!=='manual'&&s.kind!=='backup')||!s.revisionId)return false;
       const source=reviewedPixelSaveCapabilities(identity.gameId,s.revisionId);
       if(!supportsProgressSave(source)||source?.schemaVersion!==s.schemaVersion||(s.kind==='manual'&&!supportsManualSave(source)))return false;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {GAMES} from '../packages/catalog/src/index.ts';
 import {encodeCloudSnapshot,cloudSnapshotDigest,CLOUD_SNAPSHOT_FORMAT} from '../packages/runtime/src/cloud-snapshot.ts';
-import {handleNamedCloud,namedCloudEnabled,managedCloudEnabled,type NamedCloudDependencies,type AtomicManagedDependencies} from '../apps/web/server/named-cloud-api.ts';
+import {handleNamedCloud,namedCloudEnabled,managedCloudEnabled,type NamedCloudDependencies,type AtomicManagedDependencies,type AtomicNamedDependencies} from '../apps/web/server/named-cloud-api.ts';
 
 const game=GAMES[2],a='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',b='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const id='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -123,4 +123,20 @@ test('transactional managed route stores only reviewed autosaves and verifies at
   assert.deepEqual(await (await run(get(id))).json(),{snapshot:raw});
   deps.read=async()=>({id,bytes:Buffer.byteLength(stored),digest:'a'.repeat(64),snapshot:stored});
   assert.equal((await run(get(id))).status,503);
+});
+
+test('atomic named mutation requires exact account, origin, target and preserves object fallback',async()=>{
+ const h=harness(),raw=await encodeCloudSnapshot(await envelope()),digest=hash(new TextEncoder().encode(raw));let target:unknown=null,removed=0,stored=0;
+ const deps:AtomicNamedDependencies={...h.deps,store:async(_a,_g,_raw,t)=>{stored++;target=t;return {outcome:'stored',snapshots:[{id}],usedBytes:100,deletedSnapshotIds:[]};},remove:async(_a,_g,t)=>{removed++;target=t;return {outcome:'deleted',snapshots:[],usedBytes:0,deletedSnapshotIds:[id]};},read:async()=>({id,digest,bytes:Buffer.byteLength(raw),snapshot:raw})};
+ const req=(method:string,query='',owner=a,origin='https://slopboy.test')=>new Request(url+query,{method,headers:{origin,'x-slopboy-sync-account':owner,'content-type':'application/json'},...(method==='POST'?{body:raw}:{})});
+ const run=(request:Request)=>handleNamedCloud(request,game.gameId,deps);
+ const query='?backupId='+id+'&digest='+digest;
+ assert.equal((await run(req('DELETE',query,b))).status,403);
+ assert.equal((await run(req('DELETE',query,a,'https://other.test'))).status,403);
+ assert.equal((await run(req('DELETE','?backupId='+id))).status,400);
+ assert.equal(removed,0);
+ assert.equal((await run(req('POST',query))).status,201);assert.equal(stored,1);assert.deepEqual(target,{id,digest});
+ assert.equal((await run(req('GET','?backupId='+id))).status,200);
+ assert.equal((await run(req('DELETE',query))).status,200);assert.equal(removed,1);
+ deps.store=async()=>({outcome:'deleted'});assert.deepEqual(await (await run(req('POST'))).json(),{error:'BACKUP_DELETED'});
 });
