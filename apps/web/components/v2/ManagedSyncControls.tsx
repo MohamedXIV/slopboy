@@ -18,11 +18,12 @@ export function useManagedSync(available:boolean,gameId:string,hardwareId:string
   const live=useRef<AbortController|null>(null);
   useEffect(()=>{
     if(!available||!store||!accountId||!UUID.test(accountId))return;
+    const verifiedAccount=accountId;
     const controller=new AbortController();
     async function discover(){
       try{
         const deviceId=await getCloudSyncDeviceId(browserSaveDriver);
-        const scope={accountId,deviceId,gameId,hardwareId,hardwareVersion};
+        const scope:SyncScope={accountId:verifiedAccount,deviceId,gameId,hardwareId,hardwareVersion};
         const intent=createCloudSyncIntent(browserSaveDriver,scope),status=await intent.status();
         if(!controller.signal.aborted)setContext({scope,intent,generation:status.generation,pending:status.pending});
       }catch{/* Guest, offline and unavailable storage must not block local play. */}
