@@ -23,6 +23,7 @@ export async function getCloudSyncDeviceId(driver:AtomicSaveDriver):Promise<stri
     const value=typeof raw==='string'?raw:crypto.randomUUID();return {value,result:value};
   });
 }
+export type SyncLane='auto'|'pinned';
 export interface SyncScope extends CloudSnapshotIdentity {accountId:string;deviceId:string}
 export interface PendingSync {
   raw:string;digest:string;bytes:number;slotId:string;snapshotId:string;lastAttemptAt:number|null;
@@ -70,10 +71,12 @@ async function verify(p:PendingSync,scope:SyncScope){
 /** At most one exact in-flight envelope per account/game/browser.
  * New local saves coalesce in the local store; never replace an unresolved
  * reservation with a different digest. Pausing retains the exact retry bytes. */
-export function createCloudSyncIntent(driver:AtomicSaveDriver,identity:SyncScope,clock=Date.now){
+export function createCloudSyncIntent(driver:AtomicSaveDriver,identity:SyncScope,clock=Date.now,lane:SyncLane='auto'){
   const scope:SyncScope={accountId:identity.accountId,deviceId:identity.deviceId,gameId:identity.gameId,
     hardwareId:identity.hardwareId,hardwareVersion:identity.hardwareVersion};
-  const key=scopeKey(scope);
+  if(lane!=='auto'&&lane!=='pinned')throw Error('INVALID_SYNC_LANE');
+  const key=scopeKey(scope)+(lane==='pinned'?':pinned':'');
+  const allowed=(kind:string)=>lane==='auto'?kind==='auto':kind==='manual'||kind==='backup';
   const read=async()=>decode(await driver.get(key),scope);
   const change=<T>(fn:(state:Intent)=>T)=>driver.update(key,raw=>{
     const state=decode(raw,scope),result=fn(state),value=JSON.stringify(state);
@@ -103,7 +106,7 @@ export function createCloudSyncIntent(driver:AtomicSaveDriver,identity:SyncScope
     },
     async stage(generation:string,raw:string):Promise<SyncAcknowledgment>{
       const snapshot=await decodeCloudSnapshot(raw,scope);
-      if(snapshot.snapshot.kind==='legacy'||snapshot.snapshot.revisionId===null)throw Error('INVALID_SYNC_PAYLOAD');
+      if(!allowed(snapshot.snapshot.kind)||snapshot.snapshot.revisionId===null)throw Error('INVALID_SYNC_PAYLOAD');
       const next:PendingSync={raw,digest:await cloudSnapshotDigest(raw),bytes:bytes(raw),slotId:snapshot.slotId,
         snapshotId:snapshot.snapshot.id,lastAttemptAt:null};
       return change(state=>{
@@ -121,6 +124,7 @@ export function createCloudSyncIntent(driver:AtomicSaveDriver,identity:SyncScope
       const state=await read();requireGeneration(state,generation);
       if(!state.pending)return null;
       const candidate=state.pending;await verify(candidate,scope);
+      if(!allowed((await decodeCloudSnapshot(candidate.raw,scope)).snapshot.kind))throw Error('INVALID_SYNC_PAYLOAD');
       return change(current=>{
         requireGeneration(current,generation);
         if(!current.pending||!matches(current.pending,candidate)||current.pending.raw!==candidate.raw)return null;

@@ -130,3 +130,29 @@ test('account save drivers isolate all local reads, writes, atomic updates and d
   await a.delete('slot');assert.equal(await a.get('slot'),undefined);assert.equal(await d.get('slot'),'guest');assert.equal(await b.get('slot'),'second');
   assert.throws(()=>accountSaveDriver(d,'invalid'),/INVALID_SAVE_ACCOUNT/);
 });
+
+test('pinned sync has separate opt-in and pending bytes, never sends autosaves to named lane',async()=>{
+  const {d}=driver();let now=1000;
+  const auto=createCloudSyncIntent(d,scope,()=>now),pinned=createCloudSyncIntent(d,scope,()=>now,'pinned');
+  const g=(await pinned.setEnabled(true))!,raw=await payload('manual backup');
+  assert.equal((await auto.status()).enabled,false);
+  await assert.rejects(pinned.stage(g,raw),/INVALID_SYNC_PAYLOAD/);
+  const value=await decodeCloudSnapshot(raw,scope);value.snapshot.kind='backup';
+  const backup=await encodeCloudSnapshot(value),sent:string[]=[];let rows:unknown[]=[],fail=true;
+  const deps={scope,intent:pinned,signal:new AbortController().signal,isActive:()=>true,online:()=>true,nextPinnedSave:async()=>backup,
+    request:async(url:string,init:RequestInit)=>{
+      assert.ok(url.endsWith('/cloud-snapshots'));const headers=new Headers(init.headers);
+      assert.equal(headers.get('x-slopboy-sync-account'),scope.accountId);assert.equal(headers.get('x-slopboy-sync-device'),null);
+      if(init.method==='POST'){
+        const raw=String(init.body);sent.push(raw);const v=await decodeCloudSnapshot(raw,scope),s=v.snapshot;
+        rows=[{id:crypto.randomUUID(),slotId:v.slotId,slotName:v.slotName,snapshotId:s.id,snapshotName:s.name,kind:s.kind,revisionId:s.revisionId,
+          releaseVersion:s.releaseVersion,schemaVersion:s.schemaVersion,hardwareId:v.hardwareId+'@'+v.hardwareVersion,snapshotCreatedAt:s.createdAt,payloadBytes:s.bytes,payloadDigest:s.digest,
+          bytes:new TextEncoder().encode(raw).byteLength,digest:await cloudSnapshotDigest(raw),storedAt:new Date().toISOString()}];
+        if(fail)throw Error('lost response');
+      }
+      return Response.json({snapshots:rows,usedBytes:1000});
+    }};
+  assert.equal(await runManagedSyncCycle(deps),'unavailable');assert.equal((await pinned.status()).pending,true);assert.equal((await auto.status()).pending,false);
+  now+=SYNC_CYCLE_MS;fail=false;assert.equal(await runManagedSyncCycle(deps),'synced');assert.deepEqual(sent,[backup,backup]);
+  now+=SYNC_CYCLE_MS;assert.equal(await runManagedSyncCycle(deps),'idle');assert.equal(sent.length,2);
+});
