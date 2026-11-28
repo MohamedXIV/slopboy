@@ -1,0 +1,3 @@
+# Managed restore UI
+
+Inside Autosaves, explicit Show cloud devices discovers the verified account's streams. Select a browser to list its five most recent synced autosaves. Source-device IDs are only used in GETs; upload scope remains the mounted browser. Restore reuses exact digest and metadata verification, game compatibility and host save lock. Copy imports a new independent local fork; restore and play activates that fork. No automatic replacement or network discovery on opening saves. Browser labels currently use installation ID prefixes, not user-editable names. Production flag and restricted DB grants remain disabled pending acceptance. No automatic manual save sync.

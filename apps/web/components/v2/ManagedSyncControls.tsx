@@ -68,7 +68,7 @@ export function useManagedSync(available:boolean,gameId:string,hardwareId:string
     finally{setBusy(false);}
   }
   if(!available||!context||context.scope.gameId!==gameId||context.scope.accountId!==accountId)return null;
-  return {enabled:Boolean(context.generation),busy,message,confirm,setConfirm,change};
+  return {deviceId:context.scope.deviceId,enabled:Boolean(context.generation),busy,message,confirm,setConfirm,change};
 }
 type State=NonNullable<ReturnType<typeof useManagedSync>>;
 export function ManagedSyncControls({state}:{state:State}){

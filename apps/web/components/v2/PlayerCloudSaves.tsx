@@ -83,7 +83,7 @@ export function CloudSaveControls({state,busy}:{state:PlayerCloudState;busy:bool
     {state.notice&&<p role="status" data-testid="cloud-save-notice">{state.notice}</p>}
   </div>;
 }
-export function CloudRestoreConfirmation({state,local,identity,schema,busy}:{state:PlayerCloudState;local:SlotListing|null;identity:CloudSnapshotIdentity;schema:number;busy:boolean}){
+export function CloudRestoreConfirmation({state,local,identity,schema,busy}:{state:Pick<PlayerCloudState,'choice'|'name'|'setName'|'restore'|'cancel'|'keepLocal'>;local:SlotListing|null;identity:CloudSnapshotIdentity;schema:number;busy:boolean}){
   const row=state.choice;if(!row)return null;
   const comparison=localComparison(row,local);
   return <div className="v2-save-manager-slot" aria-label="Restore cloud save" data-testid="cloud-restore-confirm">
