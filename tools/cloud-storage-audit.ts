@@ -51,7 +51,10 @@ function parseMetadata(input:unknown){
   const transactionalRows=input.transactionalRows??0,transactionalBytes=input.transactionalBytes??0;
   if(!size(transactionalRows,1000)||!size(transactionalBytes,16*1024*1024)||
     (transactionalRows===0)!==(transactionalBytes===0)||((transactionalRows>0||transactionalBytes>0)&&input.managedIncluded!==true))throw Error('INVALID_TRANSACTIONAL_INVENTORY');
-  return {captured,rows,managedIncluded:input.managedIncluded===true,transactionalRows,transactionalBytes};
+  const namedTransactionalRows=input.namedTransactionalRows??0,namedTransactionalBytes=input.namedTransactionalBytes??0;
+  if(!size(namedTransactionalRows,1000)||!size(namedTransactionalBytes,16*1024*1024)||
+    (namedTransactionalRows===0)!==(namedTransactionalBytes===0)||((namedTransactionalRows>0||namedTransactionalBytes>0)&&input.managedIncluded!==true))throw Error('INVALID_NAMED_TRANSACTIONAL_INVENTORY');
+  return {captured,rows,managedIncluded:input.managedIncluded===true,transactionalRows,transactionalBytes,namedTransactionalRows,namedTransactionalBytes};
 }
 function parseObjects(input:unknown,captured:number){
   if(!obj(input)||input.IsTruncated!==false||input.Prefix!=='backups/'||input.NextContinuationToken||
@@ -72,7 +75,7 @@ function parseObjects(input:unknown,captured:number){
   return objects;
 }
 export function compareCloudInventory(metadata:unknown,storage:unknown,storageCapturedAt:string){
-  const {captured,rows,managedIncluded,transactionalRows,transactionalBytes}=parseMetadata(metadata),storageCaptured=timestamp(storageCapturedAt);
+  const {captured,rows,managedIncluded,transactionalRows,transactionalBytes,namedTransactionalRows,namedTransactionalBytes}=parseMetadata(metadata),storageCaptured=timestamp(storageCapturedAt);
   if(Math.abs(captured-storageCaptured)>MAX_CAPTURE_SKEW_MS)throw Error('INVENTORY_CAPTURE_SKEW');
   const objects=parseObjects(storage,storageCaptured);
   const cutoff=Math.min(captured,storageCaptured)-STALE_AFTER_MS;
@@ -96,7 +99,7 @@ export function compareCloudInventory(metadata:unknown,storage:unknown,storageCa
   for(const entry of entries)counts[entry.category]=(counts[entry.category]??0)+1;
   return {format:'slopboy-cloud-inventory-audit-v1',mode:'read-only-observations',integrityVerified:false,
     capturedAt:new Date(captured).toISOString(),storageCapturedAt:new Date(storageCaptured).toISOString(),
-    metadataRows:rows.size,storageObjects:objects.size,managedIncluded,transactionalRows,transactionalBytes,
+    metadataRows:rows.size,storageObjects:objects.size,managedIncluded,transactionalRows,transactionalBytes,namedTransactionalRows,namedTransactionalBytes,
     retiredReservedBytes:[...rows.values()].filter(row=>row.retired).reduce((n,row)=>n+row.bytes,0),
     reservedBytes:entries.reduce((n,e)=>n+e.reservedBytes,0),
     observedObjectBytes:entries.reduce((n,e)=>n+e.objectBytes,0),
