@@ -14,7 +14,7 @@ import {V2_DEVICE_1000,V2_LCD_PALETTES,V2_SHELLS,type V2PaletteId,type V2ShellId
 import {loadBundledCartridge,type BrowserCartridge} from '@slopboy/runtime/cartridge-browser';
 import {SANDBOX_DOCUMENT} from '@slopboy/runtime/sandbox-document';
 import {rasterizeFrame,validateFrame} from '@slopboy/runtime/protocol';
-import {browserSaveDriver,createGameSaveService,validSave} from '@slopboy/runtime/save-store';
+import {browserSaveDriver,accountSaveDriver,createGameSaveService,validSave} from '@slopboy/runtime/save-store';
 import {RetroScreenRenderer} from './RetroScreenRenderer';
 import {DEFAULT_SCREEN_FX,SCREEN_FX_PRESETS,SCREEN_FX_PRESET_META,SCREEN_FX_LEVELS,SCREEN_FX_STORAGE_KEY,
   sanitizeScreenFx,isScreenFxActive,editScreenFx,countActiveScreenFx,
@@ -65,7 +65,8 @@ const CYCLE_BUTTONS:ReadonlyArray<{name:InputName;label:string;className:string}
 
 const PRESET_ORDER=['clean','lcd','phosphor'] as const;
 
-export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:PlayableGame;managedSyncAvailable?:boolean}){
+export default function V2DevicePlayer({game,managedSyncAvailable=false,saveAccountId=null}:{game:PlayableGame;managedSyncAvailable?:boolean;saveAccountId?:string|null}){
+  const saveDriver=useMemo(()=>saveAccountId?accountSaveDriver(browserSaveDriver,saveAccountId):browserSaveDriver,[saveAccountId]);
   const [cartridge,setCartridge]=useState<BrowserCartridge|null>(null);
   const [saved,setSaved]=useState<{epoch:number;value:string|null;session?:SaveSession}|null>(null);
   const reviewedCapability=useMemo(()=>reviewedPixelSaveCapabilities(game.gameId,game.revisionId),[game.gameId,game.revisionId]);
@@ -75,11 +76,11 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:P
   const manualSupported=supportsManualSave(capability);
   const autoSupported=supportsAutosave(capability);
   const legacyLane=reviewedCapability?.mode==='auto';
-  const slotStore=useMemo(()=>capability&&supportsProgressSave(capability)?createSlotSaveStore(browserSaveDriver,{
+  const slotStore=useMemo(()=>capability&&supportsProgressSave(capability)?createSlotSaveStore(saveDriver,{
     gameId:game.gameId,revisionId:game.revisionId,releaseVersion:null,hardwareId:DEVICE.id,
     hardwareVersion:DEVICE.version,capabilities:capability
-  }):null,[game.gameId,game.revisionId,capability]);
-  const sync=useManagedSync(managedSyncAvailable&&game.status==='published'&&supportsAutosave(reviewedCapability),game.gameId,DEVICE.id,DEVICE.version,slotStore);
+  }):null,[game.gameId,game.revisionId,capability,saveDriver]);
+  const sync=useManagedSync(managedSyncAvailable&&game.status==='published'&&supportsAutosave(reviewedCapability),game.gameId,DEVICE.id,DEVICE.version,slotStore,saveAccountId);
   const [saveManagerOpen,setSaveManagerOpen]=useState(false);
   const [saveListing,setSaveListing]=useState<SlotListing|null>(null);
   const [legacyAvailable,setLegacyAvailable]=useState(false);
@@ -234,7 +235,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:P
     if(!cartridge)return;
     let active=true;
     setSaved(null);
-    const legacy=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
+    const legacy=createGameSaveService(saveDriver,DEVICE,gameSaveIdentity(game));
     const start=writeChain.current.then(async()=>{
       if(!active)return;
       if(preparedBoot.current?.epoch===epoch){setSaved(preparedBoot.current);return;}
@@ -313,7 +314,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:P
         if(!slotStore&&now-lastSave.current<250)return;
         lastSave.current=now;
         const value=msg.value as string|null;
-        const store=createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game));
+        const store=createGameSaveService(saveDriver,DEVICE,gameSaveIdentity(game));
         const bound=saved.session;
         writeChain.current=writeChain.current.then(async()=>{
           if(slotStore&&bound){
@@ -468,7 +469,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:P
         case 'delete-permanent':await slotStore.deletePermanentSave(action.target);break;
         case 'backup-snapshot':await slotStore.backupSnapshot(action.slotId,action.snapshotId,action.name);break;
         case 'legacy':{
-          const value=await createGameSaveService(browserSaveDriver,DEVICE,gameSaveIdentity(game)).read();
+          const value=await createGameSaveService(saveDriver,DEVICE,gameSaveIdentity(game)).read();
           if(value===null)throw Error('Legacy save unavailable');
           if(saved?.session)await slotStore.close(saved.session);
           restartWith({value});savePaused.current=false;setSaveManagerOpen(false);break;
@@ -988,8 +989,8 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:P
               legacyAvailable={legacyAvailable} schema={capability?.schemaVersion??1} busy={saveBusy} notice={saveNotice}
               autoSupported={autoSupported} manualSupported={manualSupported} manualReady={status==='running'&&Boolean(saved?.session)}
               onAction={saveAction} onClose={closeSaveManager} syncControls={sync?<ManagedSyncControls state={sync}/>:undefined}
-              cloud={game.status==='published'&&supportsProgressSave(reviewedCapability)?{
-                identity:{gameId:game.gameId,hardwareId:DEVICE.id,hardwareVersion:DEVICE.version},withLock:withCloudLock,
+              cloud={game.status==='published'&&supportsProgressSave(reviewedCapability)&&(!managedSyncAvailable||saveAccountId)?{
+                identity:{gameId:game.gameId,hardwareId:DEVICE.id,hardwareVersion:DEVICE.version},expectedAccount:saveAccountId??undefined,withLock:withCloudLock,
                 exportSnapshot:async(slotId,snapshotId)=>{await flushSaves();return slotStore.exportCloudSnapshot(slotId,snapshotId);},
                 importSnapshot:async(raw,name,activate,signal)=>{
                   if(activate)await flushSaves();signal.throwIfAborted();
@@ -1014,6 +1015,7 @@ export default function V2DevicePlayer({game,managedSyncAvailable=false}:{game:P
 
           {slotStore&&<div className="v2-save-current" role="status">
             <strong>{saved?.session?autoSupported?'Autosave enabled':'Manual saves':legacyAvailable?'Original save':'Preparing save…'}</strong>
+            {saveAccountId&&<span> · Account-local saves</span>}
             {saveNotice&&<span> · {saveNotice}</span>}
           </div>}
           <div className="v2-controlbar">

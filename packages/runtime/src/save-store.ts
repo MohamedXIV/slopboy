@@ -158,6 +158,17 @@ async function transaction<T>(mode:IDBTransactionMode,operation:(store:IDBObject
 export interface AtomicSaveDriver extends SaveDriver {
   update<T>(key:string,change:(raw:unknown)=>{value:string;result:T}):Promise<T>;
 }
+/** Account-isolated local lane. No implicit import or deletion of guest progress.
+ * The caller must establish a trusted account before mounting a game. */
+export function accountSaveDriver(driver:AtomicSaveDriver,accountId:string):AtomicSaveDriver{
+  if(!UUID_PATTERN.test(accountId))throw Error('INVALID_SAVE_ACCOUNT');
+  const key=(value:string)=>'slopboy-account-save-v1:'+accountId.toLowerCase()+':'+value;
+  return {
+    get:k=>driver.get(key(k)),put:(k,v)=>driver.put(key(k),v),delete:k=>driver.delete(key(k)),
+    update:(k,change)=>driver.update(key(k),change),
+    ...(driver.copyIfAbsent?{copyIfAbsent:(from:string,to:string,transform:(raw:unknown)=>string|undefined)=>driver.copyIfAbsent!(key(from),key(to),transform)}:{}),
+  };
+}
 export const browserSaveDriver:AtomicSaveDriver={
   update:async <T>(key:string,change:(raw:unknown)=>{value:string;result:T})=>{
     const db=await connect();

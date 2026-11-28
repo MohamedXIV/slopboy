@@ -4,7 +4,7 @@ import {createCloudSyncIntent,getCloudSyncDeviceId,SYNC_RETRY_MS,SYNC_CYCLE_MS,t
 import {encodeCloudSnapshot,CLOUD_SNAPSHOT_FORMAT,cloudSnapshotDigest} from '../packages/runtime/src/cloud-snapshot.ts';
 import {runManagedSyncCycle} from '../apps/web/components/v2/managed-sync-worker.ts';
 import {decodeCloudSnapshot} from '../packages/runtime/src/cloud-snapshot.ts';
-import type {AtomicSaveDriver} from '../packages/runtime/src/save-store.ts';
+import {accountSaveDriver,type AtomicSaveDriver} from '../packages/runtime/src/save-store.ts';
 
 function driver(){
   const records=new Map<string,string>();let chain:Promise<unknown>=Promise.resolve();
@@ -119,4 +119,14 @@ test('browser installation identity is atomic, stable across tabs and refuses co
   const {d,records}=driver();const ids=await Promise.all([getCloudSyncDeviceId(d),getCloudSyncDeviceId(d),getCloudSyncDeviceId(d)]);
   assert.equal(new Set(ids).size,1);assert.equal(await getCloudSyncDeviceId(d),ids[0]);
   records.set([...records.keys()][0],'bad-device');await assert.rejects(getCloudSyncDeviceId(d),/INVALID_SYNC_DEVICE/);
+});
+
+test('account save drivers isolate all local reads, writes, atomic updates and deletion from guests and other accounts',async()=>{
+  const {d}=driver(),a=accountSaveDriver(d,scope.accountId),b=accountSaveDriver(d,crypto.randomUUID());
+  await d.put('slot','guest');await a.put('slot','first');await b.put('slot','second');
+  assert.equal(await a.get('slot'),'first');assert.equal(await b.get('slot'),'second');assert.equal(await d.get('slot'),'guest');
+  await a.update('slot',raw=>{assert.equal(raw,'first');return {value:'updated',result:true};});
+  assert.equal(await accountSaveDriver(d,scope.accountId).get('slot'),'updated');
+  await a.delete('slot');assert.equal(await a.get('slot'),undefined);assert.equal(await d.get('slot'),'guest');assert.equal(await b.get('slot'),'second');
+  assert.throws(()=>accountSaveDriver(d,'invalid'),/INVALID_SAVE_ACCOUNT/);
 });

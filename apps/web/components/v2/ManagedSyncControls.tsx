@@ -12,32 +12,27 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const STATUS:Record<string,string>={disabled:'Off',offline:'Offline — local saves still work',throttled:'Waiting for next sync',
   idle:'No new autosave to upload',synced:'Latest autosave backed up',pending:'Waiting to retry',quota:'Cloud quota reached',
   'rate-limited':'Cloud request limit reached',unavailable:'Cloud unavailable — local saves retained',retired:'Old upload retired — sync paused',cancelled:'Sync paused'};
-export function useManagedSync(available:boolean,gameId:string,hardwareId:string,hardwareVersion:string,store:Store|null){
+export function useManagedSync(available:boolean,gameId:string,hardwareId:string,hardwareVersion:string,store:Store|null,accountId:string|null){
   const [context,setContext]=useState<Context|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState('');
   const [confirm,setConfirm]=useState(false);
   const live=useRef<AbortController|null>(null);
   useEffect(()=>{
-    if(!available||!store)return;
+    if(!available||!store||!accountId||!UUID.test(accountId))return;
+    const verifiedAccount=accountId;
     const controller=new AbortController();
     async function discover(){
       try{
-        const response=await fetch('/api/account/cloud-sync',{cache:'no-store',credentials:'same-origin',redirect:'error',signal:controller.signal});
-        if(!response.ok)return;
-        const result:unknown=await response.json();
-        if(!result||typeof result!=='object'||!('accountId' in result)||typeof result.accountId!=='string'||!UUID.test(result.accountId))return;
         const deviceId=await getCloudSyncDeviceId(browserSaveDriver);
-        const scope={accountId:result.accountId,deviceId,gameId,hardwareId,hardwareVersion};
+        const scope:SyncScope={accountId:verifiedAccount,deviceId,gameId,hardwareId,hardwareVersion};
         const intent=createCloudSyncIntent(browserSaveDriver,scope),status=await intent.status();
         if(!controller.signal.aborted)setContext({scope,intent,generation:status.generation,pending:status.pending});
       }catch{/* Guest, offline and unavailable storage must not block local play. */}
     }
     void discover();
-    // Reconnect may discover the authorized account if initial load was offline.
-    window.addEventListener('online',discover);
-    return()=>{controller.abort();window.removeEventListener('online',discover);};
-  },[available,gameId,hardwareId,hardwareVersion,store]);
+    return()=>controller.abort();
+  },[available,gameId,hardwareId,hardwareVersion,store,accountId]);
   useEffect(()=>{
-    if(!available||!store||!context?.generation)return;
+    if(!available||!store||!context?.generation||context.scope.accountId!==accountId)return;
     const controller=new AbortController();live.current=controller;
     let running=false,stopped=false;
     const tick=async()=>{
@@ -60,7 +55,7 @@ export function useManagedSync(available:boolean,gameId:string,hardwareId:string
     window.addEventListener('online',wake);document.addEventListener('visibilitychange',wake);
     return()=>{controller.abort();window.clearInterval(timer);window.removeEventListener('online',wake);document.removeEventListener('visibilitychange',wake);
       if(live.current===controller)live.current=null;};
-  },[available,store,context]);
+  },[available,store,context,accountId]);
   async function change(enabled:boolean){
     if(!context||busy)return;
     if(!enabled)live.current?.abort();
@@ -72,7 +67,7 @@ export function useManagedSync(available:boolean,gameId:string,hardwareId:string
     }catch{setMessage('Could not update sync preference. Reopen the game to retry.');}
     finally{setBusy(false);}
   }
-  if(!available||!context||context.scope.gameId!==gameId)return null;
+  if(!available||!context||context.scope.gameId!==gameId||context.scope.accountId!==accountId)return null;
   return {enabled:Boolean(context.generation),busy,message,confirm,setConfirm,change};
 }
 type State=NonNullable<ReturnType<typeof useManagedSync>>;
@@ -85,7 +80,7 @@ export function ManagedSyncControls({state}:{state:State}){
     </div>
     <small>{state.message||(state.enabled?'On — latest autosave only':'Off')}</small>
     {state.confirm&&<div>
-      <p>Back up this browser’s game progress to the signed-in account? Existing local saves may have been created by a guest or another player. Only enable this on a device you trust.</p>
+      <p>Back up this account’s local autosaves? Guest saves and other accounts’ progress stay separate. You can turn sync off at any time.</p>
       <div className="v2-save-manager-actions"><Button size="sm" variant="primary" isDisabled={state.busy} onPress={()=>void state.change(true)}>Enable sync</Button>
         <Button size="sm" variant="secondary" onPress={()=>state.setConfirm(false)}>Cancel</Button></div>
     </div>}
