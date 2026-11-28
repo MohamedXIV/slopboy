@@ -1,0 +1,585 @@
+/**
+ * Slopboy Save Manager — HeroUI v3 themed overlay.
+ * Consumes semantic tokens from slopboy-theme.css & slopboy-components.css.
+ */
+
+@keyframes sb-save-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sb-save-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sb-save-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.v2-player[data-v2-theme] .sb-save-manager.v2-save-manager,
+.sb-save-manager.v2-save-manager {
+  position: absolute;
+  inset: 12px;
+  z-index: 30;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 20px 22px;
+  border-radius: 22px;
+  background: var(--background);
+  color: var(--sb-ui-ink);
+  border: 1px solid var(--border);
+  box-shadow: var(--overlay-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: left;
+  animation: sb-save-enter 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sb-save-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--separator);
+}
+
+.sb-save-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sb-save-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  background: var(--sb-ui-field);
+  color: var(--sb-ui-primary);
+  flex-shrink: 0;
+}
+
+.sb-save-title-wrap h2 {
+  margin: 0;
+  font-size: 1.08rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--sb-ui-ink);
+  line-height: 1.15;
+}
+
+.sb-save-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.sb-save-sfx-btn {
+  min-width: 34px;
+  padding-inline: 8px;
+}
+
+.sb-save-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* HeroUI Tabs-aligned segmented pill control */
+.sb-save-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 9999px;
+  background: var(--sb-ui-field);
+  border: 1px solid var(--sb-ui-line);
+}
+
+.sb-save-segmented .sb-save-tab-btn {
+  border-radius: 9999px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  gap: 6px;
+}
+
+.sb-save-segmented .sb-save-tab-btn[aria-pressed='true'] {
+  background: var(--sb-ui-surface);
+  color: var(--sb-ui-ink);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.14);
+}
+
+.sb-save-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--sb-ui-field);
+  color: var(--sb-ui-ink);
+}
+
+.sb-save-primary-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Rolling 5-slot Autosave Ring Meter */
+.sb-save-ring-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 14px;
+  border-radius: 14px;
+  background: var(--sb-ui-soft);
+  border: 1px solid var(--border);
+  font-size: 0.79rem;
+  color: var(--muted);
+}
+
+.sb-save-ring-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--sb-ui-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-save-ring-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: var(--sb-ui-line);
+  transition: background-color 180ms ease, transform 180ms ease;
+}
+
+.sb-save-ring-dot.is-filled {
+  background: var(--sb-ui-primary);
+  transform: scale(1.1);
+}
+
+/* Search & Sort Row */
+.sb-save-filter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.sb-save-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sb-save-search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sb-save-search-field {
+  width: 100%;
+}
+
+.sb-save-search-field .input {
+  min-height: 38px;
+  padding-left: 36px;
+  padding-right: 14px;
+  font-size: 0.86rem;
+}
+
+.sb-save-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Inline Editor & Confirmation Panels */
+.sb-save-inline-panel {
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--sb-ui-surface);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: sb-save-expand 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sb-save-inline-panel.is-danger {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.sb-save-inline-panel p {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.sb-save-inline-panel strong {
+  font-size: 0.92rem;
+  color: var(--sb-ui-ink);
+}
+
+/* Save List & Cards */
+.sb-save-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sb-save-card {
+  position: relative;
+  padding: 13px 15px;
+  border-radius: 18px;
+  background: var(--sb-ui-surface);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: border-color 160ms ease, transform 160ms ease, background-color 160ms ease;
+  animation: sb-save-card-in 200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--sb-i, 0) * 28ms);
+}
+
+.sb-save-card:hover {
+  border-color: color-mix(in srgb, var(--sb-ui-primary) 48%, var(--border));
+  transform: translateY(-1px);
+}
+
+.sb-save-card.is-active {
+  border-color: var(--sb-ui-primary);
+  box-shadow: inset 3px 0 0 var(--sb-ui-primary);
+}
+
+.sb-save-card.is-cloud-only {
+  border-style: dashed;
+}
+
+.sb-save-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sb-save-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1 1 200px;
+}
+
+.sb-save-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.sb-save-card-name {
+  font-size: 0.94rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--sb-ui-ink);
+  word-break: break-word;
+}
+
+.sb-save-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.sb-save-timestamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.sb-save-location-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.sb-save-location-pill.is-synced {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.sb-save-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.sb-save-details-drawer {
+  padding-top: 10px;
+  border-top: 1px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: sb-save-expand 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sb-save-tech {
+  font-size: 0.73rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--muted);
+}
+
+/* Cloud & Auto-Sync Compact Strip */
+.sb-cloud-strip {
+  padding: 11px 14px;
+  border-radius: 16px;
+  background: var(--sb-ui-soft);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.sb-cloud-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sb-cloud-strip-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.sb-cloud-quota-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sb-cloud-quota-bar {
+  width: 64px;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--sb-ui-line);
+  overflow: hidden;
+}
+
+.sb-cloud-quota-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--sb-ui-primary);
+  transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sb-cloud-usage-text {
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.sb-cloud-manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--separator);
+  animation: sb-save-expand 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sb-cloud-manage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--sb-ui-surface);
+  border: 1px solid var(--border);
+}
+
+.sb-cloud-manage-row p {
+  margin: 2px 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Auto-Sync Compact Toggle Rows */
+.sb-sync-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.sb-sync-card {
+  padding: 10px 13px;
+  border-radius: 15px;
+  background: var(--sb-ui-soft);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sb-sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sb-sync-label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sb-sync-label-wrap strong {
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--sb-ui-ink);
+}
+
+.sb-sync-status {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* Empty & Loading States */
+.sb-save-empty {
+  padding: 26px 16px;
+  border-radius: 18px;
+  border: 1px dashed var(--border);
+  text-align: center;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+}
+
+.sb-save-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.sb-save-notice-alert {
+  padding: 10px 14px;
+  animation: sb-save-expand 160ms ease both;
+}
+
+.sb-save-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 560px) {
+  .v2-player[data-v2-theme] .sb-save-manager.v2-save-manager,
+  .sb-save-manager.v2-save-manager {
+    inset: 6px;
+    padding: 14px;
+    border-radius: 16px;
+  }
+  .sb-save-filter-row {
+    grid-template-columns: 1fr;
+  }
+  .sb-save-card-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-player[data-v2-theme] .sb-save-manager.v2-save-manager,
+  .sb-save-manager.v2-save-manager,
+  .sb-save-card,
+  .sb-save-inline-panel,
+  .sb-save-details-drawer,
+  .sb-cloud-manage-list,
+  .sb-save-notice-alert {
+    animation: none;
+    transition: none;
+  }
+  .sb-save-card:hover {
+    transform: none;
+  }
+}
