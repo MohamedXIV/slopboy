@@ -12,11 +12,13 @@ WITH inventory AS (
  UNION ALL
  SELECT 'managed',m.id,m.account_id,m.game_id,m.storage_key,m.byte_size,m.digest,m.status,
         m.created_at,m.ready_at,to_jsonb(m)->>'last_attempt_at',m.retired_at
- FROM public.managed_auto_snapshots m
+ FROM public.managed_auto_snapshots m WHERE m.storage_key IS NOT NULL
 ), bounded AS (
  SELECT * FROM inventory ORDER BY storage_key LIMIT 1001
 )
 SELECT jsonb_build_object('capturedAt',statement_timestamp(),'complete',count(*)<=1000,'managedIncluded',true,
+ 'transactionalRows',(SELECT count(*) FROM public.managed_auto_snapshots WHERE storage_key IS NULL),
+ 'transactionalBytes',(SELECT coalesce(sum(byte_size),0) FROM public.managed_auto_snapshots WHERE storage_key IS NULL),
  'rows',coalesce(jsonb_agg(jsonb_build_object(
  'lane',lane,'id',id,'accountId',account_id,'gameId',game_id,'key',storage_key,
  'bytes',byte_size,'digest',digest,'status',status,'createdAt',created_at,

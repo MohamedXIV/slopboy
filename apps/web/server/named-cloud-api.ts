@@ -27,6 +27,10 @@ export interface NamedCloudDependencies {
   upload(key:string,account:string,game:string,id:string,digest:string,bytes:Uint8Array):Promise<void>;
   download(key:string,account:string,game:string,id:string,digest:string,bytes:number):Promise<Uint8Array>;
 }
+export type AtomicManagedDependencies=Pick<NamedCloudDependencies,'enabled'|'subject'|'role'|'game'|'consumeRequest'|'list'>&{
+  store(account:string,game:string,raw:string):Promise<Reservation|null>;
+  read(account:string,game:string,id:string):Promise<{id:string;digest:string;bytes:number;snapshot:string}|null>;
+};
 export function namedCloudEnabled(env:Readonly<Record<string,string|undefined>>):boolean {
   return env.CLOUD_NAMED_SNAPSHOTS_ENABLED==='1';
 }
@@ -67,8 +71,9 @@ export function eligibleSnapshot(value:CloudSnapshot,game:CloudGame):boolean {
 }
 export type ManagedCloudScope={expectedAccount:string;deviceId:string};
 export function managedCloudEnabled(env:Readonly<Record<string,string|undefined>>):boolean{return env.CLOUD_MANAGED_AUTOSAVES_ENABLED==='1';}
-export async function handleNamedCloud(request:Request,gameId:string,deps:NamedCloudDependencies,managed?:ManagedCloudScope):Promise<Response>{
+export async function handleNamedCloud(request:Request,gameId:string,deps:NamedCloudDependencies|AtomicManagedDependencies,managed?:ManagedCloudScope):Promise<Response>{
   try{
+    if('store' in deps&&!managed)return error('NOT_FOUND',404);
     if(!deps.enabled())return error('NOT_FOUND',404);
     const create=request.method==='POST';
     if(!create&&request.method!=='GET')return error('METHOD_NOT_ALLOWED',405);
@@ -102,6 +107,17 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
       }
       const id=ids[0].toLowerCase();
       if(!isGameUuid(id))return error('NOT_FOUND',404);
+      if('read' in deps){
+        const row=await deps.read(account,gameKey,id);
+        if(!row)return error('NOT_FOUND',404);
+        if(row.id!==id||typeof row.snapshot!=='string'||!Number.isSafeInteger(row.bytes)||row.bytes<1||row.bytes>CLOUD_SNAPSHOT_MAX_BYTES||
+          !/^[a-f0-9]{64}$/.test(row.digest))return error('UNAVAILABLE',503);
+        const bytes=new TextEncoder().encode(row.snapshot);
+        if(bytes.byteLength!==row.bytes||hash(bytes)!==row.digest)return error('UNAVAILABLE',503);
+        const value=await decodeCloudSnapshot(row.snapshot,identity);
+        if(value.snapshot.kind!=='auto')return error('UNAVAILABLE',503);
+        return json({snapshot:row.snapshot});
+      }
       const row=await deps.lookup(account,gameKey,id);
       if(!row)return error('NOT_FOUND',404);
       if(row.id!==id||row.bytes<1||row.bytes>CLOUD_SNAPSHOT_MAX_BYTES||!Number.isSafeInteger(row.bytes)||
@@ -122,6 +138,16 @@ export async function handleNamedCloud(request:Request,gameId:string,deps:NamedC
       value=await decodeCloudSnapshot(raw,identity);
       if(!eligibleSnapshot(value,game)||(managed&&value.snapshot.kind!=='auto'))throw Error('UNREVIEWED_SAVE');
     }catch{return error('INVALID_SAVE',400);}
+    if('store' in deps){
+      const stored=await deps.store(account,gameKey,new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes));
+      if(!stored)return error('UNAVAILABLE',503);
+      if(stored.outcome==='not_found')return error('NOT_FOUND',404);
+      if(stored.outcome==='invalid')return error('INVALID_SAVE',400);
+      if(stored.outcome==='quota')return error('BACKUP_QUOTA',409);
+      if(stored.outcome==='in_progress')return error('BACKUP_IN_PROGRESS',409);
+      if(!['stored','replayed'].includes(stored.outcome))return error('UNAVAILABLE',503);
+      return listing(stored,stored.outcome==='stored'?201:200);
+    }
     const digest=hash(bytes);
     const reserved=await deps.reserve(account,gameKey,digest,bytes.byteLength,snapshotMetadata(value));
     if(!reserved)return error('UNAVAILABLE',503);
